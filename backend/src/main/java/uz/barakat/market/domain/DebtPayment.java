@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,11 +16,12 @@ import lombok.Setter;
  * increase of it. Exactly one of {@code debtorId} / {@code customerDebtId}
  * is set (enforced by a database CHECK constraint).
  */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "debt_payments")
 @Getter
 @Setter
-public class DebtPayment extends BaseEntity {
+public class DebtPayment extends TenantScopedEntity {
 
     @Column(name = "debtor_id")
     private Long debtorId;

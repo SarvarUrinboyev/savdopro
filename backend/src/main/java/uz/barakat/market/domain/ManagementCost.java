@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,11 +15,12 @@ import lombok.Setter;
  * A management cost entry (salary, tax or other). Subtracted from gross
  * profit on the Management page to give the net profit.
  */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "management_costs")
 @Getter
 @Setter
-public class ManagementCost extends BaseEntity {
+public class ManagementCost extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;

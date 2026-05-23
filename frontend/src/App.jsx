@@ -48,6 +48,7 @@ export default function App() {
 }
 
 function Authenticated() {
+  const auth = useAuth();
   const { data: shift, loading, error, reload } = useApi(() => ShiftApi.current(), []);
 
   if (loading) {
@@ -59,6 +60,15 @@ function Authenticated() {
   }
 
   if (error) {
+    // Auth-related failures: bounce back to login. The api client has
+    // already cleared the JWT, so logging out completes the reset and
+    // App.jsx will render <Login /> on the next render.
+    const isAuth = /\b(401|403)\b/.test(String(error))
+      || /sessiya|akkaunt/i.test(String(error));
+    if (isAuth) {
+      auth.logout();
+      return null;
+    }
     return (
       <div className="center-screen">
         <div className="empty">

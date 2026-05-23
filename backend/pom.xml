@@ -42,6 +42,13 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
+        <!-- AOP: used to enable the Hibernate "tenantFilter" around every
+             service call so reads are automatically scoped by shop_id. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- JWT for stateless session tokens (desktop app remembers via localStorage) -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

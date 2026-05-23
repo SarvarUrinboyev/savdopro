@@ -22,10 +22,15 @@ export function AuthProvider({ children }) {
       const me = await AuthApi.me();
       setUser(me);
     } catch (err) {
+      // Always drop session state on a failed /me — a bad token, an
+      // expired one or a blocked account should all land on /login.
+      setToken(null);
       setUser(null);
-      // If the token was rejected the api layer already cleared it; we
-      // only surface the message when there *was* a token to begin with.
-      if (getToken()) setError(err.message);
+      // Surface the error only if it isn't a plain "no session" 401/403,
+      // which the user expects (they need to log in).
+      const benign = /\b(401|403)\b/.test(String(err.message))
+        || /sessiya|akkaunt/i.test(String(err.message));
+      if (!benign) setError(err.message);
     } finally {
       setLoading(false);
     }

@@ -4,15 +4,17 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** A warehouse / inventory item (phone, accessory, electronics). */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "products")
 @Getter
 @Setter
-public class Product extends BaseEntity {
+public class Product extends TenantScopedEntity {
 
     @Column(nullable = false)
     private String name;

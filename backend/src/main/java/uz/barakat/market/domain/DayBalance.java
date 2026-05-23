@@ -5,15 +5,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** The morning cash the owner brought in for a given date. */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "day_balance")
 @Getter
 @Setter
-public class DayBalance extends BaseEntity {
+public class DayBalance extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false, unique = true)
     private LocalDate date;

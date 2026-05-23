@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,11 +19,12 @@ import lombok.Setter;
  * equals {@code amount}, for {@link PaymentType#ARALASH} they are split,
  * and for {@link PaymentType#QARZGA} all three are zero.
  */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "expenses")
 @Getter
 @Setter
-public class Expense extends BaseEntity {
+public class Expense extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;

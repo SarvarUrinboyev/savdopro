@@ -5,15 +5,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** "My debt": an amount the owner owes to a supplier. */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "debtors")
 @Getter
 @Setter
-public class Debtor extends BaseEntity {
+public class Debtor extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;

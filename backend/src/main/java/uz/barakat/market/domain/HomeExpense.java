@@ -7,15 +7,17 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** A home / personal expense, tracked separately from the market. */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "home_expenses")
 @Getter
 @Setter
-public class HomeExpense extends BaseEntity {
+public class HomeExpense extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;

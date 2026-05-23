@@ -6,15 +6,17 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** An incoming goods order expected from a supplier. */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "orders")
 @Getter
 @Setter
-public class Order extends BaseEntity {
+public class Order extends TenantScopedEntity {
 
     @Column(name = "order_date", nullable = false)
     private LocalDate orderDate;

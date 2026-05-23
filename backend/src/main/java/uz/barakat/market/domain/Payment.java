@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,11 +15,12 @@ import lombok.Setter;
  * One entry of the payment journal ("To'lovlar jurnali"): every money
  * movement - customer payments, supplier payments, salaries, taxes.
  */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "payments")
 @Getter
 @Setter
-public class Payment extends BaseEntity {
+public class Payment extends TenantScopedEntity {
 
     @Column(name = "date", nullable = false)
     private LocalDate date;

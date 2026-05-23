@@ -35,10 +35,15 @@ async function request(method, path, body) {
     options.headers.Authorization = `Bearer ${token}`;
   }
   // Tenant scoping: the active shop id is sent on every call so the
-  // backend (Phase 1C-2) can filter rows by shop when needed.
-  const shopId = localStorage.getItem(ACTIVE_SHOP_KEY);
-  if (shopId) {
-    options.headers['X-Shop-Id'] = shopId;
+  // backend (Phase 1C-2) can filter rows by shop when needed. Only send
+  // it when there's an active session — otherwise a stale shop id from
+  // a previous install would tag /api/auth/login with a tenant header
+  // the backend can't validate yet, confusing the customer with a 403.
+  if (token) {
+    const shopId = localStorage.getItem(ACTIVE_SHOP_KEY);
+    if (shopId) {
+      options.headers['X-Shop-Id'] = shopId;
+    }
   }
 
   let response;
@@ -49,8 +54,12 @@ async function request(method, path, body) {
   }
 
   if (response.status === 401 || response.status === 403) {
-    // Token rejected — clear it and notify the app to show /login.
+    // Token rejected — clear all session state and notify the app so it
+    // can drop the user back on the login screen. We clear shopId too so
+    // a stale X-Shop-Id from a deleted shop doesn't keep tripping the
+    // backend on the next request.
     setToken(null);
+    localStorage.removeItem(ACTIVE_SHOP_KEY);
     if (onUnauthorized) onUnauthorized(response.status);
   }
 

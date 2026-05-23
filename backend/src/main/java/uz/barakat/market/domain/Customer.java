@@ -3,15 +3,17 @@ package uz.barakat.market.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** A shop customer ("Mijoz"): name plus contact details. */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "customers")
 @Getter
 @Setter
-public class Customer extends BaseEntity {
+public class Customer extends TenantScopedEntity {
 
     @Column(nullable = false)
     private String name;

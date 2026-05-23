@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,11 +15,12 @@ import lombok.Setter;
  * One line of a customer's ledger: either goods handed over or a
  * payment received. The running balance is sum(GOODS) - sum(PAYMENT).
  */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "customer_transactions")
 @Getter
 @Setter
-public class CustomerTransaction extends BaseEntity {
+public class CustomerTransaction extends TenantScopedEntity {
 
     @Column(name = "customer_id", nullable = false)
     private Long customerId;

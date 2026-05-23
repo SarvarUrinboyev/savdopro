@@ -5,15 +5,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
 
 /** One stock-quantity change for a product (the "Ombor harakatlari"). */
+@Filter(name = "tenantFilter", condition = "shop_id = :shopId")
 @Entity
 @Table(name = "stock_movements")
 @Getter
 @Setter
-public class StockMovement extends BaseEntity {
+public class StockMovement extends TenantScopedEntity {
 
     @Column(name = "product_id", nullable = false)
     private Long productId;
