@@ -93,7 +93,14 @@ async function uploadFile(path, file) {
 
 export const AuthApi = {
   login: (body) => licenseApi.post('/api/auth/login', body),
+  refresh: (body) => licenseApi.post('/api/auth/refresh', body),
+  logout: (body) => licenseApi.post('/api/auth/logout', body),
   me: () => licenseApi.get('/api/auth/me'),
+};
+
+export const AuditApi = {
+  list: (page = 0, size = 50) =>
+    licenseApi.get(`/api/admin/audit${qs({ page, size })}`),
 };
 
 export const ShopApi = {
@@ -193,4 +200,9 @@ export const SupplierApi = {
   create: (body) => api.post('/suppliers', body),
   update: (id, body) => api.put(`/suppliers/${id}`, body),
   remove: (id) => api.del(`/suppliers/${id}`),
+};
+
+export const TransferApi = {
+  list: () => api.get('/transfers'),
+  create: (body) => api.post('/transfers', body),
 };

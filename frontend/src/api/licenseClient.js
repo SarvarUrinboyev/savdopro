@@ -9,10 +9,20 @@
 //   1. ?licenseUrl=... query parameter (injected by Electron main.js)
 //   2. localStorage.savdopro.licenseUrl (set via the in-app settings)
 //   3. http://localhost:9090 (dev fallback)
+//
+// Phase 3.2 refresh flow:
+//   - Login stores BOTH an access JWT (~1h TTL) and a refresh token (~7d).
+//   - On any 401 the client transparently calls /api/auth/refresh with
+//     the stored refresh token, persists the new pair, and retries the
+//     original request once. Only if the refresh itself fails do we
+//     wipe credentials and surface the auth error.
+//   - In-flight refreshes are coalesced via a single promise so 20
+//     parallel requests don't trigger 20 refreshes.
 
 import { getToken, setToken } from './client.js';
 
 const LICENSE_URL_KEY = 'savdopro.licenseUrl';
+const REFRESH_KEY = 'savdopro.refreshToken';
 const DEFAULT_URL = 'http://localhost:9090';
 
 function urlFromQuery() {
@@ -41,6 +51,18 @@ export function setLicenseUrl(url) {
   }
 }
 
+export function getRefreshToken() {
+  return localStorage.getItem(REFRESH_KEY);
+}
+
+export function setRefreshToken(token) {
+  if (token) {
+    localStorage.setItem(REFRESH_KEY, token);
+  } else {
+    localStorage.removeItem(REFRESH_KEY);
+  }
+}
+
 let onUnauthorized = null;
 
 /** Register a callback that fires when the License Server rejects auth. */
@@ -48,7 +70,54 @@ export function setLicenseUnauthorizedHandler(handler) {
   onUnauthorized = handler;
 }
 
-async function request(method, path, body) {
+/**
+ * Persist a fresh access + refresh pair from a login or refresh response.
+ * Called by the AuthProvider; centralised here so we have a single place
+ * to keep the two tokens in sync.
+ */
+export function persistAuthPair(response) {
+  if (!response) return;
+  if (response.token) setToken(response.token);
+  if (response.refreshToken) setRefreshToken(response.refreshToken);
+}
+
+/** Wipe both tokens — used on logout and on irrecoverable refresh failure. */
+export function clearAuthPair() {
+  setToken(null);
+  setRefreshToken(null);
+}
+
+// In-flight refresh promise; null when no refresh is happening. Every
+// concurrent caller awaits the same promise, so parallel 401s only
+// trigger one refresh round-trip.
+let refreshInFlight = null;
+
+async function refreshOnce() {
+  if (refreshInFlight) return refreshInFlight;
+  const stored = getRefreshToken();
+  if (!stored) return null;
+  const base = getLicenseUrl().replace(/\/+$/, '');
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(`${base}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: stored }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      persistAuthPair(data);
+      return data.token;
+    } catch (_) {
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
+}
+
+async function rawFetch(method, path, body) {
   const base = getLicenseUrl().replace(/\/+$/, '');
   const options = { method, headers: {} };
   if (body !== undefined) {
@@ -56,13 +125,14 @@ async function request(method, path, body) {
     options.body = JSON.stringify(body);
   }
   const token = getToken();
-  if (token) {
-    options.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) options.headers.Authorization = `Bearer ${token}`;
+  return fetch(`${base}${path}`, options);
+}
 
+async function request(method, path, body) {
   let response;
   try {
-    response = await fetch(`${base}${path}`, options);
+    response = await rawFetch(method, path, body);
   } catch {
     throw new LicenseError(
       "License Server'ga ulanib bo'lmadi. Internet va server URL'ini tekshiring.",
@@ -70,8 +140,24 @@ async function request(method, path, body) {
     );
   }
 
+  // 401 → try a silent refresh and replay the original request once.
+  // Skip the dance on the refresh endpoint itself to avoid loops.
+  if (response.status === 401 && path !== '/api/auth/refresh') {
+    const fresh = await refreshOnce();
+    if (fresh) {
+      try {
+        response = await rawFetch(method, path, body);
+      } catch {
+        throw new LicenseError(
+          "License Server'ga ulanib bo'lmadi.",
+          0,
+        );
+      }
+    }
+  }
+
   if (response.status === 401 || response.status === 403) {
-    setToken(null);
+    clearAuthPair();
     if (onUnauthorized) onUnauthorized(response.status);
   }
 

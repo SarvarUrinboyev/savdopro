@@ -19,8 +19,8 @@
         display: grid;
         place-items: center;
         background:
-          radial-gradient(58% 46% at 22% 0%, rgba(16, 185, 129, .22), transparent 70%),
-          radial-gradient(48% 40% at 100% 100%, rgba(34, 211, 238, .12), transparent 70%),
+          radial-gradient(58% 46% at 22% 0%, rgba(59, 130, 246, .22), transparent 70%),
+          radial-gradient(48% 40% at 100% 100%, rgba(34, 197, 94, .14), transparent 70%),
           linear-gradient(135deg, #03050a 0%, #050a14 60%, #07131e 100%);
         color: #fff;
       }
@@ -32,13 +32,13 @@
       .logo-wrap::after {
         content: ''; position: absolute; inset: -18px;
         border-radius: 32px;
-        background: radial-gradient(closest-side, rgba(16, 185, 129, .35), transparent 70%);
+        background: radial-gradient(closest-side, rgba(59, 130, 246, .35), transparent 70%);
         z-index: 0;
       }
       .logo-wrap svg {
         width: 100%; height: 100%; position: relative; z-index: 1;
         border-radius: 24px;
-        box-shadow: 0 20px 50px -18px rgba(16, 185, 129, .55);
+        box-shadow: 0 20px 50px -18px rgba(59, 130, 246, .55);
       }
       h1 {
         margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.02em;
@@ -49,9 +49,9 @@
         padding: 3px 8px;
         font-size: 11px; font-weight: 800;
         letter-spacing: .12em;
-        color: #34d399;
-        background: rgba(16, 185, 129, .12);
-        border: 1px solid rgba(16, 185, 129, .35);
+        color: #4ade80;
+        background: rgba(34, 197, 94, .14);
+        border: 1px solid rgba(34, 197, 94, .35);
         border-radius: 6px;
         vertical-align: 6px;
       }
@@ -71,8 +71,8 @@
       .spinner {
         width: 32px; height: 32px;
         margin: 16px auto 0;
-        border: 2.5px solid rgba(16, 185, 129, .22);
-        border-top-color: #10b981;
+        border: 2.5px solid rgba(59, 130, 246, .22);
+        border-top-color: #3b82f6;
         border-radius: 50%;
         animation: spin .8s linear infinite;
       }
@@ -95,23 +95,23 @@
       <div class="logo-wrap">
         <svg viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#34d399" />
-              <stop offset="55%" stop-color="#10b981" />
-              <stop offset="100%" stop-color="#047857" />
+            <linearGradient id="g" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0%" stop-color="#1e3a8a" />
+              <stop offset="100%" stop-color="#3b82f6" />
             </linearGradient>
           </defs>
-          <rect x="0" y="0" width="96" height="96" rx="24" fill="url(#g)" />
-          <path d="M28 40 H68 L65.5 73 Q65 79 59 79 H37 Q31 79 30.5 73 Z"
-                fill="rgba(255,255,255,0.95)" />
-          <path d="M38 41 V31 a10 10 0 0 1 20 0 V41"
-                fill="none" stroke="rgba(255,255,255,0.95)"
-                stroke-width="5" stroke-linecap="round" />
-          <path d="M40 65 L48 57 L56 65" fill="none"
-                stroke="#047857" stroke-width="5"
+          <rect width="96" height="96" rx="22" fill="url(#g)" />
+          <!-- Three bars, ascending — last one in the brand-green accent. -->
+          <rect x="22" y="56" width="15" height="20" rx="4" fill="#ffffff" opacity="0.42" />
+          <rect x="40.5" y="46" width="15" height="30" rx="4" fill="#ffffff" opacity="0.62" />
+          <rect x="59" y="33" width="15" height="43" rx="4" fill="#22c55e" />
+          <!-- Trend line + arrow head on top of the bars. -->
+          <path d="M29.5 49 L48 38 L67.5 26" fill="none"
+                stroke="#ffffff" stroke-width="5"
                 stroke-linecap="round" stroke-linejoin="round" />
-          <line x1="48" y1="57" x2="48" y2="74" stroke="#047857"
-                stroke-width="5" stroke-linecap="round" />
+          <path d="M59 26 L67.5 26 L67.5 34.5" fill="none"
+                stroke="#ffffff" stroke-width="5"
+                stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </div>
       <h1>SavdoPRO<span class="pos-tag">POS</span></h1>

@@ -25,17 +25,21 @@ public class ShopService {
     }
 
     public record ShopResponse(Long id, String name, boolean main,
-                                String address, String contactPhone) {
+                                String address, String contactPhone,
+                                String printerName, String cashRegisterNo,
+                                String receiptFooter) {
     }
 
     public record CreateShopRequest(
             @NotBlank(message = "Do'kon nomi kiritilishi shart") String name,
-            String address, String contactPhone) {
+            String address, String contactPhone,
+            String printerName, String cashRegisterNo, String receiptFooter) {
     }
 
     public record UpdateShopRequest(
             @NotBlank(message = "Do'kon nomi kiritilishi shart") String name,
-            String address, String contactPhone) {
+            String address, String contactPhone,
+            String printerName, String cashRegisterNo, String receiptFooter) {
     }
 
     public List<ShopResponse> list(Long accountId) {
@@ -63,6 +67,9 @@ public class ShopService {
         s.setName(request.name().trim());
         s.setAddress(blankToNull(request.address()));
         s.setContactPhone(blankToNull(request.contactPhone()));
+        s.setPrinterName(blankToNull(request.printerName()));
+        s.setCashRegisterNo(blankToNull(request.cashRegisterNo()));
+        s.setReceiptFooter(blankToNull(request.receiptFooter()));
         // First shop of an account auto-becomes the main shop.
         s.setMain(shops.countByAccountId(accountId) == 0);
         return toResponse(shops.save(s));
@@ -73,6 +80,9 @@ public class ShopService {
         s.setName(request.name().trim());
         s.setAddress(blankToNull(request.address()));
         s.setContactPhone(blankToNull(request.contactPhone()));
+        s.setPrinterName(blankToNull(request.printerName()));
+        s.setCashRegisterNo(blankToNull(request.cashRegisterNo()));
+        s.setReceiptFooter(blankToNull(request.receiptFooter()));
         return toResponse(shops.save(s));
     }
 
@@ -107,7 +117,8 @@ public class ShopService {
 
     private static ShopResponse toResponse(Shop s) {
         return new ShopResponse(s.getId(), s.getName(), s.isMain(),
-                s.getAddress(), s.getContactPhone());
+                s.getAddress(), s.getContactPhone(),
+                s.getPrinterName(), s.getCashRegisterNo(), s.getReceiptFooter());
     }
 
     private static String blankToNull(String value) {

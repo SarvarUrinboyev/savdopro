@@ -1,7 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { AuthApi } from '../api/endpoints.js';
 import { getToken, setToken, setUnauthorizedHandler } from '../api/client.js';
-import { setLicenseUnauthorizedHandler } from '../api/licenseClient.js';
+import {
+  clearAuthPair,
+  getRefreshToken,
+  persistAuthPair,
+  setLicenseUnauthorizedHandler,
+} from '../api/licenseClient.js';
 
 const AuthCtx = createContext(null);
 
@@ -32,7 +37,11 @@ export function AuthProvider({ children }) {
       const isAuthReject = status === 401 || status === 403
         || /sessiya|akkaunt/i.test(String(err.message));
       if (isAuthReject) {
-        setToken(null);
+        // Drop both tokens — the License Server has the final say on
+        // session validity and it told us no. (licenseClient already
+        // tried a silent refresh before throwing, so reaching here
+        // means even the refresh token is dead.)
+        clearAuthPair();
         setUser(null);
       } else {
         // Surface transient failures so the UI can show a retry banner;
@@ -48,7 +57,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setUnauthorizedHandler(() => setUser(null));
     setLicenseUnauthorizedHandler(() => setUser(null));
-    if (getToken()) {
+    // Treat either token as "we might still have a session" — if only
+    // the refresh remains, the first /me call will trigger an in-flight
+    // refresh and either resurrect the session or bounce to login.
+    if (getToken() || getRefreshToken()) {
       loadMe();
     } else {
       setLoading(false);
@@ -57,14 +69,21 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const response = await AuthApi.login({ username, password });
-    setToken(response.token);
+    persistAuthPair(response);
     setUser(response.user);
     setError(null);
     return response.user;
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
+    // Best-effort revoke on the server so the refresh token can't be
+    // reused. We don't block on the result — the local clear below
+    // happens either way so the user instantly lands on Login.
+    const rt = getRefreshToken();
+    if (rt) {
+      AuthApi.logout({ refreshToken: rt }).catch(() => { /* ignore */ });
+    }
+    clearAuthPair();
     setUser(null);
   }, []);
 

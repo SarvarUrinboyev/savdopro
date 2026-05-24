@@ -114,6 +114,21 @@
     .topbar .me { display: flex; align-items: center; gap: 10px; font-size: 12px; }
     .topbar .me-name { color: var(--text-muted); }
 
+    .tabs { display: flex; gap: 6px; margin-bottom: 16px;
+            border-bottom: 1px solid var(--border); padding-left: 2px; }
+    .tab {
+      background: none; border: none;
+      color: var(--text-muted);
+      padding: 10px 16px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+
     .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
              margin-bottom: 18px; }
     @media (max-width: 720px) { .stats { grid-template-columns: 1fr; } }
@@ -229,7 +244,10 @@
     const state = {
       user: null,
       accounts: [],
-      modal: null, // { type, item }
+      tab: 'accounts',   // 'accounts' | 'audit'
+      audit: [],          // last-loaded audit page
+      auditLoading: false,
+      modal: null,        // { type, item }
     };
 
     // ============================================================ api
@@ -312,26 +330,28 @@
     }
 
     // ============================================================ brand SVG
+    // Single inline copy so the panel can be served by any host without
+    // an extra round-trip for a logo asset. Mirrors .logos/logo3.svg.
     const BRAND_SVG = `
       <svg viewBox="0 0 40 40" aria-hidden="true">
         <defs>
-          <linearGradient id="brandG" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#34d399"/>
-            <stop offset="55%" stop-color="#10b981"/>
-            <stop offset="100%" stop-color="#047857"/>
+          <linearGradient id="brandG" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stop-color="#1e3a8a"/>
+            <stop offset="100%" stop-color="#3b82f6"/>
           </linearGradient>
         </defs>
-        <rect x="0" y="0" width="40" height="40" rx="11" fill="url(#brandG)"/>
-        <path d="M11 16 H29 L27.5 30.5 Q27 33.5 24 33.5 H16 Q13 33.5 12.5 30.5 Z"
-              fill="rgba(255,255,255,0.95)"/>
-        <path d="M15.5 16.5 V12.5 a4.5 4.5 0 0 1 9 0 V16.5"
-              fill="none" stroke="rgba(255,255,255,0.95)"
-              stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M17.5 26.5 L20 24 L22.5 26.5" fill="none"
-              stroke="#047857" stroke-width="2.2"
+        <rect width="40" height="40" rx="9" fill="url(#brandG)"/>
+        <rect x="9" y="23.5" width="6.25" height="8.3" rx="1.7"
+              fill="#ffffff" opacity="0.42"/>
+        <rect x="16.9" y="19" width="6.25" height="12.65" rx="1.7"
+              fill="#ffffff" opacity="0.62"/>
+        <rect x="24.7" y="13.6" width="6.25" height="18.1" rx="1.7" fill="#22c55e"/>
+        <path d="M12.2 20.5 L20 15.8 L28.1 10.9" fill="none"
+              stroke="#ffffff" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round"/>
-        <line x1="20" y1="24" x2="20" y2="29.5" stroke="#047857"
-              stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M24.7 10.9 L28.1 10.9 L28.1 14.4" fill="none"
+              stroke="#ffffff" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
       </svg>`;
 
     // ============================================================ login
@@ -411,10 +431,6 @@
     }
 
     function adminView() {
-      const total = state.accounts.length;
-      const blocked = state.accounts.filter(a => a.blocked || a.expired).length;
-      const active = total - blocked;
-      const rows = state.accounts.map(accountRow).join('');
       return `
         <div class="center">
           <div class="topbar">
@@ -425,28 +441,109 @@
             </div>
           </div>
 
-          <div class="stats">
-            <div class="stat green"><span class="eyebrow">Jami akkauntlar</span><div class="v">${total}</div></div>
-            <div class="stat blue"><span class="eyebrow">Faol</span><div class="v">${active}</div></div>
-            <div class="stat red"><span class="eyebrow">Bloklangan / muddati tugagan</span><div class="v">${blocked}</div></div>
+          <div class="tabs">
+            <button class="tab ${state.tab === 'accounts' ? 'active' : ''}"
+                    data-tab="accounts">🏪 Akkauntlar</button>
+            <button class="tab ${state.tab === 'audit' ? 'active' : ''}"
+                    data-tab="audit">📜 Audit log</button>
           </div>
 
-          <div class="card">
-            <div class="card-head">
-              <h2>Mijoz akkauntlari</h2>
-              <button class="btn btn-primary btn-sm" id="newAccountBtn">+ Yangi akkaunt</button>
-            </div>
-            <table class="tbl">
-              <thead>
-                <tr>
-                  <th>Akkaunt</th><th>Telefon</th><th>Obuna tugashi</th>
-                  <th>Userlar</th><th>Holat</th><th></th>
-                </tr>
-              </thead>
-              <tbody>${rows || '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">Hozircha akkaunt yo’q</td></tr>'}</tbody>
-            </table>
-          </div>
+          ${state.tab === 'audit' ? renderAuditTab() : renderAccountsTab()}
         </div>`;
+    }
+
+    function renderAccountsTab() {
+      const total = state.accounts.length;
+      const blocked = state.accounts.filter(a => a.blocked || a.expired).length;
+      const active = total - blocked;
+      const rows = state.accounts.map(accountRow).join('');
+      return `
+        <div class="stats">
+          <div class="stat green"><span class="eyebrow">Jami akkauntlar</span><div class="v">${total}</div></div>
+          <div class="stat blue"><span class="eyebrow">Faol</span><div class="v">${active}</div></div>
+          <div class="stat red"><span class="eyebrow">Bloklangan / muddati tugagan</span><div class="v">${blocked}</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Mijoz akkauntlari</h2>
+            <button class="btn btn-primary btn-sm" id="newAccountBtn">+ Yangi akkaunt</button>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>Akkaunt</th><th>Telefon</th><th>Obuna tugashi</th>
+                <th>Userlar</th><th>Holat</th><th></th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">Hozircha akkaunt yo&rsquo;q</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    }
+
+    /** Map action codes to short Uzbek labels for the audit table. */
+    const ACTION_LABEL = {
+      ACCOUNT_CREATE:      { label: "Akkaunt yaratildi",    cls: 'ok' },
+      ACCOUNT_UPDATE:      { label: "Akkaunt yangilandi",   cls: 'info' },
+      ACCOUNT_BLOCK:       { label: "Akkaunt bloklandi",    cls: 'block' },
+      ACCOUNT_UNBLOCK:     { label: "Bloк olib tashlandi",  cls: 'ok' },
+      ACCOUNT_DELETE:      { label: "Akkaunt o'chirildi",   cls: 'block' },
+      USER_CREATE:         { label: "Foydalanuvchi qo'shildi", cls: 'ok' },
+      USER_DELETE:         { label: "Foydalanuvchi o'chirildi", cls: 'block' },
+      USER_RESET_PASSWORD: { label: "Parol o'rnatildi",     cls: 'warn' },
+    };
+
+    function renderAuditTab() {
+      if (state.auditLoading) {
+        return `<div class="card"><div class="muted" style="text-align:center;padding:36px">⏳ Yuklanmoqda...</div></div>`;
+      }
+      const rows = state.audit.map(row => {
+        const meta = ACTION_LABEL[row.action]
+                  || { label: row.action, cls: 'info' };
+        const when = (row.createdAt || '').replace('T', ' ').slice(0, 19);
+        return `
+          <tr>
+            <td class="mono" style="font-size:11px;color:var(--muted)">${esc(when)}</td>
+            <td><span class="badge ${meta.cls}">${esc(meta.label)}</span></td>
+            <td>${esc(row.targetLabel || (row.targetType + ' #' + (row.targetId ?? '?')))}</td>
+            <td class="muted">${esc(row.actorName)}</td>
+            <td class="mono" style="font-size:11px;color:var(--muted)">${esc(row.clientIp || '—')}</td>
+            <td class="muted" style="font-size:12px">${esc(row.detail || '')}</td>
+          </tr>`;
+      }).join('');
+      return `
+        <div class="card">
+          <div class="card-head">
+            <h2>📜 Audit log <span class="muted" style="font-weight:400;font-size:12px">— so'nggi 50 ta amal</span></h2>
+            <button class="btn btn-ghost btn-sm" id="auditReloadBtn">🔄 Yangilash</button>
+          </div>
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th style="width:140px">Vaqt</th>
+                <th style="width:170px">Amal</th>
+                <th>Maqsad</th>
+                <th style="width:120px">Kim</th>
+                <th style="width:110px">IP</th>
+                <th>Tafsilot</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="6" class="muted" style="text-align:center;padding:30px">Audit yozuvi yo&rsquo;q</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    }
+
+    async function loadAudit() {
+      state.auditLoading = true;
+      render();
+      try {
+        state.audit = await api('GET', '/api/admin/audit?page=0&size=50');
+      } catch (ex) {
+        toast(ex.message, true);
+      } finally {
+        state.auditLoading = false;
+        render();
+      }
     }
 
     function accountRow(a) {
@@ -485,14 +582,35 @@
         state.user = null;
         render();
       });
-      document.getElementById('newAccountBtn').addEventListener('click', () => {
-        state.modal = { type: 'create' };
-        render();
+      // Tab switcher wired here so the click handler survives every
+      // re-render of the admin shell.
+      document.querySelectorAll('button[data-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.tab = btn.dataset.tab;
+          if (state.tab === 'audit') {
+            loadAudit();   // fires its own render
+          } else {
+            render();
+          }
+        });
       });
-      document.querySelectorAll('button[data-action]').forEach(btn => {
-        if (btn.disabled) return;
-        btn.addEventListener('click', () => handleAction(btn.dataset.action, Number(btn.dataset.id)));
-      });
+      // Below this point: only wire the controls that belong to the
+      // currently-active tab — they're the only ones in the DOM.
+      if (state.tab === 'accounts') {
+        const newBtn = document.getElementById('newAccountBtn');
+        if (newBtn) newBtn.addEventListener('click', () => {
+          state.modal = { type: 'create' };
+          render();
+        });
+        document.querySelectorAll('button[data-action]').forEach(btn => {
+          if (btn.disabled) return;
+          btn.addEventListener('click', () => handleAction(btn.dataset.action, Number(btn.dataset.id)));
+        });
+      }
+      if (state.tab === 'audit') {
+        const reload = document.getElementById('auditReloadBtn');
+        if (reload) reload.addEventListener('click', () => loadAudit());
+      }
     }
 
     async function handleAction(action, id) {

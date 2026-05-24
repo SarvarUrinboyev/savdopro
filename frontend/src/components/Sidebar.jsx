@@ -111,6 +111,13 @@ const ICON = {
       <path d="M3 9l2-5h14l2 5M3 9v11h18V9M3 9h18M9 15h6" />
     </svg>
   ),
+  '/transfers': (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7 7H17M17 7l-3-3M17 7l-3 3" />
+      <path d="M17 17H7M7 17l3 3M7 17l3-3" />
+    </svg>
+  ),
 };
 
 const NAV_ITEMS = [
@@ -141,25 +148,25 @@ export function Sidebar({ shift }) {
         <div className="logo">
           <svg viewBox="0 0 40 40" aria-hidden="true">
             <defs>
-              <linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#34d399" />
-                <stop offset="55%" stopColor="#10b981" />
-                <stop offset="100%" stopColor="#047857" />
+              <linearGradient id="brandGrad" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stopColor="#1e3a8a" />
+                <stop offset="100%" stopColor="#3b82f6" />
               </linearGradient>
             </defs>
-            <rect x="0" y="0" width="40" height="40" rx="11" fill="url(#brandGrad)" />
-            {/* shopping-bag silhouette */}
-            <path d="M11 16 H29 L27.5 30.5 Q27 33.5 24 33.5 H16 Q13 33.5 12.5 30.5 Z"
-                  fill="rgba(255,255,255,0.95)" />
-            <path d="M15.5 16.5 V12.5 a4.5 4.5 0 0 1 9 0 V16.5"
-                  fill="none" stroke="rgba(255,255,255,0.95)"
-                  strokeWidth="2.4" strokeLinecap="round" />
-            {/* arrow up = sales growth */}
-            <path d="M17.5 26.5 L20 24 L22.5 26.5" fill="none"
-                  stroke="#047857" strokeWidth="2.2"
+            <rect width="40" height="40" rx="9" fill="url(#brandGrad)" />
+            {/* Three bars — ascending, the tallest in the brand-green accent. */}
+            <rect x="9" y="23.5" width="6.25" height="8.3" rx="1.7"
+                  fill="#ffffff" opacity="0.42" />
+            <rect x="16.9" y="19" width="6.25" height="12.65" rx="1.7"
+                  fill="#ffffff" opacity="0.62" />
+            <rect x="24.7" y="13.6" width="6.25" height="18.1" rx="1.7" fill="#22c55e" />
+            {/* Trend line with arrow head — sales-growth motif. */}
+            <path d="M12.2 20.5 L20 15.8 L28.1 10.9" fill="none"
+                  stroke="#ffffff" strokeWidth="2"
                   strokeLinecap="round" strokeLinejoin="round" />
-            <line x1="20" y1="24" x2="20" y2="29.5" stroke="#047857"
-                  strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M24.7 10.9 L28.1 10.9 L28.1 14.4" fill="none"
+                  stroke="#ffffff" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
         <div>
@@ -186,6 +193,15 @@ export function Sidebar({ shift }) {
           >
             <span className="ico">{ICON['/shops']}</span>
             <span>{t("Do'konlar")}</span>
+          </NavLink>
+        )}
+        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
+          <NavLink
+            to="/transfers"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="ico">{ICON['/transfers']}</span>
+            <span>{t("Tovar transferi")}</span>
           </NavLink>
         )}
         {NAV_ITEMS.map((item) => (

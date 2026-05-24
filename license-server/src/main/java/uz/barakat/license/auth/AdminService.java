@@ -33,11 +33,16 @@ public class AdminService {
 
     private final AccountRepository accounts;
     private final AppUserRepository users;
+    private final AuditService audit;
+    private final RefreshTokenService refreshTokens;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public AdminService(AccountRepository accounts, AppUserRepository users) {
+    public AdminService(AccountRepository accounts, AppUserRepository users,
+                        AuditService audit, RefreshTokenService refreshTokens) {
         this.accounts = accounts;
         this.users = users;
+        this.audit = audit;
+        this.refreshTokens = refreshTokens;
     }
 
     @Transactional(readOnly = true)
@@ -94,6 +99,8 @@ public class AdminService {
             throw new BadRequestException("Bu login band: " + username);
         }
 
+        audit.record("ACCOUNT_CREATE", "ACCOUNT", saved.getId(), saved.getName(),
+                "Owner: " + username);
         return toAccountResponse(saved);
     }
 
@@ -104,7 +111,10 @@ public class AdminService {
         a.setContactPhone(blankToNull(request.contactPhone()));
         a.setContactNote(blankToNull(request.contactNote()));
         a.setSubscriptionExpires(request.subscriptionExpires());
-        return toAccountResponse(accounts.save(a));
+        Account saved = accounts.save(a);
+        audit.record("ACCOUNT_UPDATE", "ACCOUNT", saved.getId(), saved.getName(),
+                "subExpires=" + saved.getSubscriptionExpires());
+        return toAccountResponse(saved);
     }
 
     public AdminAccountResponse setBlocked(Long id, boolean blocked) {
@@ -114,7 +124,16 @@ public class AdminService {
             throw new BadRequestException("Super-admin akkauntini bloklash mumkin emas");
         }
         a.setBlocked(blocked);
-        return toAccountResponse(accounts.save(a));
+        Account saved = accounts.save(a);
+        // Block also nukes every active session for users of that
+        // account — otherwise their already-issued access JWTs would
+        // keep working until they expire (up to 1h).
+        if (blocked) {
+            refreshTokens.revokeAllForAccount(id);
+        }
+        audit.record(blocked ? "ACCOUNT_BLOCK" : "ACCOUNT_UNBLOCK",
+                "ACCOUNT", id, saved.getName(), null);
+        return toAccountResponse(saved);
     }
 
     public void deleteAccount(Long id) {
@@ -123,8 +142,11 @@ public class AdminService {
         }
         Account a = accounts.findById(id)
                 .orElseThrow(() -> NotFoundException.of("Akkaunt", id));
+        String label = a.getName();
+        refreshTokens.revokeAllForAccount(id);
         // ON DELETE CASCADE on app_users.account_id wipes the linked users.
         accounts.delete(a);
+        audit.record("ACCOUNT_DELETE", "ACCOUNT", id, label, null);
     }
 
     public AdminUserResponse createUser(Long accountId, CreateUserRequest request) {
@@ -141,7 +163,10 @@ public class AdminService {
         u.setRole(parseRole(request.role(), UserRole.SHOP_USER));
         u.setAccountId(accountId);
         try {
-            return toUserResponse(users.save(u));
+            AppUser saved = users.save(u);
+            audit.record("USER_CREATE", "USER", saved.getId(), saved.getUsername(),
+                    "role=" + saved.getRole() + ", accountId=" + accountId);
+            return toUserResponse(saved);
         } catch (DataIntegrityViolationException ex) {
             // Race winner already grabbed this username.
             throw new BadRequestException("Bu login band: " + username);
@@ -153,6 +178,10 @@ public class AdminService {
                 .orElseThrow(() -> NotFoundException.of("Foydalanuvchi", userId));
         u.setPasswordHash(encoder.encode(newPassword));
         users.save(u);
+        // Force a re-login on every device so the old refresh tokens
+        // can't keep handing out access JWTs after the password change.
+        refreshTokens.revokeAllForUser(userId);
+        audit.record("USER_RESET_PASSWORD", "USER", userId, u.getUsername(), null);
     }
 
     public void deleteUser(Long userId) {
@@ -161,7 +190,10 @@ public class AdminService {
         if (u.getRole() == UserRole.SUPER_ADMIN) {
             throw new BadRequestException("Super-admin foydalanuvchini o'chirish mumkin emas");
         }
+        String label = u.getUsername();
+        refreshTokens.revokeAllForUser(userId);
         users.delete(u);
+        audit.record("USER_DELETE", "USER", userId, label, null);
     }
 
     // ------------------------------------------------------------ helpers

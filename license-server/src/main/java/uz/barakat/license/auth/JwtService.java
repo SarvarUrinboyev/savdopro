@@ -50,12 +50,13 @@ public class JwtService {
             "savdopro-dev-secret-please-override-in-production-XXXXXXXXXXXXXXXX";
 
     /**
-     * 24 hours: long enough that a cashier opening a shift in the morning
-     * isn't forced to re-log mid-day, short enough that a leaked token
-     * doesn't grant week-long access. Adjust together with the desktop
-     * client's refresh logic (Phase 3).
+     * Access-token lifetime. Short on purpose (1h) — the desktop client
+     * pairs each access token with a refresh token (7d) and silently
+     * rotates before expiry, so a leaked access token grants at most
+     * one hour of impersonation. Refresh flow is implemented in
+     * {@link RefreshTokenService}.
      */
-    private static final long TOKEN_TTL_HOURS = 24;
+    private static final long TOKEN_TTL_HOURS = 1;
 
     private final String configuredSecret;
     private final Environment environment;
@@ -93,17 +94,32 @@ public class JwtService {
     }
 
     public String issue(AppUser user) {
+        return issueFor(user.getId(), user.getUsername(),
+                user.getRole().name(), user.getAccountId());
+    }
+
+    /**
+     * Lower-level issuer used by the refresh flow — the refresh code
+     * already knows the claim values it wants and doesn't need to
+     * re-load the AppUser entity just to project them.
+     */
+    public String issueFor(Long userId, String username, String role, Long accountId) {
         Instant now = Instant.now();
         Instant exp = now.plus(TOKEN_TTL_HOURS, ChronoUnit.HOURS);
         return Jwts.builder()
-                .subject(String.valueOf(user.getId()))
-                .claim("username", user.getUsername())
-                .claim("role", user.getRole().name())
-                .claim("accountId", user.getAccountId())
+                .subject(String.valueOf(userId))
+                .claim("username", username)
+                .claim("role", role)
+                .claim("accountId", accountId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(signingKey)
                 .compact();
+    }
+
+    /** Lets the controller layer expose the access-token TTL to clients. */
+    public long accessTtlSeconds() {
+        return TOKEN_TTL_HOURS * 3600L;
     }
 
     /** Returns the JWT claims if the token is valid, else throws. */

@@ -162,6 +162,12 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
   const [name, setName] = useState(initial?.name || '');
   const [address, setAddress] = useState(initial?.address || '');
   const [phone, setPhone] = useState(initial?.contactPhone || '');
+  // Phase 3.3 register-profile fields. Optional everywhere — empty
+  // strings serialise to null on the server side so existing
+  // single-shop installs keep working without touching them.
+  const [printerName, setPrinterName] = useState(initial?.printerName || '');
+  const [cashRegisterNo, setCashRegisterNo] = useState(initial?.cashRegisterNo || '');
+  const [receiptFooter, setReceiptFooter] = useState(initial?.receiptFooter || '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -176,6 +182,9 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
         name: name.trim(),
         address: address.trim() || null,
         contactPhone: phone.trim() || null,
+        printerName: printerName.trim() || null,
+        cashRegisterNo: cashRegisterNo.trim() || null,
+        receiptFooter: receiptFooter.trim() || null,
       });
       onClose();
     } catch (err) {
@@ -215,6 +224,34 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
         <input className="input" value={phone}
                onChange={(e) => setPhone(e.target.value)} />
       </div>
+      {/* Phase 3.3: per-shop register profile. Collapsible header so
+          single-shop users don't see noise; multi-shop owners can
+          configure each location's printer and cash register. */}
+      <details style={{ marginTop: 12, paddingTop: 8,
+                        borderTop: '1px solid var(--border)' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600,
+                          fontSize: 13, color: 'var(--muted)' }}>
+          🖨 {t("Kassa va printer sozlamalari")}
+        </summary>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>{t('Printer nomi (Windowsda)')}</label>
+          <input className="input" value={printerName}
+                 onChange={(e) => setPrinterName(e.target.value)}
+                 placeholder="Xprinter XP-58" />
+        </div>
+        <div className="field">
+          <label>{t('Kassa raqami')}</label>
+          <input className="input" value={cashRegisterNo}
+                 onChange={(e) => setCashRegisterNo(e.target.value)}
+                 placeholder="01" />
+        </div>
+        <div className="field">
+          <label>{t('Chek pastki yozuvi')}</label>
+          <input className="input" value={receiptFooter}
+                 onChange={(e) => setReceiptFooter(e.target.value)}
+                 placeholder="@savdo_pro · qaytarish 14 kun ichida" />
+        </div>
+      </details>
       {error && <div style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
     </Modal>
   );

@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import uz.barakat.license.auth.AdminDtos.AccountDetailResponse;
 import uz.barakat.license.auth.AdminDtos.AdminAccountResponse;
@@ -21,6 +22,7 @@ import uz.barakat.license.auth.AdminDtos.CreateAccountRequest;
 import uz.barakat.license.auth.AdminDtos.CreateUserRequest;
 import uz.barakat.license.auth.AdminDtos.SetPasswordRequest;
 import uz.barakat.license.auth.AdminDtos.UpdateAccountRequest;
+import uz.barakat.license.domain.AdminAuditEntry;
 
 /**
  * Super-admin REST API. All endpoints require the caller to hold the
@@ -33,9 +35,24 @@ import uz.barakat.license.auth.AdminDtos.UpdateAccountRequest;
 public class AdminController {
 
     private final AdminService service;
+    private final AuditService audit;
 
-    public AdminController(AdminService service) {
+    public AdminController(AdminService service, AuditService audit) {
         this.service = service;
+        this.audit = audit;
+    }
+
+    /**
+     * Paginated read of the audit trail, newest first. The panel calls
+     * this on the "Audit log" tab and on every refresh; the implementation
+     * caps page size at 200 so a runaway client can't drag the whole
+     * table over the wire.
+     */
+    @GetMapping("/audit")
+    public List<AdminAuditEntry> auditLog(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size) {
+        return audit.recent(page, size);
     }
 
     @GetMapping("/accounts")

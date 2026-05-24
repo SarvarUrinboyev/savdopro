@@ -29,15 +29,18 @@ public class AuthService {
     private final AppUserRepository users;
     private final AccountRepository accounts;
     private final JwtService jwt;
+    private final RefreshTokenService refreshTokens;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
-    public AuthService(AppUserRepository users, AccountRepository accounts, JwtService jwt) {
+    public AuthService(AppUserRepository users, AccountRepository accounts,
+                       JwtService jwt, RefreshTokenService refreshTokens) {
         this.users = users;
         this.accounts = accounts;
         this.jwt = jwt;
+        this.refreshTokens = refreshTokens;
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String clientIp) {
         AppUser user = users.findByUsernameIgnoreCase(request.username().trim())
                 .orElseThrow(() -> new BadRequestException("Login yoki parol noto'g'ri"));
         if (!encoder.matches(request.password(), user.getPasswordHash())) {
@@ -46,7 +49,41 @@ public class AuthService {
         Account account = requireUsableAccount(user.getAccountId());
         user.setLastLoginAt(LocalDateTime.now());
         users.save(user);
-        return new LoginResponse(jwt.issue(user), toMe(user, account));
+        RefreshTokenService.Issued refresh = refreshTokens.issue(
+                user.getId(), account.getId(), clientIp);
+        return new LoginResponse(
+                jwt.issue(user),
+                refresh.plaintext(),
+                jwt.accessTtlSeconds(),
+                refresh.expiresAt(),
+                toMe(user, account));
+    }
+
+    /**
+     * Rotate-on-refresh: validate the incoming refresh token, mint a
+     * brand-new access + refresh pair, return them with the same
+     * me-shape so the client can keep using the response interchangeably
+     * with a fresh login.
+     */
+    public LoginResponse refresh(String refreshTokenPlaintext, String clientIp) {
+        RefreshTokenService.RotationResult rot =
+                refreshTokens.consume(refreshTokenPlaintext, clientIp);
+        AppUser user = users.findById(rot.userId())
+                .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
+        Account account = requireUsableAccount(rot.accountId());
+        String accessToken = jwt.issueFor(
+                user.getId(), user.getUsername(), user.getRole().name(), account.getId());
+        return new LoginResponse(
+                accessToken,
+                rot.fresh().plaintext(),
+                jwt.accessTtlSeconds(),
+                rot.fresh().expiresAt(),
+                toMe(user, account));
+    }
+
+    /** Single-device logout: revoke just the refresh token. */
+    public void logout(String refreshTokenPlaintext) {
+        refreshTokens.revoke(refreshTokenPlaintext);
     }
 
     @Transactional(readOnly = true)

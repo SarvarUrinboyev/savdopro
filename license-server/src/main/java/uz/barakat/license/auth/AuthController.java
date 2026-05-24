@@ -14,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 import uz.barakat.license.auth.AuthDtos.LoginRequest;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
+import uz.barakat.license.auth.AuthDtos.RefreshRequest;
 import uz.barakat.license.exception.BadRequestException;
 
 /**
@@ -49,12 +50,35 @@ public class AuthController {
                     "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
         }
         try {
-            LoginResponse response = service.login(request);
+            LoginResponse response = service.login(request, ip);
             rateLimiter.recordSuccess(ip);
             return response;
         } catch (RuntimeException ex) {
             rateLimiter.recordFailure(ip);
             throw ex;
+        }
+    }
+
+    /**
+     * Rotate-on-refresh: exchange a valid refresh token for a new
+     * access + refresh pair. Public endpoint (no JWT required) but the
+     * refresh token itself acts as the credential.
+     */
+    @PostMapping("/refresh")
+    public LoginResponse refresh(@Valid @RequestBody RefreshRequest request,
+                                 HttpServletRequest http) {
+        return service.refresh(request.refreshToken(), clientIp(http));
+    }
+
+    /**
+     * Single-device logout: invalidates the supplied refresh token. The
+     * caller is also expected to discard their access JWT client-side
+     * — we can't revoke it here because it's stateless.
+     */
+    @PostMapping("/logout")
+    public void logout(@RequestBody(required = false) RefreshRequest request) {
+        if (request != null) {
+            service.logout(request.refreshToken());
         }
     }
 

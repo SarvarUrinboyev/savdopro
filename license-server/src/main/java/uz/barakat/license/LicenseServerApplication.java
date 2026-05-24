@@ -2,6 +2,7 @@ package uz.barakat.license;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * SavdoPRO License Server entry point.
@@ -14,6 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * and manage subscriptions from one place.
  */
 @SpringBootApplication
+@EnableScheduling   // RefreshTokenService.purgeExpired() runs nightly
 public class LicenseServerApplication {
 
     public static void main(String[] args) {

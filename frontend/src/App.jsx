@@ -22,6 +22,7 @@ import { ShiftOpen } from './pages/ShiftOpen.jsx';
 import { ProductEditor } from './pages/ProductEditor.jsx';
 import { SupplierDetail } from './pages/SupplierDetail.jsx';
 import { Suppliers } from './pages/Suppliers.jsx';
+import { Transfers } from './pages/Transfers.jsx';
 import { Warehouse } from './pages/Warehouse.jsx';
 
 /**
@@ -109,6 +110,7 @@ function Authenticated() {
         <Route path="shift-close" element={<ShiftClose onClosed={reload} />} />
         <Route path="admin" element={<Admin />} />
         <Route path="shops" element={<Shops />} />
+        <Route path="transfers" element={<Transfers />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>
