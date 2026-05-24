@@ -53,4 +53,25 @@ public class Payment extends TenantScopedEntity {
 
     @Column(length = 500)
     private String note;
+
+    /**
+     * Discount applied to this sale (Phase 4.4). Both fields are
+     * metadata for the receipt + audit trail — the journal {@code amount}
+     * column already stores the NET (post-discount) figure so historical
+     * reports keep working. When both are non-zero the percent is
+     * applied first, then the flat amount subtracted.
+     */
+    @Column(name = "discount_amount", nullable = false, precision = 15, scale = 2)
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
+    @Column(name = "discount_percent", nullable = false, precision = 5, scale = 2)
+    private BigDecimal discountPercent = BigDecimal.ZERO;
+
+    /**
+     * Loyalty customer the sale was attributed to. Null on impersonal
+     * walk-in sales. When set, {@code PaymentService.create} awards
+     * points based on {@code amount} and credits {@code customers.points_balance}.
+     */
+    @Column(name = "customer_id")
+    private Long customerId;
 }

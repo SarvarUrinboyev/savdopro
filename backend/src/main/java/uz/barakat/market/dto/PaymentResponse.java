@@ -13,6 +13,9 @@ import uz.barakat.market.domain.PaymentType;
  * native payment rows from virtual rows aggregated out of other tables
  * (expenses, home-expenses, customer ledger). Virtual rows are read-only
  * from this endpoint - the UI links the user back to the source page.
+ *
+ * <p>Phase 4.4 adds the discount + loyalty fields. Virtual rows pass
+ * {@code null} for all three; native rows return whatever's stored.
  */
 public record PaymentResponse(
         Long id,
@@ -25,5 +28,8 @@ public record PaymentResponse(
         Currency currency,
         String note,
         LocalDateTime createdAt,
-        String source) {
+        String source,
+        BigDecimal discountAmount,
+        BigDecimal discountPercent,
+        Long customerId) {
 }

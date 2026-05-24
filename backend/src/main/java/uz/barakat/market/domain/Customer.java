@@ -32,4 +32,20 @@ public class Customer extends TenantScopedEntity {
     /** Telegram chat id once the customer links the self-service bot; null until then. */
     @Column(name = "telegram_chat_id")
     private Long telegramChatId;
+
+    /**
+     * Loyalty points the customer currently has (Phase 4.4).
+     * Denormalised cache of {@code sum(customer_transactions.points_delta)};
+     * the LoyaltyService recomputes it on every earn / redeem so a
+     * malformed ledger entry can't permanently corrupt the visible balance.
+     */
+    @Column(name = "points_balance", nullable = false)
+    private long pointsBalance = 0L;
+
+    /**
+     * Lifetime points earned (never decreases). Drives the "Gold customer"
+     * tier badges that we'll roll out in a follow-up iteration.
+     */
+    @Column(name = "points_total_earned", nullable = false)
+    private long pointsTotalEarned = 0L;
 }

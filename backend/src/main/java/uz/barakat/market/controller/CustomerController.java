@@ -87,4 +87,17 @@ public class CustomerController {
                                                     @PathVariable Long transactionId) {
         return service.deleteTransaction(id, transactionId);
     }
+
+    /**
+     * Burn N loyalty points and append a redeem ledger entry. The new
+     * customer-with-balance snapshot comes back so the UI can re-render
+     * the points pill without a separate re-fetch.
+     */
+    @PostMapping("/{id}/loyalty/redeem")
+    public CustomerResponse redeemPoints(@PathVariable Long id,
+                                         @Valid @RequestBody LoyaltyRedeemRequest body) {
+        return service.redeemPoints(id, body.points());
+    }
+
+    public record LoyaltyRedeemRequest(@jakarta.validation.constraints.Positive long points) { }
 }

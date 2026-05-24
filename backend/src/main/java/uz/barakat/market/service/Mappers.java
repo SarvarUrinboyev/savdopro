@@ -135,7 +135,8 @@ public final class Mappers {
                                             BigDecimal paidTotal, int transactionCount) {
         return new CustomerResponse(c.getId(), c.getName(), c.getPhone(), c.getAddress(),
                 c.getNote(), goodsTotal, paidTotal, goodsTotal.subtract(paidTotal),
-                transactionCount, c.getCreatedAt());
+                transactionCount, c.getCreatedAt(),
+                c.getPointsBalance(), c.getPointsTotalEarned());
     }
 
     public static CustomerTransactionResponse customerTransaction(CustomerTransaction t) {
@@ -151,7 +152,8 @@ public final class Mappers {
     public static PaymentResponse payment(Payment p) {
         return new PaymentResponse(p.getId(), p.getDate(), p.getDirection(), p.getCategory(),
                 p.getParty(), p.getAmount(), p.getMethod(), p.getCurrency(), p.getNote(),
-                p.getCreatedAt(), "PAYMENT");
+                p.getCreatedAt(), "PAYMENT",
+                p.getDiscountAmount(), p.getDiscountPercent(), p.getCustomerId());
     }
 
     /** Outstanding part of a debt, never negative. */

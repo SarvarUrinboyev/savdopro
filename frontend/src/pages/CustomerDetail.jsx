@@ -103,6 +103,41 @@ function Detail({ data, reload }) {
                     label={tr(info.label)} value={info.amount} />
       </div>
 
+      {/* Phase 4.4 loyalty pill — only renders for customers who've
+          ever earned a point so single-tx walk-ins stay uncluttered. */}
+      {(customer.pointsBalance > 0 || customer.pointsTotalEarned > 0) && (
+        <div className="card" style={{
+          marginTop: -8, marginBottom: 16,
+          background: 'linear-gradient(135deg, rgba(34,197,94,.08), rgba(59,130,246,.05))',
+          borderColor: 'rgba(34,197,94,.25)',
+        }}>
+          <div className="flex-between" style={{ padding: '14px 18px' }}>
+            <div>
+              <div style={{ fontSize: 11, textTransform: 'uppercase',
+                            letterSpacing: '.08em', color: 'var(--muted)' }}>
+                ⭐ {tr('Loyalty ball')}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800,
+                            color: 'var(--brand-green, #22c55e)' }}>
+                {Number(customer.pointsBalance).toLocaleString()}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {tr('Jami yutilgan')}: {Number(customer.pointsTotalEarned).toLocaleString()}
+                {' · '}
+                {tr('1 ball')} = 1 000 {tr("so'm chegirma")}
+              </div>
+            </div>
+            <button
+              className="btn btn-ghost"
+              disabled={customer.pointsBalance <= 0}
+              onClick={() => setModal({ type: 'redeem' })}
+            >
+              💰 {tr('Ball ishlatish')}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <div className="card">
           <div className="card-head">
@@ -194,6 +229,23 @@ function Detail({ data, reload }) {
             reload();
           }}
           onClose={close}
+        />
+      )}
+
+      {modal?.type === 'redeem' && (
+        <RedeemPointsModal
+          customer={customer}
+          onClose={close}
+          onDone={async (points) => {
+            try {
+              await CustomerApi.redeemPoints(customer.id, points);
+              toast.success(`${tr('Ishlatildi')}: ${points} ${tr('ball')} (${points * 1000} ${tr("so'm chegirma")})`);
+              close();
+              reload();
+            } catch (err) {
+              toast.error(err.message);
+            }
+          }}
         />
       )}
 
@@ -795,6 +847,85 @@ function EditTxModal({ tx, onSubmit, onClose }) {
                onChange={(e) => setNote(e.target.value)} />
       </div>
       {error && <div style={{ color: 'var(--red)', fontSize: 12 }}>{error}</div>}
+    </Modal>
+  );
+}
+
+/**
+ * Burn loyalty points for a UZS-equivalent discount (Phase 4.4).
+ * Caller updates the backend via CustomerApi.redeemPoints and re-fetches
+ * the customer; this modal only collects the amount.
+ */
+function RedeemPointsModal({ customer, onClose, onDone }) {
+  const t = useT();
+  const [points, setPoints] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const max = customer.pointsBalance || 0;
+  const num = Number(points);
+  const valid = Number.isFinite(num) && num > 0 && num <= max;
+
+  const submit = async () => {
+    setError('');
+    if (!valid) {
+      setError(`${t('1 dan')} ${max} ${t('gacha kiriting')}`);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onDone(num);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  const quick = (frac) => setPoints(String(Math.floor(max * frac)));
+
+  return (
+    <Modal
+      title={t('Ball ishlatish')}
+      onClose={onClose}
+      footer={(
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            {t('Bekor qilish')}
+          </button>
+          <button className="btn btn-primary" onClick={submit} disabled={busy || !valid}>
+            {busy ? t('Ishlanmoqda...')
+                  : `${num || 0} ${t('ball')} → ${(num || 0) * 1000} ${t("so'm")}`}
+          </button>
+        </>
+      )}
+    >
+      <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+        {t('Mavjud')}: <b>{max.toLocaleString()}</b> {t('ball')}
+        {' · '} 1 {t('ball')} = 1 000 {t("so'm chegirma")}
+      </p>
+      <div className="field">
+        <label>{t('Necha ball ishlatamiz?')}</label>
+        <input
+          className="input" type="number" min="1" max={max}
+          value={points} onChange={(e) => setPoints(e.target.value)}
+          placeholder="0" autoFocus
+        />
+      </div>
+      <div className="flex gap-8" style={{ marginTop: 6 }}>
+        <button className="btn btn-ghost btn-sm" type="button"
+                onClick={() => quick(0.25)}>25%</button>
+        <button className="btn btn-ghost btn-sm" type="button"
+                onClick={() => quick(0.5)}>50%</button>
+        <button className="btn btn-ghost btn-sm" type="button"
+                onClick={() => quick(0.75)}>75%</button>
+        <button className="btn btn-ghost btn-sm" type="button"
+                onClick={() => setPoints(String(max))}>100%</button>
+      </div>
+      {error && (
+        <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>
+          ⚠ {error}
+        </div>
+      )}
     </Modal>
   );
 }

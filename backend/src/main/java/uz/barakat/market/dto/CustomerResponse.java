@@ -18,5 +18,7 @@ public record CustomerResponse(
         BigDecimal paidTotal,
         BigDecimal balance,
         int transactionCount,
-        LocalDateTime createdAt) {
+        LocalDateTime createdAt,
+        long pointsBalance,
+        long pointsTotalEarned) {
 }

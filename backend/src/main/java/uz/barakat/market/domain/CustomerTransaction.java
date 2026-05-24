@@ -42,4 +42,13 @@ public class CustomerTransaction extends TenantScopedEntity {
 
     @Column(length = 500)
     private String note;
+
+    /**
+     * Signed loyalty-points delta for this row (Phase 4.4). Positive on
+     * earn rows, negative on redeem rows, null on legacy rows that
+     * predate loyalty. {@code sum(points_delta)} is the source of
+     * truth; {@code customers.points_balance} is just a denormalised cache.
+     */
+    @Column(name = "points_delta")
+    private Long pointsDelta;
 }

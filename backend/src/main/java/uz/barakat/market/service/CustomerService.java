@@ -105,6 +105,42 @@ public class CustomerService {
     }
 
     /**
+     * Redeem loyalty points for a UZS-equivalent discount.
+     *
+     * <p>Returns the new balance. The points-to-UZS ratio is the inverse
+     * of the earn rule in {@code PaymentService} — 1 point = 1 000 UZS
+     * off — so the cashier can simply read the value to the customer.
+     * Throws if the customer doesn't have enough points; throws if
+     * {@code amount} is non-positive (would let a malicious client
+     * increase the balance).
+     */
+    public CustomerResponse redeemPoints(Long customerId, long pointsToBurn) {
+        if (pointsToBurn <= 0) {
+            throw new BadRequestException("Ball miqdori 0 dan katta bo'lishi kerak");
+        }
+        Customer customer = find(customerId);
+        if (customer.getPointsBalance() < pointsToBurn) {
+            throw new BadRequestException(
+                    "Yetarli ball yo'q: mavjud " + customer.getPointsBalance()
+                            + ", so'ralgan " + pointsToBurn);
+        }
+        customer.setPointsBalance(customer.getPointsBalance() - pointsToBurn);
+        customers.save(customer);
+
+        CustomerTransaction row = new CustomerTransaction();
+        row.setCustomerId(customerId);
+        row.setDate(java.time.LocalDate.now());
+        row.setType(CustomerTxType.PAYMENT);
+        row.setDescription("Loyalty redeem: −" + pointsToBurn + " ball");
+        row.setAmount(java.math.BigDecimal.ZERO);
+        row.setPointsDelta(-pointsToBurn);
+        transactions.save(row);
+
+        return toResponse(customer,
+                transactions.findByCustomerIdOrderByDateDescIdDesc(customerId));
+    }
+
+    /**
      * Adds a ledger line. GOODS sells a real warehouse product: stock is
      * checked and deducted (a SALE movement). PAYMENT just records money in.
      * If the customer linked the Telegram bot, they are notified.

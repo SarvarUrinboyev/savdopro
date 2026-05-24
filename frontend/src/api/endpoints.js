@@ -182,6 +182,9 @@ export const CustomerApi = {
   updateTransaction: (id, txId, body) =>
     api.put(`/customers/${id}/transactions/${txId}`, body),
   removeTransaction: (id, txId) => api.del(`/customers/${id}/transactions/${txId}`),
+  // Phase 4.4 loyalty: burn N points → returns updated customer.
+  redeemPoints: (id, points) =>
+    api.post(`/customers/${id}/loyalty/redeem`, { points }),
 };
 
 export const ManagementApi = {

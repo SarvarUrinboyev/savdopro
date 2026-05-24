@@ -120,13 +120,52 @@ public class PaymentService {
     public PaymentResponse create(PaymentRequest request) {
         Payment payment = new Payment();
         apply(payment, request);
-        return Mappers.payment(payments.save(payment));
+        Payment saved = payments.save(payment);
+        // Phase 4.4: award loyalty points on every INCOMING payment that
+        // is attributed to a customer. Points formula = 1 per
+        // POINTS_PER_UZS so the cashier never has to do mental math.
+        // Walk-in sales (customerId == null) skip this branch entirely.
+        if (saved.getDirection() == PaymentDirection.INCOMING
+                && saved.getCustomerId() != null) {
+            awardLoyaltyPoints(saved);
+        }
+        return Mappers.payment(saved);
     }
 
     public PaymentResponse update(Long id, PaymentRequest request) {
         Payment payment = find(id);
         apply(payment, request);
         return Mappers.payment(payments.save(payment));
+    }
+
+    /** 1 point per 1,000 UZS (or 100 UZS-equivalent for USD sales). */
+    private static final long POINTS_PER_UZS  = 1_000L;
+    private static final long POINTS_PER_USD  = 10L;     // ~12 500 UZS ~ 12 points
+
+    private void awardLoyaltyPoints(Payment payment) {
+        long earned = computePoints(payment.getAmount(), payment.getCurrency());
+        if (earned <= 0) return;
+        Customer customer = customers.findById(payment.getCustomerId()).orElse(null);
+        if (customer == null) return;
+        customer.setPointsBalance(customer.getPointsBalance() + earned);
+        customer.setPointsTotalEarned(customer.getPointsTotalEarned() + earned);
+        customers.save(customer);
+
+        CustomerTransaction row = new CustomerTransaction();
+        row.setCustomerId(customer.getId());
+        row.setDate(payment.getDate());
+        row.setType(CustomerTxType.PAYMENT);
+        row.setDescription("Loyalty: " + earned + " ball");
+        row.setAmount(BigDecimal.ZERO);   // pure points row, no cash movement
+        row.setPointsDelta(earned);
+        customerTransactions.save(row);
+    }
+
+    private static long computePoints(BigDecimal amount, Currency currency) {
+        if (amount == null || amount.signum() <= 0) return 0L;
+        long divisor = currency == Currency.USD ? POINTS_PER_USD : POINTS_PER_UZS;
+        return amount.divide(BigDecimal.valueOf(divisor),
+                0, java.math.RoundingMode.FLOOR).longValueExact();
     }
 
     public void delete(Long id) {
@@ -146,12 +185,14 @@ public class PaymentService {
     // --------------------------------------------------------------- mappers
 
     private static PaymentResponse fromExpense(Expense e) {
+        // Virtual rows have no discount / customer attribution.
         return new PaymentResponse(
                 e.getId(), e.getDate(), PaymentDirection.OUTGOING,
                 PaymentCategory.OTHER, e.getName(),
                 e.getAmount(), e.getPaymentType(),
                 e.getCurrency() != null ? e.getCurrency() : Currency.UZS,
-                null, e.getCreatedAt(), "EXPENSE");
+                null, e.getCreatedAt(), "EXPENSE",
+                null, null, null);
     }
 
     private static PaymentResponse fromHomeExpense(HomeExpense e) {
@@ -160,7 +201,8 @@ public class PaymentService {
                 PaymentCategory.OTHER, e.getName(),
                 e.getAmount(), e.getPaymentType(),
                 e.getCurrency() != null ? e.getCurrency() : Currency.UZS,
-                null, e.getCreatedAt(), "HOME_EXPENSE");
+                null, e.getCreatedAt(), "HOME_EXPENSE",
+                null, null, null);
     }
 
     private static PaymentResponse fromCustomerPayment(
@@ -172,7 +214,8 @@ public class PaymentService {
                 tx.getId(), tx.getDate(), PaymentDirection.INCOMING,
                 PaymentCategory.CUSTOMER, party,
                 tx.getAmount(), PaymentType.NAQD, Currency.USD,
-                tx.getNote(), tx.getCreatedAt(), "CUSTOMER");
+                tx.getNote(), tx.getCreatedAt(), "CUSTOMER",
+                null, null, tx.getCustomerId());
     }
 
     // --------------------------------------------------------------- helpers
@@ -186,6 +229,13 @@ public class PaymentService {
         payment.setMethod(request.method());
         payment.setCurrency(request.currency() != null ? request.currency() : Currency.UZS);
         payment.setNote(blankToNull(request.note()));
+        // Discount + loyalty (Phase 4.4) — null-safe so old clients that
+        // don't send these fields keep working.
+        payment.setDiscountAmount(request.discountAmount() != null
+                ? request.discountAmount() : BigDecimal.ZERO);
+        payment.setDiscountPercent(request.discountPercent() != null
+                ? request.discountPercent() : BigDecimal.ZERO);
+        payment.setCustomerId(request.customerId());
     }
 
     private static String blankToNull(String value) {
