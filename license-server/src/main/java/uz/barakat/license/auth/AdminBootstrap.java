@@ -1,6 +1,8 @@
 package uz.barakat.license.auth;
 
 import jakarta.annotation.PostConstruct;
+import java.util.Locale;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,9 +24,10 @@ import uz.barakat.license.repository.AppUserRepository;
  *
  * <h2>Weak-password gate</h2>
  * Before creating the seeded super-admin, we fail closed if the
- * configured password is unset, shorter than 8 chars, or equal to the
- * well-known {@code admin123} fallback. The operator must supply a
- * strong value via the {@code SAVDOPRO_ADMIN_PASSWORD} env var.
+ * configured password is unset, shorter than 8 chars, or matches one of
+ * the well-known weak defaults in {@link #WEAK_DEFAULT_PASSWORDS}. The
+ * operator must supply a strong value via the
+ * {@code SAVDOPRO_ADMIN_PASSWORD} env var.
  * <p>Setting {@code SAVDOPRO_ALLOW_DEV_ADMIN=true} opts in to the weak
  * default with a loud WARN and is intended for local development only.
  * Mirrors the {@code SAVDOPRO_ALLOW_DEV_SECRET} flag enforced by
@@ -35,8 +38,22 @@ public class AdminBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(AdminBootstrap.class);
 
-    /** Well-known weak default we explicitly reject. Compared case-insensitively. */
-    static final String WEAK_DEFAULT_PASSWORD = "admin123";
+    /**
+     * Well-known weak defaults we explicitly reject. Stored lowercase;
+     * the configured password is compared after folding to {@link Locale#ROOT}
+     * lowercase. Entries shorter than {@link #MIN_PASSWORD_LENGTH} are
+     * also caught by the length check, but we list them anyway so the
+     * rejection holds if that threshold is ever lowered.
+     */
+    static final Set<String> WEAK_DEFAULT_PASSWORDS = Set.of(
+            "admin",
+            "admin123",
+            "password",
+            "12345678",
+            "qwerty",
+            "savdopro",
+            "barakat"
+    );
 
     /** Minimum acceptable length for the bootstrapped admin password. */
     static final int MIN_PASSWORD_LENGTH = 8;
@@ -72,16 +89,16 @@ public class AdminBootstrap {
         // weak default (intended for local development only).
         boolean weak = adminPassword == null
                 || adminPassword.length() < MIN_PASSWORD_LENGTH
-                || WEAK_DEFAULT_PASSWORD.equalsIgnoreCase(adminPassword);
+                || WEAK_DEFAULT_PASSWORDS.contains(adminPassword.toLowerCase(Locale.ROOT));
         if (weak) {
             if (!allowDevDefaults) {
                 throw new IllegalStateException(
                         "REFUSING TO START: savdopro.admin.password is unset, shorter than "
-                                + MIN_PASSWORD_LENGTH + " chars, or equal to the well-known '"
-                                + WEAK_DEFAULT_PASSWORD + "' default. Generate a strong "
-                                + "password and pass it via the SAVDOPRO_ADMIN_PASSWORD env "
-                                + "var. To explicitly allow the weak default for local "
-                                + "development, set SAVDOPRO_ALLOW_DEV_ADMIN=true.");
+                                + MIN_PASSWORD_LENGTH + " chars, or matches a well-known weak "
+                                + "default. Generate a strong password and pass it via the "
+                                + "SAVDOPRO_ADMIN_PASSWORD env var. To explicitly allow the "
+                                + "weak default for local development, set "
+                                + "SAVDOPRO_ALLOW_DEV_ADMIN=true.");
             }
             log.warn("=================================================================");
             log.warn("  Admin password is WEAK — DO NOT USE IN PRODUCTION.");
