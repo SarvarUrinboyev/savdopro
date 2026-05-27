@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { Suspense, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AiChatWidget } from './AiChatWidget.jsx';
 import { QuickSearch } from './QuickSearch.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { ShopSwitcher } from './ShopSwitcher.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
+import { Spinner } from './ui.jsx';
 import { useKeyboard } from '../hooks/useKeyboard.js';
 import { useAuth } from '../context/Auth.jsx';
 import { useSettings } from '../context/Settings.jsx';
@@ -143,7 +144,9 @@ export function Layout({ shift }) {
         )}
         <main className="content">
           <ErrorBoundary key={pathname}>
-            <Outlet />
+            <Suspense fallback={<div className="center-screen"><Spinner /></div>}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

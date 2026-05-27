@@ -1,35 +1,44 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ShiftApi } from './api/endpoints.js';
 import { Layout } from './components/Layout.jsx';
 import { Spinner } from './components/ui.jsx';
 import { useAuth } from './context/Auth.jsx';
 import { useApi } from './hooks/useApi.js';
-import { Calculator } from './pages/Calculator.jsx';
-import { CustomerDetail } from './pages/CustomerDetail.jsx';
-import { Customers } from './pages/Customers.jsx';
-import { Dashboard } from './pages/Dashboard.jsx';
-import { Admin } from './pages/Admin.jsx';
-import { AccountDetail } from './pages/AccountDetail.jsx';
-import { AuditLog } from './pages/AuditLog.jsx';
-import { Debt } from './pages/Debt.jsx';
-import { HomeExpenses } from './pages/HomeExpenses.jsx';
 import { Login } from './pages/Login.jsx';
-import { Shops } from './pages/Shops.jsx';
-import { Management } from './pages/Management.jsx';
-import { Orders } from './pages/Orders.jsx';
-import { Payments } from './pages/Payments.jsx';
-import { Pos } from './pages/Pos.jsx';
-import { PosHistory } from './pages/PosHistory.jsx';
-import { Promos } from './pages/Promos.jsx';
-import { ShiftClose } from './pages/ShiftClose.jsx';
-import { ShiftHistory } from './pages/ShiftHistory.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
-import { ProductEditor } from './pages/ProductEditor.jsx';
-import { SupplierDetail } from './pages/SupplierDetail.jsx';
-import { Suppliers } from './pages/Suppliers.jsx';
-import { Transfers } from './pages/Transfers.jsx';
-import { Warehouse } from './pages/Warehouse.jsx';
-import { Reports } from './pages/Reports.jsx';
+
+// Route-level pages are lazy-loaded so each renders only when first navigated
+// to, keeping the initial bundle small. The Suspense boundary lives inside
+// Layout, around <Outlet />, so the sidebar/topbar stay mounted while a page
+// chunk is fetched.
+const lazyPage = (loader, exportName) =>
+  lazy(() => loader().then((m) => ({ default: m[exportName] })));
+
+const Calculator = lazyPage(() => import('./pages/Calculator.jsx'), 'Calculator');
+const CustomerDetail = lazyPage(() => import('./pages/CustomerDetail.jsx'), 'CustomerDetail');
+const Customers = lazyPage(() => import('./pages/Customers.jsx'), 'Customers');
+const Dashboard = lazyPage(() => import('./pages/Dashboard.jsx'), 'Dashboard');
+const Admin = lazyPage(() => import('./pages/Admin.jsx'), 'Admin');
+const AccountDetail = lazyPage(() => import('./pages/AccountDetail.jsx'), 'AccountDetail');
+const AuditLog = lazyPage(() => import('./pages/AuditLog.jsx'), 'AuditLog');
+const Debt = lazyPage(() => import('./pages/Debt.jsx'), 'Debt');
+const HomeExpenses = lazyPage(() => import('./pages/HomeExpenses.jsx'), 'HomeExpenses');
+const Shops = lazyPage(() => import('./pages/Shops.jsx'), 'Shops');
+const Management = lazyPage(() => import('./pages/Management.jsx'), 'Management');
+const Orders = lazyPage(() => import('./pages/Orders.jsx'), 'Orders');
+const Payments = lazyPage(() => import('./pages/Payments.jsx'), 'Payments');
+const Pos = lazyPage(() => import('./pages/Pos.jsx'), 'Pos');
+const PosHistory = lazyPage(() => import('./pages/PosHistory.jsx'), 'PosHistory');
+const Promos = lazyPage(() => import('./pages/Promos.jsx'), 'Promos');
+const ShiftClose = lazyPage(() => import('./pages/ShiftClose.jsx'), 'ShiftClose');
+const ShiftHistory = lazyPage(() => import('./pages/ShiftHistory.jsx'), 'ShiftHistory');
+const ProductEditor = lazyPage(() => import('./pages/ProductEditor.jsx'), 'ProductEditor');
+const SupplierDetail = lazyPage(() => import('./pages/SupplierDetail.jsx'), 'SupplierDetail');
+const Suppliers = lazyPage(() => import('./pages/Suppliers.jsx'), 'Suppliers');
+const Transfers = lazyPage(() => import('./pages/Transfers.jsx'), 'Transfers');
+const Warehouse = lazyPage(() => import('./pages/Warehouse.jsx'), 'Warehouse');
+const Reports = lazyPage(() => import('./pages/Reports.jsx'), 'Reports');
 
 /**
  * Top level: until a shift is open the app shows the "open shift" gate;
