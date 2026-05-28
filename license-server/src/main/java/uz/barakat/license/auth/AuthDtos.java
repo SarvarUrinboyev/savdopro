@@ -109,7 +109,14 @@ public final class AuthDtos {
              * to see. NULL = all modules visible (legacy/default).
              * The desktop sidebar filters its nav-items against this list.
              */
-            String enabledModules) {
+            String enabledModules,
+            /**
+             * Phase 4.5: effective resource-action permissions (role
+             * defaults + per-user overrides). The client uses this to
+             * hide affordances the user can't action. SUPER_ADMIN comes
+             * back as the single token {@code "*:*"}.
+             */
+            java.util.Set<String> permissions) {
     }
 
     /**

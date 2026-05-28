@@ -34,6 +34,7 @@ public class AuthService {
     private final TelegramOAuthVerifier telegramVerifier;
     private final OtpService otp;
     private final SmsProvider sms;
+    private final PermissionService permissions;
     // Cost 12 — see AdminBootstrap; old hashes (cost 10) still verify
     // because BCrypt stores the cost inside the hash, so existing users
     // keep logging in until their next password reset re-hashes at 12.
@@ -42,7 +43,8 @@ public class AuthService {
     public AuthService(AppUserRepository users, AccountRepository accounts,
                        JwtService jwt, RefreshTokenService refreshTokens,
                        TotpService totp, TelegramOAuthVerifier telegramVerifier,
-                       OtpService otp, SmsProvider sms) {
+                       OtpService otp, SmsProvider sms,
+                       PermissionService permissions) {
         this.users = users;
         this.accounts = accounts;
         this.jwt = jwt;
@@ -51,6 +53,7 @@ public class AuthService {
         this.telegramVerifier = telegramVerifier;
         this.otp = otp;
         this.sms = sms;
+        this.permissions = permissions;
     }
 
     public LoginResponse login(LoginRequest request, String clientIp) {
@@ -335,7 +338,8 @@ public class AuthService {
                 user.getId(), user.getUsername(), user.getFullName(), user.getRole().name(),
                 account.getId(), account.getName(),
                 account.getSubscriptionExpires(), days, account.isBlocked(),
-                brandFor(account), modules);
+                brandFor(account), modules,
+                permissions.effective(user));
     }
 
     /**
