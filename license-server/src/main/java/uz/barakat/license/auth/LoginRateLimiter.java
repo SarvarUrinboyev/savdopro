@@ -40,6 +40,12 @@ public class LoginRateLimiter {
     /** Per-IP attempt counter; auto-evicts on success or window expiry. */
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
+    private final SuspiciousLoginAlerter alerter;
+
+    public LoginRateLimiter(SuspiciousLoginAlerter alerter) {
+        this.alerter = alerter;
+    }
+
     /**
      * Returns true if the caller may attempt to log in right now. Side-effect:
      * if this is a new IP or its window has rolled over, the bucket is
@@ -76,6 +82,9 @@ public class LoginRateLimiter {
             b.lockedUntil = now.plus(Duration.ofMinutes(LOCKOUT_MINUTES));
             log.warn("Login rate-limit tripped: ip={} failures={} locked until {}",
                     ip, count, b.lockedUntil);
+            // Fire-and-forget: the alerter no-ops if Telegram isn't
+            // configured, so this is safe to call unconditionally.
+            alerter.notifyLockout(ip, b.lockedUntil);
         }
     }
 
