@@ -70,4 +70,13 @@ public class AppUser extends BaseEntity {
      */
     @Column(name = "phone", unique = true, length = 20)
     private String phone;
+
+    /**
+     * Comma-separated "RESOURCE:ACTION" tokens granting access beyond
+     * (or restricting under) the role defaults (Phase 4.5, V9 migration).
+     * NULL = fall back to {@link UserRole}'s default permission set.
+     * See {@link uz.barakat.license.auth.PermissionService}.
+     */
+    @Column(name = "permissions", length = 500)
+    private String permissions;
 }

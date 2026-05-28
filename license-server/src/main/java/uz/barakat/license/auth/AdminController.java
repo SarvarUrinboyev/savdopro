@@ -27,6 +27,7 @@ import uz.barakat.license.auth.AdminDtos.CreateAccountRequest;
 import uz.barakat.license.auth.AdminDtos.CreateUserRequest;
 import uz.barakat.license.auth.AdminDtos.ModulesRequest;
 import uz.barakat.license.auth.AdminDtos.SetPasswordRequest;
+import uz.barakat.license.auth.AdminDtos.SetPermissionsRequest;
 import uz.barakat.license.auth.AdminDtos.UpdateAccountRequest;
 import uz.barakat.license.domain.AdminAuditEntry;
 
@@ -42,10 +43,13 @@ public class AdminController {
 
     private final AdminService service;
     private final AuditService audit;
+    private final PermissionService permissions;
 
-    public AdminController(AdminService service, AuditService audit) {
+    public AdminController(AdminService service, AuditService audit,
+                           PermissionService permissions) {
         this.service = service;
         this.audit = audit;
+        this.permissions = permissions;
     }
 
     /**
@@ -136,6 +140,21 @@ public class AdminController {
     public ResponseEntity<Void> resetPassword(@PathVariable Long userId,
                                               @Valid @RequestBody SetPasswordRequest request) {
         service.resetPassword(userId, request.password());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Replace the per-user permission CSV (Phase 4.5 granular ACL).
+     * Body: {@code {"permissions":"USERS:READ,AUDIT:READ"}}. Send null
+     * or empty to clear the override and fall back to role defaults.
+     */
+    @PatchMapping("/users/{userId}/permissions")
+    public ResponseEntity<Void> setPermissions(@PathVariable Long userId,
+                                               @RequestBody SetPermissionsRequest request) {
+        permissions.setPermissions(userId,
+                request == null ? null : request.permissions());
+        audit.record("USER_SET_PERMISSIONS", "USER", userId, null,
+                request == null ? null : request.permissions());
         return ResponseEntity.noContent().build();
     }
 

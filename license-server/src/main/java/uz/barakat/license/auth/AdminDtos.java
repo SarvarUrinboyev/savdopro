@@ -91,4 +91,12 @@ public final class AdminDtos {
             String fullName,
             String role) {
     }
+
+    /**
+     * Body of {@code PATCH /api/admin/users/{id}/permissions}. Send the
+     * full CSV of "RESOURCE:ACTION" tokens (or null/blank to clear the
+     * override and fall back to role defaults). Unknown tokens are
+     * rejected with 400 so a typo never silently grants nothing.
+     */
+    public record SetPermissionsRequest(String permissions) { }
 }
