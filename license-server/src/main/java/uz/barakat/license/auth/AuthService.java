@@ -31,6 +31,7 @@ public class AuthService {
     private final JwtService jwt;
     private final RefreshTokenService refreshTokens;
     private final TotpService totp;
+    private final TelegramOAuthVerifier telegramVerifier;
     // Cost 12 — see AdminBootstrap; old hashes (cost 10) still verify
     // because BCrypt stores the cost inside the hash, so existing users
     // keep logging in until their next password reset re-hashes at 12.
@@ -38,12 +39,13 @@ public class AuthService {
 
     public AuthService(AppUserRepository users, AccountRepository accounts,
                        JwtService jwt, RefreshTokenService refreshTokens,
-                       TotpService totp) {
+                       TotpService totp, TelegramOAuthVerifier telegramVerifier) {
         this.users = users;
         this.accounts = accounts;
         this.jwt = jwt;
         this.refreshTokens = refreshTokens;
         this.totp = totp;
+        this.telegramVerifier = telegramVerifier;
     }
 
     public LoginResponse login(LoginRequest request, String clientIp) {
@@ -118,6 +120,64 @@ public class AuthService {
                 .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
         user.setTotpEnabled(false);
         user.setTotpSecret(null);
+        users.save(user);
+    }
+
+    // ============================================================ Telegram OAuth
+
+    /**
+     * Verify a Telegram Login Widget payload and mint a SavdoPRO session
+     * for the linked user. The Telegram id must already point at an
+     * existing app_users row (linking is done by an authenticated user
+     * via {@link #linkTelegram}); cold sign-up via Telegram is not
+     * supported — a SUPER_ADMIN must provision the SavdoPRO account first.
+     */
+    public LoginResponse loginViaTelegram(
+            uz.barakat.license.auth.AuthDtos.TelegramAuthRequest request,
+            String clientIp) {
+        long telegramId = telegramVerifier.verifyAndExtractId(request.asFieldMap());
+        AppUser user = users.findByTelegramId(telegramId)
+                .orElseThrow(() -> new BadRequestException(
+                        "Telegram hisobingiz hech qaysi SavdoPRO foydalanuvchisiga bog'lanmagan"));
+        Account account = requireUsableAccount(user.getAccountId());
+        user.setLastLoginAt(LocalDateTime.now());
+        users.save(user);
+        RefreshTokenService.Issued refresh = refreshTokens.issue(
+                user.getId(), account.getId(), clientIp);
+        return new LoginResponse(
+                jwt.issue(user),
+                refresh.plaintext(),
+                jwt.accessTtlSeconds(),
+                refresh.expiresAt(),
+                toMe(user, account));
+    }
+
+    /**
+     * Link the current user (authenticated via password / TOTP) to a
+     * verified Telegram id. Refuses to link if the Telegram account is
+     * already bound to a different SavdoPRO user — the unique index
+     * would catch it but a friendly 400 beats a 500.
+     */
+    public void linkTelegram(Long userId,
+                             uz.barakat.license.auth.AuthDtos.TelegramAuthRequest request) {
+        long telegramId = telegramVerifier.verifyAndExtractId(request.asFieldMap());
+        users.findByTelegramId(telegramId).ifPresent(existing -> {
+            if (!existing.getId().equals(userId)) {
+                throw new BadRequestException(
+                        "Bu Telegram hisobi allaqachon boshqa foydalanuvchiga bog'langan");
+            }
+        });
+        AppUser user = users.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
+        user.setTelegramId(telegramId);
+        users.save(user);
+    }
+
+    /** Detach the Telegram id from the current user. Idempotent. */
+    public void unlinkTelegram(Long userId) {
+        AppUser user = users.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
+        user.setTelegramId(null);
         users.save(user);
     }
 

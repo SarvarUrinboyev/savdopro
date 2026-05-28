@@ -52,4 +52,13 @@ public class AppUser extends BaseEntity {
 
     @Column(name = "totp_enabled", nullable = false)
     private boolean totpEnabled = false;
+
+    /**
+     * Telegram numeric user id when the user has linked their Telegram
+     * account via the Login Widget. Null = not linked. Unique across the
+     * table (V7 migration), so a Telegram account can only point at one
+     * SavdoPRO user.
+     */
+    @Column(name = "telegram_id", unique = true)
+    private Long telegramId;
 }

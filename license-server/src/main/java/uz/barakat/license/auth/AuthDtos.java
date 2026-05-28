@@ -24,6 +24,35 @@ public final class AuthDtos {
             @NotBlank(message = "Kod kiritilishi shart") String code) { }
 
     /**
+     * Raw payload Telegram's Login Widget posts. The server verifies the
+     * HMAC over these fields and only trusts {@code id} as the linkage
+     * key after verification passes — everything else (first/last name,
+     * username, photo) is informational and is allowed to mutate.
+     */
+    public record TelegramAuthRequest(
+            String id,
+            String firstName,
+            String lastName,
+            String username,
+            String photoUrl,
+            String authDate,
+            @NotBlank(message = "Telegram imzosi bo'lishi kerak") String hash) {
+
+        /** Project into the field map the verifier expects (snake_case keys). */
+        public java.util.Map<String, String> asFieldMap() {
+            java.util.LinkedHashMap<String, String> m = new java.util.LinkedHashMap<>();
+            m.put("id", id);
+            if (firstName != null) m.put("first_name", firstName);
+            if (lastName != null) m.put("last_name", lastName);
+            if (username != null) m.put("username", username);
+            if (photoUrl != null) m.put("photo_url", photoUrl);
+            if (authDate != null) m.put("auth_date", authDate);
+            m.put("hash", hash);
+            return m;
+        }
+    }
+
+    /**
      * Refresh-token rotation payload. The plaintext refresh token never
      * appears in the access JWT — we keep them on separate transports so
      * a stolen JWT alone can't extend itself.

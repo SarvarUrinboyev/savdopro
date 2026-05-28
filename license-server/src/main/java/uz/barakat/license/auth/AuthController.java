@@ -15,6 +15,7 @@ import uz.barakat.license.auth.AuthDtos.LoginRequest;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
 import uz.barakat.license.auth.AuthDtos.RefreshRequest;
+import uz.barakat.license.auth.AuthDtos.TelegramAuthRequest;
 import uz.barakat.license.auth.AuthDtos.TotpSetupResponse;
 import uz.barakat.license.auth.AuthDtos.TotpVerifyRequest;
 import uz.barakat.license.exception.BadRequestException;
@@ -117,6 +118,37 @@ public class AuthController {
     @PostMapping("/totp/disable")
     public void totpDisable(HttpServletRequest request) {
         service.disableTotp(requireUserId(request));
+    }
+
+    // ============================================================ Telegram OAuth
+
+    /**
+     * Mint a session from a verified Telegram Login Widget payload.
+     * Public endpoint (no JWT required) — the Telegram HMAC itself
+     * is the credential. The Telegram id must already be linked to an
+     * existing user (see {@code /telegram/link}); cold sign-up via
+     * Telegram is intentionally not supported.
+     */
+    @PostMapping("/telegram")
+    public LoginResponse telegramLogin(@Valid @RequestBody TelegramAuthRequest request,
+                                       HttpServletRequest http) {
+        return service.loginViaTelegram(request, clientIp(http));
+    }
+
+    /**
+     * Attach the current session's user to a verified Telegram id. Used
+     * once, from the "Telegram'ni ulash" button inside the settings page.
+     */
+    @PostMapping("/telegram/link")
+    public void telegramLink(HttpServletRequest request,
+                             @Valid @RequestBody TelegramAuthRequest body) {
+        service.linkTelegram(requireUserId(request), body);
+    }
+
+    /** Detach the Telegram id from the current user. Idempotent. */
+    @PostMapping("/telegram/unlink")
+    public void telegramUnlink(HttpServletRequest request) {
+        service.unlinkTelegram(requireUserId(request));
     }
 
     private static Long requireUserId(HttpServletRequest request) {
