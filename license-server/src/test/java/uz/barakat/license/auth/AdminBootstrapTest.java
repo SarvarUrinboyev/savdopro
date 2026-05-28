@@ -11,6 +11,8 @@ import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -97,6 +99,32 @@ class AdminBootstrapTest {
 
         bootstrap.ensureAdmin();
 
+        verify(users, never()).save(any(AppUser.class));
+    }
+
+    /**
+     * Every well-known weak default (in every case variant we care about),
+     * plus a few boundary-length values, must trip the gate. If this test
+     * fails after a refactor it almost certainly means
+     * {@link AdminBootstrap#WEAK_DEFAULT_PASSWORDS} or
+     * {@link AdminBootstrap#MIN_PASSWORD_LENGTH} silently lost an entry.
+     */
+    @ParameterizedTest(name = "[{index}] \"{0}\" must be rejected")
+    @ValueSource(strings = {
+            // The 7 explicit weak defaults.
+            "admin", "admin123", "password", "12345678", "qwerty", "savdopro", "barakat",
+            // Case variants — equalsIgnoreCase / toLowerCase contract.
+            "ADMIN123", "Admin123", "PASSWORD", "QwErTy", "BARAKAT",
+            // Boundary lengths — anything below MIN_PASSWORD_LENGTH (8).
+            "", "a", "abc", "1234567"
+    })
+    void rejectsEveryWeakOrTooShortValue(String weak) {
+        when(users.existsByUsernameIgnoreCase(USERNAME)).thenReturn(false);
+        AdminBootstrap bootstrap = new AdminBootstrap(
+                users, USERNAME, weak, FULL_NAME, false);
+
+        assertThrows(IllegalStateException.class, bootstrap::ensureAdmin,
+                "value \"" + weak + "\" should have been rejected");
         verify(users, never()).save(any(AppUser.class));
     }
 }
