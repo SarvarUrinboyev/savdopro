@@ -1,6 +1,7 @@
 package uz.barakat.license.auth;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -15,6 +16,20 @@ public final class AuthDtos {
             @NotBlank(message = "Parol kiritilishi shart") String password,
             /** 6-digit TOTP code — required only when the user has 2FA on. */
             String totpCode) {
+    }
+
+    /** Self-service merchant signup — creates a trial account + its owner user. */
+    public record RegisterRequest(
+            @NotBlank(message = "Biznes nomi kiritilishi shart") String businessName,
+            @NotBlank(message = "Ismingiz kiritilishi shart") String fullName,
+            @NotBlank(message = "Login kiritilishi shart")
+            @Size(min = 3, max = 40, message = "Login 3–40 belgidan iborat bo'lishi kerak")
+            String username,
+            @NotBlank(message = "Parol kiritilishi shart")
+            @Size(min = 6, message = "Parol kamida 6 belgi bo'lishi kerak")
+            String password,
+            /** Optional contact phone stored on the account. */
+            String phone) {
     }
 
     /** One-time payload returned by the TOTP setup endpoint. */

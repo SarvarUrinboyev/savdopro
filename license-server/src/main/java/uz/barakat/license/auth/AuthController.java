@@ -15,6 +15,7 @@ import uz.barakat.license.auth.AuthDtos.LoginRequest;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
 import uz.barakat.license.auth.AuthDtos.RefreshRequest;
+import uz.barakat.license.auth.AuthDtos.RegisterRequest;
 import uz.barakat.license.auth.AuthDtos.SmsRequestRequest;
 import uz.barakat.license.auth.AuthDtos.SmsVerifyRequest;
 import uz.barakat.license.auth.AuthDtos.TelegramAuthRequest;
@@ -62,6 +63,21 @@ public class AuthController {
             rateLimiter.recordFailure(ip);
             throw ex;
         }
+    }
+
+    /** Public self-service signup → trial account + owner, returns a session. */
+    @PostMapping("/register")
+    public LoginResponse register(@Valid @RequestBody RegisterRequest request,
+                                  HttpServletRequest http) {
+        String ip = clientIp(http);
+        if (!rateLimiter.allow(ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
+        }
+        // Count each signup toward the per-IP limit so a script can't mass-create
+        // trial accounts (until email/SMS verification lands in the next step).
+        rateLimiter.recordFailure(ip);
+        return service.register(request, ip);
     }
 
     /**

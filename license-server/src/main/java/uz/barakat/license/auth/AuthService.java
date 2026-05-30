@@ -2,10 +2,13 @@ package uz.barakat.license.auth;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.license.auth.AuthDtos.LoginRequest;
+import uz.barakat.license.auth.AuthDtos.RegisterRequest;
+import uz.barakat.license.domain.UserRole;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
 import uz.barakat.license.domain.Account;
@@ -54,6 +57,48 @@ public class AuthService {
         this.otp = otp;
         this.sms = sms;
         this.permissions = permissions;
+    }
+
+    /** Trial length granted to a brand-new self-service signup. */
+    public static final int TRIAL_DAYS = 14;
+
+    /**
+     * Self-service merchant signup: creates a trial account + its owner user
+     * and returns a session (auto-login), exactly like {@link #login}. Public
+     * endpoint — abuse is bounded by the per-IP rate limit on the controller
+     * and (next step) email/SMS verification.
+     */
+    @Transactional
+    public LoginResponse register(RegisterRequest req, String clientIp) {
+        String username = req.username().trim().toLowerCase();
+        if (users.existsByUsernameIgnoreCase(username)) {
+            throw new BadRequestException("Bu login band: " + username);
+        }
+        Account account = new Account();
+        account.setName(req.businessName().trim());
+        account.setContactPhone(
+                req.phone() == null || req.phone().isBlank() ? null : req.phone().trim());
+        account.setSubscriptionExpires(LocalDate.now().plusDays(TRIAL_DAYS));
+        account.setBlocked(false);
+        Account saved = accounts.save(account);
+
+        AppUser owner = new AppUser();
+        owner.setUsername(username);
+        owner.setPasswordHash(encoder.encode(req.password()));
+        owner.setFullName(req.fullName().trim());
+        owner.setRole(UserRole.ACCOUNT_OWNER);
+        owner.setAccountId(saved.getId());
+        try {
+            users.save(owner);
+        } catch (DataIntegrityViolationException ex) {
+            // Lost the race for this username — friendly 400, not a 500.
+            throw new BadRequestException("Bu login band: " + username);
+        }
+
+        RefreshTokenService.Issued refresh =
+                refreshTokens.issue(owner.getId(), saved.getId(), clientIp);
+        return new LoginResponse(jwt.issue(owner), refresh.plaintext(),
+                jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(owner, saved));
     }
 
     public LoginResponse login(LoginRequest request, String clientIp) {
