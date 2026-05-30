@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PrintApi, ShopApi } from '../api/endpoints.js';
+import { IS_WEB } from '../config.js';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import {
@@ -258,11 +259,15 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
           configure each location's printer and cash register. */}
       <details style={{ marginTop: 12, paddingTop: 8,
                         borderTop: '1px solid var(--border)' }}
-               onToggle={(e) => { if (e.target.open) ensurePrintersLoaded(); }}>
+               onToggle={(e) => { if (!IS_WEB && e.target.open) ensurePrintersLoaded(); }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600,
                           fontSize: 13, color: 'var(--muted)' }}>
           🖨 {t("Kassa va printer sozlamalari")}
         </summary>
+        {/* Local thermal-printer config is desktop-only: the PrintApi bridge
+            reaches the user's OS printer, which a hosted web backend cannot.
+            printerName is still preserved (kept in state + the save payload). */}
+        {!IS_WEB && (
         <div className="field" style={{ marginTop: 12 }}>
           <label>{t('Printer (Windowsda o\'rnatilgan)')}</label>
           {/* Dropdown lists what the OS sees; the free-text field below
@@ -294,6 +299,7 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
             </>
           )}
         </div>
+        )}
         <div className="field">
           <label>{t('Kassa raqami')}</label>
           <input className="input" value={cashRegisterNo}
