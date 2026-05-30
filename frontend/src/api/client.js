@@ -122,7 +122,11 @@ async function request(method, path, body) {
     // in and just sees the error. A 403 WITHOUT that code means the account
     // was blocked / the subscription expired → end the session.
     const denial = safeParse(await response.clone().text());
-    if (denial?.code === 'FORBIDDEN') {
+    // Keep the session for a permission denial (FORBIDDEN) AND for a lapsed
+    // subscription (SUBSCRIPTION_EXPIRED): the latter is read-only, not a dead
+    // session — the write fails with a message and the user heads to /billing
+    // to renew. Only a hard block / dead session falls through to logout.
+    if (denial?.code === 'FORBIDDEN' || denial?.code === 'SUBSCRIPTION_EXPIRED') {
       throw new ApiError(
         denial.message || "Bu amal uchun ruxsatingiz yo'q",
         403,

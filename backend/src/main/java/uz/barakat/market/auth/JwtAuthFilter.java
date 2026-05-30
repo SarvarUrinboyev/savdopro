@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
@@ -80,12 +81,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     }
                     accounts.insertStubIfAbsent(accountId, stubName);
                 }
-                // Block expired / banned accounts mid-session.
-                if (accountId != null && !auth.isAccountUsable(accountId)) {
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.setContentType("application/json");
-                    response.getWriter().write(
-                            "{\"message\":\"Akkaunt bloklangan yoki obuna tugagan\"}");
+                // Subscription enforcement from the (live-ish) JWT claims that
+                // the License Server mints. A manual super-admin block is a hard
+                // stop; a lapsed subscription is soft — reads + the billing page
+                // stay open, but mutating calls are refused so the owner is
+                // nudged to renew. Tokens minted before this claim existed carry
+                // no subExp/blk and are simply not enforced until the next
+                // refresh re-mints them.
+                if (Boolean.TRUE.equals(claims.get("blk", Boolean.class))) {
+                    writeForbidden(response, "BLOCKED",
+                            "Akkaunt bloklangan. Super-admin bilan bog'laning.");
+                    return;
+                }
+                Object subExpClaim = claims.get("subExp");
+                long subExp = (subExpClaim instanceof Number num) ? num.longValue() : -1L;
+                boolean expired = subExp >= 0 && subExp < LocalDate.now().toEpochDay();
+                if (expired && isMutating(request.getMethod())) {
+                    writeForbidden(response, "SUBSCRIPTION_EXPIRED",
+                            "Obuna muddati tugagan. Davom etish uchun tarifni yangilang.");
                     return;
                 }
                 request.setAttribute(ATTR_USER_ID, userId);
@@ -122,5 +135,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    private static boolean isMutating(String method) {
+        return "POST".equals(method) || "PUT".equals(method)
+                || "PATCH".equals(method) || "DELETE".equals(method);
+    }
+
+    private static void writeForbidden(HttpServletResponse response, String code, String message)
+            throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.getWriter().write(
+                "{\"code\":\"" + code + "\",\"message\":\"" + message + "\"}");
     }
 }
