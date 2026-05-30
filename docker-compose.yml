@@ -1,0 +1,85 @@
+# =====================================================================
+#  SavdoPRO — full hosted SaaS stack: Postgres + license server + backend.
+#
+#  (The license server also ships a standalone compose at
+#   license-server/docker-compose.yml for deploying it on its own VPS.)
+#
+#  Quick start:
+#    cp .env.example .env        # then edit — set strong secrets!
+#    docker compose up -d --build
+#    docker compose logs -f
+#
+#  UI + API:  http://localhost:8086     Auth/accounts:  http://localhost:9090
+#
+#  CRITICAL: backend and license MUST share SAVDOPRO_JWT_SECRET. A mismatch
+#  means login succeeds at the license server but every /api call to the
+#  backend returns 401. Compose passes the same value to both below.
+# =====================================================================
+
+name: savdopro
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-savdopro}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required (see .env.example)}
+      POSTGRES_DB: ${DB_NAME:-savdopro}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Creates the second database (license) on first boot.
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/10-create-license-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-savdopro} -d ${DB_NAME:-savdopro}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No public `ports:` — Postgres is reachable only on the compose network.
+
+  license-server:
+    build:
+      context: ./license-server
+    image: savdopro/license-server:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/license
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-savdopro}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      SAVDOPRO_JWT_SECRET: ${SAVDOPRO_JWT_SECRET:?JWT secret required (64+ random chars)}
+      SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
+      SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:?Admin password required}
+      SAVDOPRO_ADMIN_NAME: ${SAVDOPRO_ADMIN_NAME:-Super Admin}
+    ports:
+      - "9090:9090"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: savdopro/backend:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      license-server:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-savdopro}
+      DB_USER: ${DB_USER:-savdopro}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # MUST equal the license server's value above.
+      SAVDOPRO_JWT_SECRET: ${SAVDOPRO_JWT_SECRET:?JWT secret required (64+ random chars)}
+      SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
+      SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:?Admin password required}
+    ports:
+      - "8086:8086"
+
+volumes:
+  pgdata:

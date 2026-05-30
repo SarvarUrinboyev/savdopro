@@ -1,0 +1,22 @@
+# Keep the build context small + reproducible — let the image build the
+# artifacts itself rather than copying local ones in.
+**/target/
+**/node_modules/
+**/dist/
+backend/src/main/resources/static/
+.git/
+.github/
+.idea/
+.vscode/
+electron/
+# The backend image build (root context) only needs backend/ + frontend/.
+license-server/
+# Use **/ so nested files (e.g. backend/barakat.mv.db, locked by a running
+# dev server) are excluded from the build context too.
+**/*.mv.db
+**/*.trace.db
+**/*.log
+_dev-*
+backend/backups/
+backups/
+*.md
