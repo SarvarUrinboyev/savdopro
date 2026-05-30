@@ -15,7 +15,9 @@ import uz.barakat.license.auth.AuthDtos.LoginRequest;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
 import uz.barakat.license.auth.AuthDtos.RefreshRequest;
+import uz.barakat.license.auth.AuthDtos.ForgotPasswordRequest;
 import uz.barakat.license.auth.AuthDtos.RegisterRequest;
+import uz.barakat.license.auth.AuthDtos.ResetPasswordRequest;
 import uz.barakat.license.auth.AuthDtos.SmsRequestRequest;
 import uz.barakat.license.auth.AuthDtos.SmsVerifyRequest;
 import uz.barakat.license.auth.AuthDtos.TelegramAuthRequest;
@@ -78,6 +80,36 @@ public class AuthController {
         // trial accounts (until email/SMS verification lands in the next step).
         rateLimiter.recordFailure(ip);
         return service.register(request, ip);
+    }
+
+    /** Forgot-password step 1: SMS a reset code (only to a registered phone). */
+    @PostMapping("/forgot-password")
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+                               HttpServletRequest http) {
+        String ip = clientIp(http);
+        if (!rateLimiter.allow(ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
+        }
+        rateLimiter.recordFailure(ip); // throttle SMS-code requests per IP
+        service.requestPasswordResetCode(request.phone());
+    }
+
+    /** Forgot-password step 2: verify the code and set the new password. */
+    @PostMapping("/reset-password")
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request,
+                              HttpServletRequest http) {
+        String ip = clientIp(http);
+        if (!rateLimiter.allow(ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
+        }
+        try {
+            service.resetPassword(request.phone(), request.code(), request.newPassword());
+        } catch (RuntimeException ex) {
+            rateLimiter.recordFailure(ip); // count failed code-guess attempts
+            throw ex;
+        }
     }
 
     /**

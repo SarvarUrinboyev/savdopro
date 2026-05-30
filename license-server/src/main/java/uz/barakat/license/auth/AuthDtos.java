@@ -32,6 +32,20 @@ public final class AuthDtos {
             String phone) {
     }
 
+    /** Forgot-password step 1: request a reset code by SMS to a registered phone. */
+    public record ForgotPasswordRequest(
+            @NotBlank(message = "Telefon raqami kiritilishi shart") String phone) {
+    }
+
+    /** Forgot-password step 2: verify the SMS code and set a new password. */
+    public record ResetPasswordRequest(
+            @NotBlank(message = "Telefon raqami kiritilishi shart") String phone,
+            @NotBlank(message = "Kod kiritilishi shart") String code,
+            @NotBlank(message = "Yangi parol kiritilishi shart")
+            @Size(min = 6, message = "Parol kamida 6 belgi bo'lishi kerak")
+            String newPassword) {
+    }
+
     /** One-time payload returned by the TOTP setup endpoint. */
     public record TotpSetupResponse(String secret, String otpauthUri) { }
 

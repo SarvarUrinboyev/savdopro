@@ -267,6 +267,41 @@ public class AuthService {
                         + ". Kod 5 daqiqada amal qiladi."));
     }
 
+    /** Forgot-password: send a reset code by SMS — only to a registered phone. */
+    public void requestPasswordResetCode(String rawPhone) {
+        String phone = normalisePhone(rawPhone);
+        if (phone == null) {
+            throw new BadRequestException("Telefon raqami noto'g'ri");
+        }
+        OtpService.Result result = otp.requestCode(phone);
+        if (result instanceof OtpService.Result.CooldownActive cd) {
+            throw new BadRequestException(
+                    "Iltimos, " + cd.secondsRemaining() + " soniyadan keyin qayta urinib ko'ring");
+        }
+        if (result instanceof OtpService.Result.Issued issued) {
+            users.findByPhone(phone).ifPresent(u ->
+                    sms.send(phone, "SavdoPRO parol tiklash kodi: " + issued.code()
+                            + ". Kod 5 daqiqada amal qiladi."));
+        }
+    }
+
+    /** Forgot-password: verify the code, set the new password, kill old sessions. */
+    @Transactional
+    public void resetPassword(String rawPhone, String code, String newPassword) {
+        String phone = normalisePhone(rawPhone);
+        if (phone == null || !otp.verify(phone, code)) {
+            throw new BadRequestException("Kod noto'g'ri yoki muddati o'tgan");
+        }
+        AppUser user = users.findByPhone(phone)
+                .orElseThrow(() -> new BadRequestException(
+                        "Bu telefon raqamiga bog'langan foydalanuvchi topilmadi"));
+        user.setPasswordHash(encoder.encode(newPassword));
+        users.save(user);
+        // A reset invalidates every existing session so a leaked refresh token
+        // cannot outlive the password change.
+        refreshTokens.revokeAllForUser(user.getId());
+    }
+
     /**
      * Verify the SMS code and mint a session. Returns the same
      * {@link LoginResponse} shape as password login so the client can
