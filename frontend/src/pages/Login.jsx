@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/Auth.jsx';
 import { useT } from '../context/Settings.jsx';
 import { IS_WEB } from '../config.js';
@@ -208,6 +209,12 @@ export function Login() {
           {busy ? t('Tekshirilmoqda...') : t('Kirish')}
         </button>
 
+        {IS_WEB && (
+          <p className="login-foot">
+            {t('Hisobingiz yo\'qmi?')}{' '}
+            <Link to="/register">{t('Ro\'yxatdan o\'ting')}</Link>
+          </p>
+        )}
         <p className="login-foot muted">
           {t('Parol unutilgan bo\'lsa super-admin bilan bog\'laning')}
         </p>

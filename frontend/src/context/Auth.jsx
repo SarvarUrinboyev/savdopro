@@ -97,6 +97,17 @@ export function AuthProvider({ children }) {
     return response.user;
   }, []);
 
+  // Self-service signup: creates a trial account + owner and logs in, so the
+  // app shell appears immediately after a successful registration.
+  const register = useCallback(async (form) => {
+    const response = await AuthApi.register(form);
+    persistAuthPair(response);
+    setUser(response.user);
+    applyBrand(response.user?.brand);
+    setError(null);
+    return response.user;
+  }, []);
+
   const logout = useCallback(() => {
     // Best-effort revoke on the server so the refresh token can't be
     // reused. We don't block on the result — the local clear below
@@ -115,6 +126,7 @@ export function AuthProvider({ children }) {
     loading,
     error,
     login,
+    register,
     logout,
     refresh: loadMe,
   };

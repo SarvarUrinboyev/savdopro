@@ -6,6 +6,7 @@ import { Spinner } from './components/ui.jsx';
 import { useAuth } from './context/Auth.jsx';
 import { useApi } from './hooks/useApi.js';
 import { Login } from './pages/Login.jsx';
+import { Register } from './pages/Register.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
 import { IS_WEB } from './config.js';
 import { isModuleEnabled } from './lib/modules.js';
@@ -79,7 +80,14 @@ export default function App() {
     );
   }
   if (!auth.user) {
-    return <Login />;
+    // Hosted web build also exposes a public /register route; the desktop
+    // build is single-tenant so it only ever shows Login.
+    return (
+      <Routes>
+        {IS_WEB && <Route path="/register" element={<Register />} />}
+        <Route path="*" element={<Login />} />
+      </Routes>
+    );
   }
 
   return <Authenticated />;
