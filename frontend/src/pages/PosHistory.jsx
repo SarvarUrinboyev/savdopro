@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PosApi } from '../api/endpoints.js';
 import { ExportButton } from '../components/ExportButton.jsx';
 import { Modal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, PageHeader, Spinner } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
-import { useApi } from '../hooks/useApi.js';
 import { money } from '../lib/format.js';
 
 /**
@@ -17,13 +16,40 @@ import { money } from '../lib/format.js';
  */
 export function PosHistory() {
   const t = useT();
-  const { data, loading, error, reload } = useApi(() => PosApi.recent(), []);
+  const PAGE_SIZE = 50;
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
   const [open, setOpen] = useState(null); // {sale}
-  const rows = data || [];
+  const rows = items;
+
+  const fetchPage = async (p, append) => {
+    if (append) setLoadingMore(true); else setLoading(true);
+    setError(null);
+    try {
+      const res = await PosApi.recent(p, PAGE_SIZE);
+      const next = res?.items || [];
+      setItems((prev) => (append ? [...prev, ...next] : next));
+      setHasMore(Boolean(res?.hasMore));
+      setPage(p);
+    } catch (err) {
+      setError(err.message || t('Xatolik yuz berdi'));
+    } finally {
+      if (append) setLoadingMore(false); else setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPage(0, false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reload = () => fetchPage(0, false);
+  const loadMore = () => fetchPage(page + 1, true);
 
   return (
     <>
-      <PageHeader title={t('Sotuvlar tarixi')} desc={t('Oxirgi 100 ta sotuv')}>
+      <PageHeader title={t('Sotuvlar tarixi')} desc={`${rows.length}${hasMore ? '+' : ''} ${t('ta sotuv')}`}>
         <ExportButton
           filename={`sotuvlar-${new Date().toISOString().slice(0, 10)}`}
           rows={rows.map((s) => ({
@@ -92,6 +118,13 @@ export function PosHistory() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {hasMore && rows.length > 0 && (
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? t('Yuklanmoqda...') : `⬇️ ${t("Ko'proq yuklash")}`}
+              </button>
             </div>
           )}
         </Loader>

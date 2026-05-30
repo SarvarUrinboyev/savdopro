@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Customer;
@@ -20,6 +22,7 @@ import uz.barakat.market.domain.Sale;
 import uz.barakat.market.domain.SaleItem;
 import uz.barakat.market.domain.StockMovement;
 import uz.barakat.market.domain.StockReason;
+import uz.barakat.market.dto.PageSlice;
 import uz.barakat.market.dto.PosDtos.CartItem;
 import uz.barakat.market.dto.PosDtos.CheckoutRequest;
 import uz.barakat.market.dto.PosDtos.RefundItemRequest;
@@ -329,9 +332,13 @@ public class PosService {
     // ============================================================== queries
 
     @Transactional(readOnly = true)
-    public List<SaleResponse> recent() {
-        return sales.findTop100ByOrderByCreatedAtDesc()
-                .stream().map(this::toResponse).toList();
+    public PageSlice<SaleResponse> recent(int page, int size) {
+        int p = Math.max(page, 0);
+        int s = Math.min(Math.max(size, 1), 100);   // clamp the page size
+        Slice<Sale> slice = sales.findByOrderByCreatedAtDescIdDesc(PageRequest.of(p, s));
+        return new PageSlice<>(
+                slice.getContent().stream().map(this::toResponse).toList(),
+                slice.hasNext());
     }
 
     @Transactional(readOnly = true)

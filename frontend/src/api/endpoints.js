@@ -149,7 +149,7 @@ export const PromoApi = {
 
 export const PosApi = {
   checkout: (body) => api.post('/pos/checkout', body),
-  recent: () => api.get('/pos/sales'),
+  recent: (page = 0, size = 50) => api.get(`/pos/sales?page=${page}&size=${size}`),
   get: (id) => api.get(`/pos/sales/${id}`),
   refund: (id, body) => api.post(`/pos/sales/${id}/refund`, body ?? { items: [] }),
 };

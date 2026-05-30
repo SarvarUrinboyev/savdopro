@@ -1,13 +1,14 @@
 package uz.barakat.market.controller;
 
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import uz.barakat.market.dto.PageSlice;
 import uz.barakat.market.dto.PosDtos.CheckoutRequest;
 import uz.barakat.market.dto.PosDtos.RefundRequest;
 import uz.barakat.market.dto.PosDtos.SaleResponse;
@@ -18,7 +19,7 @@ import uz.barakat.market.service.PosService;
  *
  * <ul>
  *   <li>{@code POST /api/pos/checkout}        — book a new sale</li>
- *   <li>{@code GET  /api/pos/sales}           — last 100 sales (newest first)</li>
+ *   <li>{@code GET  /api/pos/sales?page=&size=} — paginated sales (newest first)</li>
  *   <li>{@code GET  /api/pos/sales/{id}}      — single sale + items</li>
  *   <li>{@code POST /api/pos/sales/{id}/refund} — full or partial refund</li>
  * </ul>
@@ -39,8 +40,10 @@ public class PosController {
     }
 
     @GetMapping("/sales")
-    public List<SaleResponse> recent() {
-        return service.recent();
+    public PageSlice<SaleResponse> recent(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return service.recent(page, size);
     }
 
     @GetMapping("/sales/{id}")

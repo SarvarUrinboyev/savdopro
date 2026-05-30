@@ -2,6 +2,8 @@ package uz.barakat.market.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,8 +11,10 @@ import uz.barakat.market.domain.Sale;
 
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
-    /** Recent sales (newest first), capped at the page size. */
-    List<Sale> findTop100ByOrderByCreatedAtDesc();
+    /** A page of sales (newest first). Spring Data {@code Slice} fetches
+     *  {@code size + 1} rows so {@code hasNext()} works without a COUNT
+     *  query — ideal for "load more". */
+    Slice<Sale> findByOrderByCreatedAtDescIdDesc(Pageable pageable);
 
     /** Sales window — used by Reports and end-of-day. */
     List<Sale> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime from, LocalDateTime to);
