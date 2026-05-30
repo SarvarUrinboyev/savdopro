@@ -39,14 +39,18 @@ class PermissionServiceTest {
     }
 
     @Test
-    void accountOwnerGetsRoleDefaultsOnly() {
+    void accountOwnerGetsFullOperationalControlButNotPlatformAdmin() {
         AppUser owner = user(UserRole.ACCOUNT_OWNER, null);
 
+        // Full control of their own account's data + staff.
         assertTrue(service.has(owner, "USERS:WRITE"));
         assertTrue(service.has(owner, "AUDIT:READ"));
-        // Not in the default set.
-        assertFalse(service.has(owner, "PRODUCTS:WRITE"));
-        assertFalse(service.has(owner, "DEBTS:WRITE"));
+        assertTrue(service.has(owner, "PRODUCTS:WRITE"));
+        assertTrue(service.has(owner, "DEBTS:WRITE"));
+        assertTrue(service.has(owner, "SALES:WRITE"));
+        assertTrue(service.has(owner, "MANAGEMENT:WRITE"));
+        // But NOT platform-level account administration (SUPER_ADMIN only).
+        assertFalse(service.has(owner, "ACCOUNTS:WRITE"));
     }
 
     @Test
@@ -118,12 +122,19 @@ class PermissionServiceTest {
     }
 
     @Test
-    void shopUserCannotWriteAnything() {
+    void shopUserHasFrontOfShopWritesOnly() {
         AppUser shop = user(UserRole.SHOP_USER, null);
-        assertFalse(service.has(shop, "PRODUCTS:WRITE"));
-        assertFalse(service.has(shop, "ORDERS:WRITE"));
-        // Default does include reports read.
+        // Can run the till: sell, take payments, manage customers + debts.
+        assertTrue(service.has(shop, "SALES:WRITE"));
+        assertTrue(service.has(shop, "PAYMENTS:WRITE"));
+        assertTrue(service.has(shop, "CUSTOMERS:WRITE"));
         assertTrue(service.has(shop, "REPORTS:READ"));
+        assertTrue(service.has(shop, "PRODUCTS:READ"));
+        // But not owner / admin functions.
+        assertFalse(service.has(shop, "PRODUCTS:WRITE"));
+        assertFalse(service.has(shop, "MANAGEMENT:READ"));
+        assertFalse(service.has(shop, "USERS:WRITE"));
+        assertFalse(service.has(shop, "ACCOUNTS:WRITE"));
     }
 
     private static AppUser user(UserRole role, String permissions) {

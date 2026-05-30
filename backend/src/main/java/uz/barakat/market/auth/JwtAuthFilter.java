@@ -6,10 +6,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -89,12 +91,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 request.setAttribute(ATTR_USER_ID, userId);
                 request.setAttribute(ATTR_ACCOUNT_ID, accountId);
                 request.setAttribute(ATTR_ROLE, role);
-                // ROLE_null breaks Spring Security's hasRole check; fall back to a
-                // generic USER authority if the claim is missing for any reason.
-                String authority = "ROLE_" + (role == null || role.isBlank() ? "USER" : role);
+                // Authorities = the role (ROLE_*) plus every RESOURCE:ACTION
+                // permission the License Server minted into the token. The
+                // backend enforces these per endpoint (see SecurityConfig). A
+                // legacy token with no "perms" claim authenticates but carries
+                // no permissions — refreshing the session re-mints it with the
+                // full effective set.
+                List<GrantedAuthority> authorities = new ArrayList<>();
+                authorities.add(new SimpleGrantedAuthority(
+                        "ROLE_" + (role == null || role.isBlank() ? "USER" : role)));
+                Object permsClaim = claims.get("perms");
+                if (permsClaim instanceof List<?> perms) {
+                    for (Object p : perms) {
+                        if (p != null) {
+                            authorities.add(new SimpleGrantedAuthority(p.toString()));
+                        }
+                    }
+                }
                 var authToken = new UsernamePasswordAuthenticationToken(
-                        userId, null,
-                        List.of(new SimpleGrantedAuthority(authority)));
+                        userId, null, authorities);
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             } catch (Exception ex) {
                 // Invalid / expired token — clear the security context and let

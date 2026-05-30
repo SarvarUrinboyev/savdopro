@@ -277,8 +277,9 @@ public class AuthService {
         AppUser user = users.findById(rot.userId())
                 .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
         Account account = requireUsableAccount(rot.accountId());
-        String accessToken = jwt.issueFor(
-                user.getId(), user.getUsername(), user.getRole().name(), account.getId());
+        // Re-issue a full access token (incl. the effective perms claim) for
+        // the refreshed session — same shape as a fresh login.
+        String accessToken = jwt.issue(user);
         return new LoginResponse(
                 accessToken,
                 rot.fresh().plaintext(),

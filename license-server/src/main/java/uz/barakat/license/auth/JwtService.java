@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.List;
 import javax.crypto.SecretKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,12 +71,15 @@ public class JwtService {
 
     private final String configuredSecret;
     private final boolean allowDevSecret;
+    private final PermissionService permissions;
     private SecretKey signingKey;
 
     public JwtService(@Value("${savdopro.jwt.secret:}") String configuredSecret,
-                      @Value("${SAVDOPRO_ALLOW_DEV_SECRET:false}") boolean allowDevSecret) {
+                      @Value("${SAVDOPRO_ALLOW_DEV_SECRET:false}") boolean allowDevSecret,
+                      PermissionService permissions) {
         this.configuredSecret = configuredSecret;
         this.allowDevSecret = allowDevSecret;
+        this.permissions = permissions;
     }
 
     @PostConstruct
@@ -113,23 +117,17 @@ public class JwtService {
     }
 
     public String issue(AppUser user) {
-        return issueFor(user.getId(), user.getUsername(),
-                user.getRole().name(), user.getAccountId());
-    }
-
-    /**
-     * Lower-level issuer used by the refresh flow — the refresh code
-     * already knows the claim values it wants and doesn't need to
-     * re-load the AppUser entity just to project them.
-     */
-    public String issueFor(Long userId, String username, String role, Long accountId) {
         Instant now = Instant.now();
         Instant exp = now.plus(TOKEN_TTL_HOURS, ChronoUnit.HOURS);
         return Jwts.builder()
-                .subject(String.valueOf(userId))
-                .claim("username", username)
-                .claim("role", role)
-                .claim("accountId", accountId)
+                .subject(String.valueOf(user.getId()))
+                .claim("username", user.getUsername())
+                .claim("role", user.getRole().name())
+                .claim("accountId", user.getAccountId())
+                // Web authorization: the backend reads this to enforce
+                // RESOURCE:ACTION permissions per endpoint with no DB round-trip.
+                // Single source of truth — the effective set is computed here.
+                .claim("perms", List.copyOf(permissions.effective(user)))
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(signingKey)

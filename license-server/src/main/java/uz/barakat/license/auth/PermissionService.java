@@ -31,7 +31,12 @@ import uz.barakat.license.repository.AppUserRepository;
 public class PermissionService {
 
     static final Set<String> KNOWN_RESOURCES = Set.of(
-            "ACCOUNTS", "USERS", "AUDIT", "REPORTS", "PRODUCTS", "ORDERS", "DEBTS");
+            // Platform / account administration (mostly License-Server surface)
+            "ACCOUNTS", "USERS", "AUDIT",
+            // Backend operational resources (one per controller family)
+            "REPORTS", "PRODUCTS", "ORDERS", "DEBTS", "SALES", "PAYMENTS",
+            "CUSTOMERS", "SUPPLIERS", "EXPENSES", "MANAGEMENT", "TRANSFERS",
+            "SHIFTS", "SHOPS", "PROMOS");
     static final Set<String> KNOWN_ACTIONS = Set.of("READ", "WRITE");
 
     private final AppUserRepository users;
@@ -107,11 +112,41 @@ public class PermissionService {
      */
     public static Set<String> defaultsFor(UserRole role) {
         return switch (role) {
+            // Platform owner — every resource, every action.
             case SUPER_ADMIN -> Set.of("*:*");
+            // Merchant owner — full control of their OWN account's data and
+            // staff, but NOT platform administration: creating/blocking other
+            // accounts is SUPER_ADMIN-only (and lives on the License Server).
             case ACCOUNT_OWNER -> Set.of(
-                    "ACCOUNTS:READ", "USERS:READ", "USERS:WRITE",
-                    "AUDIT:READ", "REPORTS:READ");
-            case SHOP_USER -> Set.of("REPORTS:READ");
+                    "ACCOUNTS:READ", "USERS:READ", "USERS:WRITE", "AUDIT:READ",
+                    "REPORTS:READ", "REPORTS:WRITE",
+                    "PRODUCTS:READ", "PRODUCTS:WRITE",
+                    "ORDERS:READ", "ORDERS:WRITE",
+                    "DEBTS:READ", "DEBTS:WRITE",
+                    "SALES:READ", "SALES:WRITE",
+                    "PAYMENTS:READ", "PAYMENTS:WRITE",
+                    "CUSTOMERS:READ", "CUSTOMERS:WRITE",
+                    "SUPPLIERS:READ", "SUPPLIERS:WRITE",
+                    "EXPENSES:READ", "EXPENSES:WRITE",
+                    "MANAGEMENT:READ", "MANAGEMENT:WRITE",
+                    "TRANSFERS:READ", "TRANSFERS:WRITE",
+                    "SHIFTS:READ", "SHIFTS:WRITE",
+                    "SHOPS:READ", "SHOPS:WRITE",
+                    "PROMOS:READ", "PROMOS:WRITE");
+            // Cashier / shop staff — front-of-shop operations only: ring up
+            // sales, take payments, manage customers and their debts, run a
+            // shift. No catalogue edits, cost/profit figures, supplier or
+            // transfer control, or any account/user administration. Owners
+            // grant more per-user via the override column when needed.
+            case SHOP_USER -> Set.of(
+                    "REPORTS:READ",
+                    "PRODUCTS:READ",
+                    "ORDERS:READ",
+                    "SALES:READ", "SALES:WRITE",
+                    "PAYMENTS:READ", "PAYMENTS:WRITE",
+                    "CUSTOMERS:READ", "CUSTOMERS:WRITE",
+                    "DEBTS:READ", "DEBTS:WRITE",
+                    "SHIFTS:READ", "SHIFTS:WRITE");
         };
     }
 
