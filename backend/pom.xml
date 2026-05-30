@@ -44,6 +44,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
+        <!-- Actuator: DB-aware health + readiness/liveness probes for prod LB/uptime -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
 
         <!-- Auth: Spring Security (login, BCrypt password hashing, filter chain) -->
         <dependency>

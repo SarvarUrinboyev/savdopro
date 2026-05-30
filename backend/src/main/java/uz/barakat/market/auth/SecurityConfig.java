@@ -42,6 +42,9 @@ public class SecurityConfig {
                         .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.INCLUDE).permitAll()
                         // Public endpoints — health probe and static shell.
                         .requestMatchers("/api/health/**").permitAll()
+                        // Actuator health/info — public so load balancers can probe;
+                        // details are gated (show-details=when-authorized).
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         // WebSocket handshake — STOMP CONNECT frame can carry
                         // the JWT in its native auth header; we don't gate it
                         // at the HTTP layer.
