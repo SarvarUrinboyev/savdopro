@@ -8,6 +8,13 @@ target/
 backend/application-local.properties
 **/application-local.properties
 .env
+# Local dev-runner launchers — contain a dev JWT secret passed via -D
+_dev-*.bat
+_dev-*.cmd
+_dev-*.sh
+# Local DB backups / dumps (may contain tenant data)
+backups/
+backend/backups/
 
 # --- Node / frontend ---
 node_modules/
