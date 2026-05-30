@@ -262,7 +262,7 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
                onToggle={(e) => { if (!IS_WEB && e.target.open) ensurePrintersLoaded(); }}>
         <summary style={{ cursor: 'pointer', fontWeight: 600,
                           fontSize: 13, color: 'var(--muted)' }}>
-          🖨 {t("Kassa va printer sozlamalari")}
+          {IS_WEB ? '🧾' : '🖨'} {t(IS_WEB ? 'Kassa va chek sozlamalari' : 'Kassa va printer sozlamalari')}
         </summary>
         {/* Local thermal-printer config is desktop-only: the PrintApi bridge
             reaches the user's OS printer, which a hosted web backend cannot.
