@@ -1,11 +1,15 @@
 package uz.barakat.market.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +37,16 @@ import uz.barakat.market.service.ai.OpenAiCompatProvider;
  * 5xx) we silently fall through to the next. Every failure is logged at
  * {@code WARN} so an operator can spot a misconfigured key.
  *
+ * <h2>Tool calling (agentic)</h2>
+ * Instead of feeding the model one fixed snapshot, we let it pull the
+ * exact data it needs. The system prompt advertises a small whitelist of
+ * read-only, tenant-scoped tools (see {@link AiToolService}); to use one
+ * the model replies with a single line {@code TOOL <name> {json-args}}.
+ * We execute it, append the result, and loop — up to {@link #MAX_TOOL_STEPS}
+ * times — until the model produces a final answer. This is a
+ * provider-agnostic emulation of function-calling: it works uniformly
+ * across every provider in the chain and the backend validates every call.
+ *
  * <p>When every provider fails (or none are configured) we return the
  * raw KPI snapshot — useful as a degraded fallback so the UI never has
  * a fully blank screen.
@@ -41,6 +55,15 @@ import uz.barakat.market.service.ai.OpenAiCompatProvider;
 public class AiChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AiChatService.class);
+
+    /** Hard cap on tool-call round-trips so a confused model can't loop forever. */
+    private static final int MAX_TOOL_STEPS = 4;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    /** Matches a tool request line: {@code TOOL <name> {..json..}} (json optional). */
+    private static final Pattern TOOL_RE =
+            Pattern.compile("(?is)^TOOL\\s+([a-zA-Z]+)\\s*(\\{.*})?\\s*$");
 
     private static final String SYSTEM_PROMPT =
             "Sen — SavdoPRO POS tizimining yordamchisisan. Foydalanuvchi savoliga "
@@ -51,6 +74,7 @@ public class AiChatService {
     private final AnalyticsService analytics;
     private final SaleRepository sales;
     private final ProductRepository products;
+    private final AiToolService tools;
     private final List<AiProvider> chain;
 
     public AiChatService(
@@ -58,6 +82,7 @@ public class AiChatService {
             AnalyticsService analytics,
             SaleRepository sales,
             ProductRepository products,
+            AiToolService tools,
             // chain order — change to reorder failover priority
             @Value("${ai.providers:gemini,nvidia-deepseek,nvidia-kimi,openrouter}") String chainOrder,
             // Per-provider keys + models. All optional; unset = skipped.
@@ -73,6 +98,7 @@ public class AiChatService {
         this.analytics = analytics;
         this.sales = sales;
         this.products = products;
+        this.tools = tools;
         this.chain = buildChain(
                 chainOrder,
                 geminiKey, geminiModel,
@@ -120,34 +146,130 @@ public class AiChatService {
         return List.copyOf(out);
     }
 
-    public record ChatRequest(String question) { }
+    /** One prior exchange, sent by the client so follow-up questions keep context. */
+    public record Turn(String question, String answer) { }
+
+    public record ChatRequest(String question, List<Turn> history) { }
+
     public record ChatResponse(String answer, String snapshot, String provider) { }
 
-    public ChatResponse ask(String question) {
+    public ChatResponse ask(ChatRequest req) {
+        String question = (req == null || req.question() == null) ? "" : req.question();
+        List<Turn> history = (req == null || req.history() == null) ? List.of() : req.history();
         String snapshot = buildSnapshot();
-        String contextual = (snapshot.isEmpty() ? "" : "KONTEKST:\n" + snapshot + "\n\n")
-                + "SAVOL: " + question;
+
+        String system = SYSTEM_PROMPT
+                + "\n\nBUGUNGI SANA: " + LocalDate.now() + "\n\n"
+                + tools.catalog()
+                + "\nQO'SHIMCHA ma'lumot kerak bo'lsa, FAQAT bitta qatorda shunday yoz:\n"
+                + "TOOL <nom> {\"arg\":\"qiymat\"}\n"
+                + "Boshqa hech narsa yozma. Ma'lumot yetarli bo'lsa — to'g'ridan-to'g'ri "
+                + "yakuniy javobni yoz (TOOL'siz). Sanalar YYYY-MM-DD ko'rinishida.";
+
+        StringBuilder ctx = new StringBuilder();
+        if (!snapshot.isEmpty()) {
+            ctx.append("KONTEKST (asosiy KPI):\n").append(snapshot).append('\n');
+        }
+        if (!history.isEmpty()) {
+            ctx.append("OLDINGI SUHBAT:\n");
+            for (Turn t : history) {
+                if (t == null) continue;
+                ctx.append("Savol: ").append(nz(t.question())).append('\n')
+                   .append("Javob: ").append(nz(t.answer())).append('\n');
+            }
+            ctx.append('\n');
+        }
+        ctx.append("SAVOL: ").append(question);
 
         StringBuilder errs = new StringBuilder();
+        String lastProvider = "none";
+
+        for (int step = 0; step < MAX_TOOL_STEPS; step++) {
+            // On the final allowed step, forbid further tool calls so the
+            // model is forced to answer with whatever it has gathered.
+            String sys = (step == MAX_TOOL_STEPS - 1)
+                    ? system + "\n\nMUHIM: endi boshqa TOOL chaqirma — yakuniy javob ber."
+                    : system;
+
+            LlmResult r = callLlm(sys, ctx.toString(), errs);
+            if (r == null) break;             // every provider failed
+            lastProvider = r.provider();
+
+            ToolCall tc = parseToolCall(r.text());
+            if (tc == null) {
+                return new ChatResponse(r.text().trim(), snapshot, r.provider());
+            }
+
+            // Execute the requested tool (tenant-scoped, read-only) and feed
+            // the result back into the running context for the next turn.
+            String result = tools.call(tc.name(), tc.args());
+            log.debug("AI tool call: {} {} -> {} chars", tc.name(), tc.args(), result.length());
+            ctx.append("\n\n[siz so'radingiz] TOOL ").append(tc.name())
+               .append("\n[natija]\n").append(result)
+               .append("\n\nShu ma'lumot asosida davom et.");
+        }
+
+        // Tool budget exhausted or no provider answered: degrade gracefully
+        // to the raw snapshot so the UI still shows real numbers.
+        String diag = errs.length() == 0
+                ? "AI hozir javob bera olmadi."
+                : "Barcha AI providerlar javob bermadi: " + errs;
+        return new ChatResponse(
+                diag + (snapshot.isEmpty() ? "" : "\n\nKalit ma'lumot:\n" + snapshot),
+                snapshot, lastProvider);
+    }
+
+    // --------------------------------------------------------------- llm + tools
+
+    private record LlmResult(String text, String provider) { }
+
+    /** Walk the provider chain once; first success wins, failures accumulate in {@code errs}. */
+    private LlmResult callLlm(String system, String user, StringBuilder errs) {
         for (AiProvider p : chain) {
             if (!p.isConfigured()) continue;
             try {
-                String answer = p.complete(SYSTEM_PROMPT, contextual);
-                return new ChatResponse(answer, snapshot, p.name());
+                String answer = p.complete(system, user);
+                if (answer != null && !answer.isBlank()) {
+                    return new LlmResult(answer, p.name());
+                }
             } catch (Exception ex) {
                 log.warn("AI provider {} failed: {}", p.name(), ex.getMessage());
                 errs.append(p.name()).append("=").append(ex.getMessage()).append("; ");
             }
         }
+        return null;
+    }
 
-        // Every provider failed (or none configured). Hand back the raw
-        // snapshot so the UI still shows the numbers.
-        String diag = errs.length() == 0
-                ? "AI providerlar sozlanmagan."
-                : "Barcha AI providerlar javob bermadi: " + errs;
-        return new ChatResponse(
-                diag + (snapshot.isEmpty() ? "" : "\n\nKalit ma'lumot:\n" + snapshot),
-                snapshot, "none");
+    private record ToolCall(String name, Map<String, Object> args) { }
+
+    /**
+     * Parse a {@code TOOL <name> {json}} line out of the model's reply.
+     * Returns {@code null} when the reply is a normal (final) answer.
+     * Tolerant of markdown fences the model sometimes adds.
+     */
+    private ToolCall parseToolCall(String text) {
+        if (text == null) return null;
+        String t = text.trim();
+        if (t.startsWith("```")) {
+            t = t.replaceAll("(?s)```[a-zA-Z]*", "").trim();
+        }
+        Matcher m = TOOL_RE.matcher(t);
+        if (!m.matches()) return null;
+        String name = m.group(1);
+        Map<String, Object> args = Map.of();
+        String json = m.group(2);
+        if (json != null && !json.isBlank()) {
+            try {
+                args = MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
+            } catch (Exception ignore) {
+                // Malformed args — run the tool with no args; it defaults sensibly.
+            }
+        }
+        return new ToolCall(name, args);
+    }
+
+    private static String nz(String s) {
+        return s == null ? "" : s;
     }
 
     // --------------------------------------------------------------- snapshot

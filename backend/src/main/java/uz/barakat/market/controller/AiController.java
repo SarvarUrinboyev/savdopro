@@ -45,7 +45,7 @@ public class AiController {
     /** POST a natural-language question, get a plain-language answer. */
     @PostMapping("/ask")
     public ChatResponse ask(@Valid @RequestBody ChatRequest req) {
-        return chat.ask(req.question() == null ? "" : req.question());
+        return chat.ask(req);
     }
 
     /** Per-product velocity + days-of-stock + run-out date forecasts. */
