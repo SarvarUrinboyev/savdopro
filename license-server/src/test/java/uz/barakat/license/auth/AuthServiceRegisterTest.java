@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import uz.barakat.license.auth.AuthDtos.RegisterRequest;
 import uz.barakat.license.domain.Account;
 import uz.barakat.license.domain.AppUser;
+import uz.barakat.license.domain.SubscriptionPlan;
 import uz.barakat.license.domain.UserRole;
 import uz.barakat.license.exception.BadRequestException;
 import uz.barakat.license.repository.AccountRepository;
@@ -80,6 +81,7 @@ class AuthServiceRegisterTest {
         assertThat(acc.getValue().getSubscriptionExpires())
                 .isEqualTo(LocalDate.now().plusDays(AuthService.TRIAL_DAYS));
         assertThat(acc.getValue().isBlocked()).isFalse();
+        assertThat(acc.getValue().getPlan()).isEqualTo(SubscriptionPlan.TRIAL);
 
         ArgumentCaptor<AppUser> usr = ArgumentCaptor.forClass(AppUser.class);
         verify(users).save(usr.capture());

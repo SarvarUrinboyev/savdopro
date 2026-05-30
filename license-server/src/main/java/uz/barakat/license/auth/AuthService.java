@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.license.auth.AuthDtos.LoginRequest;
 import uz.barakat.license.auth.AuthDtos.RegisterRequest;
+import uz.barakat.license.domain.SubscriptionPlan;
 import uz.barakat.license.domain.UserRole;
 import uz.barakat.license.auth.AuthDtos.LoginResponse;
 import uz.barakat.license.auth.AuthDtos.MeResponse;
@@ -80,6 +81,7 @@ public class AuthService {
                 req.phone() == null || req.phone().isBlank() ? null : req.phone().trim());
         account.setSubscriptionExpires(LocalDate.now().plusDays(TRIAL_DAYS));
         account.setBlocked(false);
+        account.setPlan(SubscriptionPlan.TRIAL);
         Account saved = accounts.save(account);
 
         AppUser owner = new AppUser();

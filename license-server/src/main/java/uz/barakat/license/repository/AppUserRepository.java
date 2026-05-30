@@ -14,6 +14,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     List<AppUser> findByAccountIdOrderByUsernameAsc(Long accountId);
 
+    /** Live user count for one account — enforces the plan's maxUsers limit. */
+    long countByAccountId(Long accountId);
+
     boolean existsByUsernameIgnoreCase(String username);
 
     /** Telegram OAuth login looks the user up by their linked Telegram numeric id. */

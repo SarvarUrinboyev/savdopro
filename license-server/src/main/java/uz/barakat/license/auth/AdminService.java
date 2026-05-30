@@ -171,8 +171,14 @@ public class AdminService {
     }
 
     public AdminUserResponse createUser(Long accountId, CreateUserRequest request) {
-        accounts.findById(accountId)
+        Account account = accounts.findById(accountId)
                 .orElseThrow(() -> NotFoundException.of("Akkaunt", accountId));
+        if (users.countByAccountId(accountId) >= account.getPlan().maxUsers()) {
+            throw new BadRequestException(
+                    "Tarif rejasi (" + account.getPlan() + ") bo'yicha foydalanuvchilar "
+                            + "chegarasi (" + account.getPlan().maxUsers() + ") to'ldi. "
+                            + "Rejani yangilang.");
+        }
         String username = request.username().trim().toLowerCase();
         if (users.existsByUsernameIgnoreCase(username)) {
             throw new BadRequestException("Bu login band: " + username);

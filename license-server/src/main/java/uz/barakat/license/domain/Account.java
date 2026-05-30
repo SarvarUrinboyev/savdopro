@@ -2,6 +2,8 @@ package uz.barakat.license.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import lombok.Getter;
@@ -39,6 +41,11 @@ public class Account extends BaseEntity {
     /** Manual lock by the super-admin. Overrides the expiry check. */
     @Column(nullable = false)
     private boolean blocked = false;
+
+    /** Subscription tier — sets the per-account limits (users / shops). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SubscriptionPlan plan = SubscriptionPlan.TRIAL;
 
     /**
      * White-label brand fields (Phase 4.6 / v2.0). All optional — when
