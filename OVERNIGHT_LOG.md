@@ -11,7 +11,7 @@ kiosk conveniences).
 
 | Module | Command | Result |
 |---|---|---|
-| backend | `./mvnw -o test` | **105 tests, 0 failures, 0 errors, 0 skipped — BUILD SUCCESS** |
+| backend | `./mvnw -o test` | **107 tests, 0 failures, 0 errors, 0 skipped — BUILD SUCCESS** |
 | license-server | `./mvnw -o test` | **62 tests, 0 failures, 0 errors, 0 skipped — BUILD SUCCESS** |
 | frontend | `npm run build` | builds clean (no automated test suite exists) |
 
@@ -19,7 +19,7 @@ No `@Disabled`/`@Ignore`, no stubs/TODO in new code. One existing test file
 (`PermissionServiceTest`) was intentionally updated to match the new — broader,
 not weaker — permission matrix.
 
-## Commits, grouped by theme (16, oldest → newest)
+## Commits, grouped by theme (oldest → newest)
 
 **Tenancy / data isolation & WebSocket security**
 - `5660227` feat(tenancy): X-Shop-Id ownership check + fail-closed tenant aspect + native sales-queries scoped by shop
@@ -27,6 +27,7 @@ not weaker — permission matrix.
 
 **Authorization (RBAC)**
 - `6bc98de` feat(authz): License Server mints `perms` into the JWT; backend enforces RESOURCE:ACTION per endpoint via `SecurityConfig` + wildcard `PermissionChecker`
+- `e13d69e` fix(authz): owner-only `SHIFTS:ADMIN` to clear shift history (was `SHIFTS:WRITE` — a cashier could erase cash-discrepancy evidence)
 
 **Correctness**
 - `ec0cbcb` fix(backend): payments-timeline sort, `orderStatus` NPE, unified loyalty rate (USD fix)
