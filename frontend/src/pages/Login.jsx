@@ -209,15 +209,22 @@ export function Login() {
           {busy ? t('Tekshirilmoqda...') : t('Kirish')}
         </button>
 
-        {IS_WEB && (
-          <p className="login-foot">
-            {t('Hisobingiz yo\'qmi?')}{' '}
-            <Link to="/register">{t('Ro\'yxatdan o\'ting')}</Link>
+        {IS_WEB ? (
+          <>
+            <p className="login-foot">
+              {t('Hisobingiz yo\'qmi?')}{' '}
+              <Link to="/register">{t('Ro\'yxatdan o\'ting')}</Link>
+            </p>
+            <p className="login-foot muted">
+              {t('Parolni unutdingizmi?')}{' '}
+              <Link to="/forgot-password">{t('Tiklash')}</Link>
+            </p>
+          </>
+        ) : (
+          <p className="login-foot muted">
+            {t('Parol unutilgan bo\'lsa super-admin bilan bog\'laning')}
           </p>
         )}
-        <p className="login-foot muted">
-          {t('Parol unutilgan bo\'lsa super-admin bilan bog\'laning')}
-        </p>
       </form>
     </div>
   );

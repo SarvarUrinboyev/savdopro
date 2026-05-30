@@ -94,6 +94,8 @@ async function uploadFile(path, file) {
 export const AuthApi = {
   login: (body) => licenseApi.post('/api/auth/login', body),
   register: (body) => licenseApi.post('/api/auth/register', body),
+  forgotPassword: (phone) => licenseApi.post('/api/auth/forgot-password', { phone }),
+  resetPassword: (body) => licenseApi.post('/api/auth/reset-password', body),
   refresh: (body) => licenseApi.post('/api/auth/refresh', body),
   logout: (body) => licenseApi.post('/api/auth/logout', body),
   me: () => licenseApi.get('/api/auth/me'),

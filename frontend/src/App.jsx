@@ -7,6 +7,7 @@ import { useAuth } from './context/Auth.jsx';
 import { useApi } from './hooks/useApi.js';
 import { Login } from './pages/Login.jsx';
 import { Register } from './pages/Register.jsx';
+import { ForgotPassword } from './pages/ForgotPassword.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
 import { IS_WEB } from './config.js';
 import { isModuleEnabled } from './lib/modules.js';
@@ -85,6 +86,7 @@ export default function App() {
     return (
       <Routes>
         {IS_WEB && <Route path="/register" element={<Register />} />}
+        {IS_WEB && <Route path="/forgot-password" element={<ForgotPassword />} />}
         <Route path="*" element={<Login />} />
       </Routes>
     );
