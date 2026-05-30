@@ -55,19 +55,22 @@ public class PaymentService {
     private final CustomerTransactionRepository customerTransactions;
     private final CustomerRepository customers;
     private final MoneyConverter converter;
+    private final LoyaltyService loyalty;
 
     public PaymentService(PaymentRepository payments,
                           ExpenseRepository expenses,
                           HomeExpenseRepository homeExpenses,
                           CustomerTransactionRepository customerTransactions,
                           CustomerRepository customers,
-                          MoneyConverter converter) {
+                          MoneyConverter converter,
+                          LoyaltyService loyalty) {
         this.payments = payments;
         this.expenses = expenses;
         this.homeExpenses = homeExpenses;
         this.customerTransactions = customerTransactions;
         this.customers = customers;
         this.converter = converter;
+        this.loyalty = loyalty;
     }
 
     @Transactional(readOnly = true)
@@ -97,8 +100,12 @@ public class PaymentService {
         }
 
         // Re-sort the union by date desc, then by id desc within same date.
+        // Compose the ascending comparator, then reverse the whole thing ONCE.
+        // (The previous code called .reversed() twice — after comparing(date)
+        // and again at the end — which silently flipped the timeline back to
+        // oldest-first.)
         rows.sort(Comparator
-                .comparing(PaymentResponse::date).reversed()
+                .comparing(PaymentResponse::date)
                 .thenComparing((PaymentResponse r) -> r.id() == null ? 0L : r.id())
                 .reversed());
 
@@ -121,9 +128,8 @@ public class PaymentService {
         Payment payment = new Payment();
         apply(payment, request);
         Payment saved = payments.save(payment);
-        // Phase 4.4: award loyalty points on every INCOMING payment that
-        // is attributed to a customer. Points formula = 1 per
-        // POINTS_PER_UZS so the cashier never has to do mental math.
+        // Award loyalty points on every INCOMING payment attributed to a
+        // customer, using the shared LoyaltyService earn rate (same as POS).
         // Walk-in sales (customerId == null) skip this branch entirely.
         if (saved.getDirection() == PaymentDirection.INCOMING
                 && saved.getCustomerId() != null) {
@@ -138,12 +144,15 @@ public class PaymentService {
         return Mappers.payment(payments.save(payment));
     }
 
-    /** 1 point per 1,000 UZS (or 100 UZS-equivalent for USD sales). */
-    private static final long POINTS_PER_UZS  = 1_000L;
-    private static final long POINTS_PER_USD  = 10L;     // ~12 500 UZS ~ 12 points
-
     private void awardLoyaltyPoints(Payment payment) {
-        long earned = computePoints(payment.getAmount(), payment.getCurrency());
+        // Single source of truth for the earn rate: LoyaltyService (the same
+        // rate the POS uses). Points are based on UZS spent, so a USD payment
+        // is converted to its UZS-equivalent first. The previous per-currency
+        // divisors here under-credited USD payments by ~100x.
+        BigDecimal spentUzs = payment.getCurrency() == Currency.USD
+                ? payment.getAmount().multiply(converter.usdToUzs())
+                : payment.getAmount();
+        long earned = loyalty.pointsForSale(spentUzs);
         if (earned <= 0) return;
         Customer customer = customers.findById(payment.getCustomerId()).orElse(null);
         if (customer == null) return;
@@ -159,13 +168,6 @@ public class PaymentService {
         row.setAmount(BigDecimal.ZERO);   // pure points row, no cash movement
         row.setPointsDelta(earned);
         customerTransactions.save(row);
-    }
-
-    private static long computePoints(BigDecimal amount, Currency currency) {
-        if (amount == null || amount.signum() <= 0) return 0L;
-        long divisor = currency == Currency.USD ? POINTS_PER_USD : POINTS_PER_UZS;
-        return amount.divide(BigDecimal.valueOf(divisor),
-                0, java.math.RoundingMode.FLOOR).longValueExact();
     }
 
     public void delete(Long id) {

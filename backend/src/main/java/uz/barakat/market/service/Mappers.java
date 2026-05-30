@@ -61,10 +61,15 @@ public final class Mappers {
         if (o.isCompleted()) {
             return "COMPLETED";
         }
-        if (o.getDeliveryDate().isEqual(today)) {
+        LocalDate due = o.getDeliveryDate();
+        if (due == null) {
+            // No delivery date set yet — not due and not overdue (guards an NPE).
+            return "UPCOMING";
+        }
+        if (due.isEqual(today)) {
             return "TODAY";
         }
-        return o.getDeliveryDate().isBefore(today) ? "OVERDUE" : "UPCOMING";
+        return due.isBefore(today) ? "OVERDUE" : "UPCOMING";
     }
 
     public static DebtorResponse debtor(Debtor d) {
