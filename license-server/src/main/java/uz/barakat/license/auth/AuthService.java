@@ -302,6 +302,28 @@ public class AuthService {
         refreshTokens.revokeAllForUser(user.getId());
     }
 
+    /** Read-only subscription snapshot for the billing page (current account). */
+    @Transactional(readOnly = true)
+    public AuthDtos.SubscriptionStatusResponse subscriptionStatus(Long userId) {
+        AppUser user = users.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
+        Account account = accounts.findById(user.getAccountId())
+                .orElseThrow(() -> new BadRequestException("Akkaunt topilmadi"));
+        SubscriptionPlan plan = account.getPlan();
+        LocalDate expires = account.getSubscriptionExpires();
+        boolean expired = expires != null && expires.isBefore(LocalDate.now());
+        return new AuthDtos.SubscriptionStatusResponse(
+                plan.name(),
+                plan.monthlyPriceUzs(),
+                expires,
+                Math.max(daysUntilBlock(account), 0),
+                expired,
+                account.isBlocked(),
+                plan.maxUsers(),
+                users.countByAccountId(user.getAccountId()),
+                plan.maxShops());
+    }
+
     /**
      * Verify the SMS code and mint a session. Returns the same
      * {@link LoginResponse} shape as password login so the client can

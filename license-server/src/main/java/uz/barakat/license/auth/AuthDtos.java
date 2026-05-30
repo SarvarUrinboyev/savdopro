@@ -46,6 +46,19 @@ public final class AuthDtos {
             String newPassword) {
     }
 
+    /** Read-only snapshot for the in-app billing / subscription page. */
+    public record SubscriptionStatusResponse(
+            String plan,
+            long monthlyPriceUzs,
+            LocalDate subscriptionExpires,
+            int daysRemaining,
+            boolean expired,
+            boolean blocked,
+            int maxUsers,
+            long currentUsers,
+            int maxShops) {
+    }
+
     /** One-time payload returned by the TOTP setup endpoint. */
     public record TotpSetupResponse(String secret, String otpauthUri) { }
 
