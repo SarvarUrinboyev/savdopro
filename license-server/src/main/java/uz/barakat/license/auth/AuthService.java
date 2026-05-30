@@ -421,13 +421,10 @@ public class AuthService {
         if (account.isBlocked()) {
             throw new BadRequestException("Akkaunt bloklangan. Super-admin bilan bog'laning.");
         }
-        if (account.getSubscriptionExpires() != null
-                && account.getSubscriptionExpires().isBefore(LocalDate.now())) {
-            throw new BadRequestException(
-                    "Obuna muddati tugagan ("
-                            + account.getSubscriptionExpires()
-                            + "). Super-admin bilan bog'laning.");
-        }
+        // An expired subscription is NOT a hard stop: the user logs in
+        // read-only and is steered to billing to renew. The JWT carries a
+        // subExp claim and the shop backend blocks writes while it is in the
+        // past — see JwtAuthFilter. Only a manual super-admin block stops login.
         return account;
     }
 

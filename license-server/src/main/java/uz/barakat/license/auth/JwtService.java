@@ -14,7 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import uz.barakat.license.domain.Account;
 import uz.barakat.license.domain.AppUser;
+import uz.barakat.license.repository.AccountRepository;
 
 /**
  * Stateless JWT issuer / parser. The desktop client stores the token in
@@ -72,14 +74,17 @@ public class JwtService {
     private final String configuredSecret;
     private final boolean allowDevSecret;
     private final PermissionService permissions;
+    private final AccountRepository accounts;
     private SecretKey signingKey;
 
     public JwtService(@Value("${savdopro.jwt.secret:}") String configuredSecret,
                       @Value("${SAVDOPRO_ALLOW_DEV_SECRET:false}") boolean allowDevSecret,
-                      PermissionService permissions) {
+                      PermissionService permissions,
+                      AccountRepository accounts) {
         this.configuredSecret = configuredSecret;
         this.allowDevSecret = allowDevSecret;
         this.permissions = permissions;
+        this.accounts = accounts;
     }
 
     @PostConstruct
@@ -119,6 +124,13 @@ public class JwtService {
     public String issue(AppUser user) {
         Instant now = Instant.now();
         Instant exp = now.plus(TOKEN_TTL_HOURS, ChronoUnit.HOURS);
+        // Subscription state rides in the token so the shop backend enforces
+        // read-only / hard-block with no cross-service call. Re-minted on every
+        // refresh, so it stays roughly current. subExp = -1 means "no expiry".
+        Account account = accounts.findById(user.getAccountId()).orElse(null);
+        long subExp = (account != null && account.getSubscriptionExpires() != null)
+                ? account.getSubscriptionExpires().toEpochDay() : -1L;
+        boolean blocked = account != null && account.isBlocked();
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
@@ -128,6 +140,8 @@ public class JwtService {
                 // RESOURCE:ACTION permissions per endpoint with no DB round-trip.
                 // Single source of truth — the effective set is computed here.
                 .claim("perms", List.copyOf(permissions.effective(user)))
+                .claim("subExp", subExp)
+                .claim("blk", blocked)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(signingKey)
