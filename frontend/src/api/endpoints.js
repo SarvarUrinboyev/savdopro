@@ -130,7 +130,9 @@ export const AdminApi = {
 };
 
 export const AiApi = {
-  ask: (question) => api.post('/ai/ask', { question }),
+  // `history` is an optional [{question, answer}, ...] tail so the backend
+  // keeps context for follow-up questions ("a o'tgan oychi?").
+  ask: (question, history) => api.post('/ai/ask', { question, history }),
   forecast: () => api.get('/ai/forecast'),
   reorderQueue: () => api.get('/ai/reorder-queue'),
   slowMovers: () => api.get('/ai/slow-movers'),

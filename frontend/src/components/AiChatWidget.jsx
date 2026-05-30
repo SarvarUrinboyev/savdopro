@@ -7,9 +7,16 @@ import { useT } from '../context/Settings.jsx';
  * shop-owner can ask "O'tgan haftada qancha sotdik?" anywhere.
  *
  * State lives in this component (not global) so the conversation
- * resets on page change — that's intentional: each session is a
- * fresh query against the same backend snapshot.
+ * resets on page change. Within a session we send the recent Q/A
+ * history to the backend so follow-up questions keep context, and the
+ * assistant pulls the exact data it needs via its tool calls.
  */
+const SUGGESTIONS = [
+  "Bugun qaysi soatda eng ko'p sotildi?",
+  'Eng foydali mahsulotlar?',
+  'Qaysi mahsulot tugayapti?',
+];
+
 export function AiChatWidget() {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -24,14 +31,28 @@ export function AiChatWidget() {
     if (open) scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' });
   }, [open, msgs]);
 
-  const send = async () => {
-    const q = input.trim();
+  // Pair the visible transcript into prior Q/A turns so follow-up
+  // questions keep context. Capped to the last few exchanges so the
+  // prompt stays small.
+  const recentTurns = () => {
+    const turns = [];
+    for (let i = 0; i < msgs.length - 1; i += 1) {
+      if (msgs[i].role === 'user' && msgs[i + 1]?.role === 'ai') {
+        turns.push({ question: msgs[i].text, answer: msgs[i + 1].text });
+      }
+    }
+    return turns.slice(-5);
+  };
+
+  const send = async (preset) => {
+    const q = (preset ?? input).trim();
     if (!q || busy) return;
+    const history = recentTurns();
     setMsgs((m) => [...m, { role: 'user', text: q }]);
     setInput('');
     setBusy(true);
     try {
-      const resp = await AiApi.ask(q);
+      const resp = await AiApi.ask(q, history);
       setMsgs((m) => [...m, { role: 'ai', text: resp.answer }]);
     } catch (err) {
       setMsgs((m) => [...m, { role: 'ai', text: '⚠️ ' + (err.message || 'Xatolik') }]);
@@ -62,6 +83,28 @@ export function AiChatWidget() {
             {msgs.map((m, i) => (
               <div key={i} className={`ai-msg ${m.role}`}>{m.text}</div>
             ))}
+            {msgs.length === 1 && !busy && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => send(s)}
+                    style={{
+                      fontSize: 12,
+                      padding: '4px 10px',
+                      borderRadius: 14,
+                      border: '1px solid var(--brand-primary, #3b82f6)',
+                      background: 'transparent',
+                      color: 'var(--brand-primary, #3b82f6)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t(s)}
+                  </button>
+                ))}
+              </div>
+            )}
             {busy && <div className="ai-msg ai">⋯</div>}
           </div>
           <div className="ai-chat-foot">
@@ -73,7 +116,7 @@ export function AiChatWidget() {
               onKeyDown={(e) => e.key === 'Enter' && send()}
               disabled={busy}
             />
-            <button className="btn btn-primary" onClick={send} disabled={busy || !input.trim()}>
+            <button className="btn btn-primary" onClick={() => send()} disabled={busy || !input.trim()}>
               {busy ? '...' : '➤'}
             </button>
           </div>
