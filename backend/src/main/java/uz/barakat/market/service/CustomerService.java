@@ -67,10 +67,23 @@ public class CustomerService {
     /** All customers, each with its ledger totals and balance. */
     @Transactional(readOnly = true)
     public List<CustomerResponse> list() {
-        Map<Long, List<CustomerTransaction>> byCustomer = transactions.findAll().stream()
-                .collect(Collectors.groupingBy(CustomerTransaction::getCustomerId));
+        // Balances come from one GROUP BY (aggregateLedgerTotals) instead of
+        // loading every customer's full ledger into memory — the old
+        // transactions.findAll() pulled the entire ledger table on each call.
+        Map<Long, CustomerTransactionRepository.LedgerTotals> totals =
+                transactions.aggregateLedgerTotals(CustomerTxType.GOODS, CustomerTxType.PAYMENT)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                CustomerTransactionRepository.LedgerTotals::getCustomerId,
+                                t -> t));
         return customers.findAllByOrderByNameAsc().stream()
-                .map(c -> toResponse(c, byCustomer.getOrDefault(c.getId(), List.of())))
+                .map(c -> {
+                    var t = totals.get(c.getId());
+                    BigDecimal goods = t != null && t.getGoods() != null ? t.getGoods() : ZERO;
+                    BigDecimal paid = t != null && t.getPaid() != null ? t.getPaid() : ZERO;
+                    int count = t != null ? (int) t.getTxCount() : 0;
+                    return Mappers.customer(c, goods, paid, count);
+                })
                 .toList();
     }
 
