@@ -43,6 +43,7 @@ const Suppliers = lazyPage(() => import('./pages/Suppliers.jsx'), 'Suppliers');
 const Transfers = lazyPage(() => import('./pages/Transfers.jsx'), 'Transfers');
 const Warehouse = lazyPage(() => import('./pages/Warehouse.jsx'), 'Warehouse');
 const Reports = lazyPage(() => import('./pages/Reports.jsx'), 'Reports');
+const Billing = lazyPage(() => import('./pages/Billing.jsx'), 'Billing');
 
 const OWNER_ROLES = ['ACCOUNT_OWNER', 'SUPER_ADMIN'];
 
@@ -163,6 +164,7 @@ function Authenticated() {
         <Route path="admin/audit" element={g(<AuditLog />, { roles: ['SUPER_ADMIN'] })} />
         <Route path="shops" element={g(<Shops />, { module: 'shops', roles: OWNER_ROLES })} />
         <Route path="transfers" element={g(<Transfers />, { module: 'transfers', roles: OWNER_ROLES })} />
+        <Route path="billing" element={g(<Billing />, { roles: OWNER_ROLES })} />
         <Route path="reports" element={g(<Reports />, { module: 'reports' })} />
         <Route path="pos" element={g(<Pos />, { module: 'pos' })} />
         <Route path="pos/history" element={g(<PosHistory />, { module: 'pos-history' })} />

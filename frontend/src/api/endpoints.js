@@ -101,6 +101,10 @@ export const AuthApi = {
   me: () => licenseApi.get('/api/auth/me'),
 };
 
+export const BillingApi = {
+  status: () => licenseApi.get('/api/billing/status'),
+};
+
 export const AuditApi = {
   list: (page = 0, size = 50) =>
     licenseApi.get(`/api/admin/audit${qs({ page, size })}`),

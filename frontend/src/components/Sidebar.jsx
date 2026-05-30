@@ -235,6 +235,15 @@ export function Sidebar({ shift, open }) {
             <span>{t("Tovar transferi")}</span>
           </NavLink>
         )}
+        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
+          <NavLink
+            to="/billing"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="ico">💳</span>
+            <span>{t("Tarif va to'lov")}</span>
+          </NavLink>
+        )}
         {NAV_ITEMS.filter((item) => isOn(item.key)).map((item) => (
           <NavLink
             key={item.to}
