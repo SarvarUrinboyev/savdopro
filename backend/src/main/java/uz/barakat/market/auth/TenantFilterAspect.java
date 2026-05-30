@@ -53,8 +53,13 @@ public class TenantFilterAspect {
                     session.enableFilter("tenantFilter")
                             .setParameter("shopId", shopId);
                 }
-            } catch (Exception ex) {
-                log.warn("tenant filter NOT enabled: {}", ex.toString());
+            } catch (RuntimeException ex) {
+                // Fail CLOSED: a tenant scope was requested but the row-level
+                // filter could not be activated. Running the query unscoped
+                // would expose every tenant's rows, so refuse outright rather
+                // than silently widen the result set.
+                log.error("Refusing to run unscoped — tenant filter activation failed", ex);
+                throw ex;
             }
         }
         return pjp.proceed();

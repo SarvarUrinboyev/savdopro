@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.market.auth.TenantContext;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.StockMovementRepository;
@@ -58,7 +59,9 @@ public class AnalyticsService {
         LocalDateTime toDt = (to == null ? LocalDate.now() : to).plusDays(1).atStartOfDay();
 
         // Pre-load every referenced product in one trip so we don't N+1.
-        List<Object[]> raw = movements.sumSalesQtyByProduct(fromDt, toDt);
+        List<Long> scope = TenantContext.activeScope();
+        if (scope.isEmpty()) return List.of();
+        List<Object[]> raw = movements.sumSalesQtyByProduct(scope, fromDt, toDt);
         if (raw.isEmpty()) return List.of();
 
         Map<Long, Product> byId = new HashMap<>();
@@ -93,10 +96,13 @@ public class AnalyticsService {
         LocalDateTime toDt = (to == null ? LocalDate.now() : to).plusDays(1).atStartOfDay();
 
         long[] hours = new long[24];
-        for (Object[] r : movements.hourlySalesCount(fromDt, toDt)) {
-            int h = ((Number) r[0]).intValue();
-            long c = ((Number) r[1]).longValue();
-            if (h >= 0 && h < 24) hours[h] += c;
+        List<Long> scope = TenantContext.activeScope();
+        if (!scope.isEmpty()) {
+            for (Object[] r : movements.hourlySalesCount(scope, fromDt, toDt)) {
+                int h = ((Number) r[0]).intValue();
+                long c = ((Number) r[1]).longValue();
+                if (h >= 0 && h < 24) hours[h] += c;
+            }
         }
         List<HourlySalesBucket> out = new ArrayList<>(24);
         for (int h = 0; h < 24; h++) out.add(new HourlySalesBucket(h, hours[h]));

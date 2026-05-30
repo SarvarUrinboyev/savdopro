@@ -43,6 +43,21 @@ public final class TenantContext {
         return CURRENT_SHOP_IDS.get();
     }
 
+    /**
+     * The shop ids in effect for the current request as a flat list: the
+     * consolidated set when in "Hamma do'konlar" mode, otherwise the single
+     * active shop, otherwise empty. Used to scope <em>native</em> queries,
+     * which the Hibernate {@code @Filter} cannot rewrite.
+     */
+    public static List<Long> activeScope() {
+        List<Long> ids = CURRENT_SHOP_IDS.get();
+        if (ids != null && !ids.isEmpty()) {
+            return ids;
+        }
+        Long single = CURRENT_SHOP.get();
+        return single != null ? List.of(single) : List.of();
+    }
+
     /** {@code true} when the request is in consolidated "Hamma do'konlar" mode. */
     public static boolean isConsolidated() {
         return CURRENT_SHOP_IDS.get() != null;

@@ -107,6 +107,27 @@ public class TenantFilter extends OncePerRequestFilter {
                             shopId, accountId, path, remote);
                     shopId = null;
                 }
+                if (shopId != null) {
+                    if (accountId == null) {
+                        // No authenticated account on the request — never trust a
+                        // shop header from an anonymous caller. Drop it; Spring
+                        // Security rejects the (necessarily /api) call right after.
+                        log.warn("X-Shop-Id={} on unauthenticated request path={} remote={} — ignoring",
+                                shopId, path, remote);
+                        shopId = null;
+                    } else if (!shops.existsByIdAndAccountId(shopId, accountId)) {
+                        // Cross-tenant attempt: the shop is owned by a different
+                        // account (or doesn't exist). Refuse — a tenant must never
+                        // be able to scope queries to a shop it does not own.
+                        log.warn("X-Shop-Id={} not owned by accountId={} path={} remote={} — denied",
+                                shopId, accountId, path, remote);
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json");
+                        response.getWriter().write(
+                                "{\"message\":\"Bu do'kon sizning akkauntingizga tegishli emas\"}");
+                        return;
+                    }
+                }
                 if (shopId == null && accountId != null && isTenantScopedPath(path)) {
                     // Phase 2 fallback: the desktop's first-login flow doesn't
                     // know an X-Shop-Id yet (the frontend has just received its

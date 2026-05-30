@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.market.auth.TenantContext;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.StockMovementRepository;
@@ -129,7 +130,9 @@ public class ForecastService {
         LocalDateTime from = LocalDate.now().minusDays(WINDOW_DAYS).atStartOfDay();
         LocalDateTime to = LocalDate.now().plusDays(1).atStartOfDay();
         Map<Long, Double> map = new HashMap<>();
-        for (Object[] row : movements.sumSalesQtyByProduct(from, to)) {
+        List<Long> scope = TenantContext.activeScope();
+        if (scope.isEmpty()) return map;
+        for (Object[] row : movements.sumSalesQtyByProduct(scope, from, to)) {
             Long pid = ((Number) row[0]).longValue();
             double qty = ((Number) row[1]).doubleValue();
             map.put(pid, qty);

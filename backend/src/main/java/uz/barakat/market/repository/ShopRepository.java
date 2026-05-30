@@ -12,4 +12,7 @@ public interface ShopRepository extends JpaRepository<Shop, Long> {
     Optional<Shop> findFirstByAccountIdAndMainTrue(Long accountId);
 
     long countByAccountId(Long accountId);
+
+    /** True when shop {@code id} exists AND belongs to {@code accountId}. */
+    boolean existsByIdAndAccountId(Long id, Long accountId);
 }
