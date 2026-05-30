@@ -71,8 +71,10 @@ public class ManagementService {
                 continue;
             }
             BigDecimal qty = BigDecimal.valueOf(units);
-            revenue = revenue.add(product.getSalePrice().multiply(qty));
-            costOfGoods = costOfGoods.add(product.getPurchasePrice().multiply(qty));
+            BigDecimal salePrice = priceAt(m.getUnitSalePrice(), product.getSalePrice());
+            BigDecimal costPrice = priceAt(m.getUnitCostPrice(), product.getPurchasePrice());
+            revenue = revenue.add(salePrice.multiply(qty));
+            costOfGoods = costOfGoods.add(costPrice.multiply(qty));
             unitsSold += units;
         }
         BigDecimal grossProfit = revenue.subtract(costOfGoods);
@@ -115,11 +117,13 @@ public class ManagementService {
                 continue;
             }
             BigDecimal qty = BigDecimal.valueOf(units);
-            BigDecimal lineRevenue = product.getSalePrice().multiply(qty);
-            BigDecimal lineCost = product.getPurchasePrice().multiply(qty);
+            BigDecimal salePrice = priceAt(m.getUnitSalePrice(), product.getSalePrice());
+            BigDecimal costPrice = priceAt(m.getUnitCostPrice(), product.getPurchasePrice());
+            BigDecimal lineRevenue = salePrice.multiply(qty);
+            BigDecimal lineCost = costPrice.multiply(qty);
             lines.add(new SoldGoodsLine(
                     m.getCreatedAt(), product.getName(), units,
-                    product.getSalePrice(), product.getPurchasePrice(),
+                    salePrice, costPrice,
                     lineRevenue, lineCost, lineRevenue.subtract(lineCost),
                     m.getNote()));
             totalUnits += units;
@@ -157,6 +161,15 @@ public class ManagementService {
         cost.setCurrency(request.currency() != null ? request.currency() : Currency.UZS);
         cost.setNote(request.note() == null || request.note().isBlank()
                 ? null : request.note().strip());
+    }
+
+    /** Snapshot price if recorded on the movement, else the product's current
+     *  price (legacy rows from before V23). */
+    private static BigDecimal priceAt(BigDecimal snapshot, BigDecimal current) {
+        if (snapshot != null) {
+            return snapshot;
+        }
+        return current != null ? current : ZERO;
     }
 
     /** Sums costs of one type, converting each entry to USD. */

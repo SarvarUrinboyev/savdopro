@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
@@ -35,4 +36,15 @@ public class StockMovement extends TenantScopedEntity {
 
     @Column(length = 500)
     private String note;
+
+    /**
+     * Product sale / cost unit price at the moment of this movement
+     * (historical-price snapshot). NULL for movements recorded before the
+     * snapshot existed — reports fall back to the product's current price.
+     */
+    @Column(name = "unit_sale_price", precision = 15, scale = 2)
+    private BigDecimal unitSalePrice;
+
+    @Column(name = "unit_cost_price", precision = 15, scale = 2)
+    private BigDecimal unitCostPrice;
 }

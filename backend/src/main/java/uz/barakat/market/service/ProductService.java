@@ -252,6 +252,10 @@ public class ProductService {
         movement.setResultingQuantity(resulting);
         movement.setReason(reason);
         movement.setNote(note);
+        // Freeze the product's price so historical profit reports value this
+        // movement at the price as it was, not the current one.
+        movement.setUnitSalePrice(product.getSalePrice());
+        movement.setUnitCostPrice(product.getPurchasePrice());
         movements.save(movement);
     }
 

@@ -147,6 +147,9 @@ public class PosService {
             mv.setResultingQuantity(newQty);
             mv.setReason(StockReason.SALE);
             mv.setNote("POS sale");
+            // Freeze the price for historical profit reporting.
+            mv.setUnitSalePrice(p.getSalePrice());
+            mv.setUnitCostPrice(p.getPurchasePrice());
             movements.save(mv);
 
             // Broadcast stock change — live warehouse view picks this up.

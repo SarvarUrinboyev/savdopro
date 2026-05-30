@@ -61,7 +61,10 @@ public class AnalyticsService {
         // Pre-load every referenced product in one trip so we don't N+1.
         List<Long> scope = TenantContext.activeScope();
         if (scope.isEmpty()) return List.of();
-        List<Object[]> raw = movements.sumSalesQtyByProduct(scope, fromDt, toDt);
+        // Revenue + cost are computed in SQL from the per-movement price
+        // snapshot (COALESCE to the product's current price for legacy rows),
+        // so a later price change no longer rewrites past-period profit.
+        List<Object[]> raw = movements.salesProfitByProduct(scope, fromDt, toDt);
         if (raw.isEmpty()) return List.of();
 
         Map<Long, Product> byId = new HashMap<>();
@@ -73,11 +76,8 @@ public class AnalyticsService {
             int qty = ((Number) r[1]).intValue();
             Product p = byId.get(pid);
             if (p == null) continue;
-            BigDecimal sell = nullSafe(p.getSalePrice());
-            BigDecimal cost = nullSafe(p.getPurchasePrice());
-            BigDecimal qtyDec = BigDecimal.valueOf(qty);
-            BigDecimal revenue = sell.multiply(qtyDec).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal totalCost = cost.multiply(qtyDec).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal revenue = toBig(r[2]).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal totalCost = toBig(r[3]).setScale(2, RoundingMode.HALF_UP);
             BigDecimal profit = revenue.subtract(totalCost);
             BigDecimal margin = revenue.signum() == 0
                     ? BigDecimal.ZERO
@@ -109,7 +109,8 @@ public class AnalyticsService {
         return out;
     }
 
-    private static BigDecimal nullSafe(BigDecimal v) {
-        return v == null ? BigDecimal.ZERO : v;
+    /** Coerce a SQL aggregate value (BigDecimal / Double / etc.) to BigDecimal. */
+    private static BigDecimal toBig(Object v) {
+        return v == null ? BigDecimal.ZERO : new BigDecimal(v.toString());
     }
 }

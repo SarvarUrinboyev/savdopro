@@ -38,6 +38,28 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     /**
+     * Per-product sold qty + revenue + cost over the window, valued at the
+     * price snapshot recorded on each movement, falling back to the product's
+     * CURRENT price for legacy (pre-V23) rows via COALESCE. Returns rows of
+     * (productId, qty, revenueUzs, costUzs). Scoped to the active shop(s).
+     */
+    @Query(value =
+            "SELECT m.product_id AS pid, "
+            + "       -SUM(m.delta) AS qty, "
+            + "       SUM(-m.delta * COALESCE(m.unit_sale_price, p.sale_price)) AS revenue, "
+            + "       SUM(-m.delta * COALESCE(m.unit_cost_price, p.purchase_price)) AS cost "
+            + "FROM stock_movements m "
+            + "JOIN products p ON p.id = m.product_id "
+            + "WHERE m.reason = 'SALE' "
+            + "  AND m.shop_id IN (:shopIds) "
+            + "  AND m.created_at >= :from AND m.created_at < :to "
+            + "GROUP BY m.product_id",
+            nativeQuery = true)
+    List<Object[]> salesProfitByProduct(
+            @Param("shopIds") Collection<Long> shopIds,
+            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    /**
      * Hourly sales totals (count of SALE movements) for the window.
      * Returns rows of (hourOfDay 0..23, count) — fuels the "Soatlik
      * sotuvlar" heatmap on the Reports page.
