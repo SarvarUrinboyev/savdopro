@@ -103,6 +103,8 @@ export const AuthApi = {
 
 export const BillingApi = {
   status: () => licenseApi.get('/api/billing/status'),
+  checkout: (plan, months) => licenseApi.post('/api/billing/checkout', { plan, months }),
+  payments: () => licenseApi.get('/api/billing/payments'),
 };
 
 export const AuditApi = {
