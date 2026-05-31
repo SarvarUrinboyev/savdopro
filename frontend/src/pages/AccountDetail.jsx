@@ -32,6 +32,9 @@ export function AccountDetail() {
   // then mutated locally until the user presses Save.
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [grantPlan, setGrantPlan] = useState('BASIC');
+  const [grantMonths, setGrantMonths] = useState(1);
+  const [granting, setGranting] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -84,6 +87,64 @@ export function AccountDetail() {
           ← {t('Akkauntlar ro\'yxati')}
         </button>
       </PageHeader>
+
+      <div className="card section" style={{ padding: 16 }}>
+        <h2 style={{ marginTop: 0 }}>{t('Obuna')}</h2>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 14, marginBottom: 12 }}>
+          <div><span className="faint">{t('Tarif')}: </span><b>{account.plan}</b></div>
+          <div>
+            <span className="faint">{t('Holat')}: </span>
+            <b style={{ color: account.blocked || account.expired ? '#dc2626' : '#16a34a' }}>
+              {account.blocked ? t('Bloklangan') : account.expired ? t('Muddati tugagan') : t('Faol')}
+            </b>
+          </div>
+          <div>
+            <span className="faint">{t('Tugaydi')}: </span>
+            <b>{account.subscriptionExpires || '—'}</b>
+            {!account.expired && account.subscriptionExpires
+              ? ` (${account.daysUntilBlock} ${t('kun')})` : ''}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select
+            className="input"
+            value={grantPlan}
+            onChange={(e) => setGrantPlan(e.target.value)}
+            style={{ width: 'auto' }}
+          >
+            <option value="TRIAL">TRIAL</option>
+            <option value="BASIC">BASIC</option>
+            <option value="STANDARD">STANDARD</option>
+            <option value="PRO">PRO</option>
+          </select>
+          <input
+            className="input"
+            type="number"
+            min="1"
+            value={grantMonths}
+            onChange={(e) => setGrantMonths(Number(e.target.value) || 1)}
+            style={{ width: 80 }}
+          />
+          <span className="faint">{t('oy')}</span>
+          <button
+            className="btn btn-primary"
+            disabled={granting}
+            onClick={async () => {
+              setGranting(true);
+              try {
+                await AdminApi.grant(account.id, grantPlan, grantMonths);
+                reload();
+              } catch (e) {
+                alert(e.message || 'Xatolik');
+              } finally {
+                setGranting(false);
+              }
+            }}
+          >
+            {granting ? '...' : t("Tarifni berish / uzaytirish")}
+          </button>
+        </div>
+      </div>
 
       <div className="card section">
         <div className="card-head">

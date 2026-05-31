@@ -123,6 +123,8 @@ export const ShopApi = {
 export const AdminApi = {
   listAccounts: () => licenseApi.get('/api/admin/accounts'),
   accountDetail: (id) => licenseApi.get(`/api/admin/accounts/${id}`),
+  grant: (id, plan, months) =>
+    licenseApi.post(`/api/admin/accounts/${id}/grant`, { plan, months }),
   createAccount: (body) => licenseApi.post('/api/admin/accounts', body),
   updateAccount: (id, body) => licenseApi.put(`/api/admin/accounts/${id}`, body),
   setBlocked: (id, blocked) =>
