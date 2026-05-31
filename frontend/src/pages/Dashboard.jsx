@@ -4,6 +4,7 @@ import {
 } from '../api/endpoints.js';
 import { AnomalyBanner } from '../components/AnomalyBanner.jsx';
 import { CashboxForecastCard } from '../components/CashboxForecastCard.jsx';
+import { OnboardingChecklist } from '../components/OnboardingChecklist.jsx';
 import { LiveSalesFeed } from '../components/LiveSalesFeed.jsx';
 import { LowStockWidget } from '../components/LowStockWidget.jsx';
 import { Modal } from '../components/Modal.jsx';
@@ -73,6 +74,7 @@ function Content({ data, rate, onEditBalance }) {
   const t = useT();
   return (
     <>
+      <OnboardingChecklist />
       <RateBanner rate={rate} />
       <AnomalyBanner />
       <LiveSalesFeed />

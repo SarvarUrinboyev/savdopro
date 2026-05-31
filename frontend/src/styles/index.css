@@ -2539,3 +2539,41 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 }
 .lp-footer-links { display: flex; gap: 16px; }
 .lp-footer-copy { color: var(--text-muted, #94a3b8); font-size: 13px; }
+
+/* ============================================================
+   First-run onboarding checklist (dashboard, hosted web build).
+   ============================================================ */
+.onb { padding: 18px 20px; border-left: 4px solid var(--brand-primary, #3b82f6); }
+.onb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.onb-title { font-weight: 800; font-size: 16px; }
+.onb-sub { color: var(--text-muted); font-size: 13px; margin-top: 2px; }
+.onb-skip {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; font-weight: 600;
+}
+.onb-skip:hover { color: var(--text); }
+.onb-progress {
+  height: 6px; border-radius: 6px; background: var(--surface-2);
+  overflow: hidden; margin: 12px 0 14px;
+}
+.onb-progress-bar {
+  height: 100%; background: var(--brand-primary, #3b82f6); transition: width .3s ease;
+}
+.onb-steps { display: grid; gap: 8px; }
+.onb-step {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+  text-decoration: none; color: var(--text); transition: background .15s;
+}
+.onb-step:hover { background: var(--surface-2); }
+.onb-step.done { opacity: .6; }
+.onb-check {
+  width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center;
+  border-radius: 50%; background: var(--surface-2); font-size: 15px;
+}
+.onb-step.done .onb-check { background: #16a34a; color: #fff; }
+.onb-step-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.onb-step-title { font-weight: 700; font-size: 14px; }
+.onb-step.done .onb-step-title { text-decoration: line-through; }
+.onb-step-desc { color: var(--text-muted); font-size: 12.5px; }
+.onb-arrow { color: var(--brand-primary, #3b82f6); font-weight: 700; font-size: 16px; }
