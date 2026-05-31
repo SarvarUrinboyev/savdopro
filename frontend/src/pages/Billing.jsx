@@ -22,6 +22,13 @@ const PAID_PLANS = [
   { key: 'PRO', priceUzs: 599000, maxUsers: 100, maxShops: 20 },
 ];
 
+// Payment providers offered at checkout. Each redirects to the PSP's hosted
+// checkout; the backend rejects one whose merchant keys aren't configured yet.
+const PROVIDERS = [
+  { key: 'CLICK', label: 'Click' },
+  { key: 'PAYME', label: 'Payme' },
+];
+
 function money(n) {
   return Number(n || 0).toLocaleString('ru-RU');
 }
@@ -37,7 +44,8 @@ export function Billing() {
   const { data, loading, error, reload } = useApi(() => BillingApi.status(), []);
   const { data: payments, reload: reloadPayments } =
     useApi(() => BillingApi.payments().catch(() => []), []);
-  const [busyPlan, setBusyPlan] = useState(null);
+  const [pendingPlan, setPendingPlan] = useState(null);
+  const [busyProvider, setBusyProvider] = useState(null);
   const [notice, setNotice] = useState('');
 
   if (loading) return <Spinner />;
@@ -52,19 +60,24 @@ export function Billing() {
   const statusColor = s.expired ? '#dc2626' : soon ? '#d97706' : '#16a34a';
   const statusText = s.expired ? t('Muddati tugagan') : `${s.daysRemaining} ${t('kun qoldi')}`;
 
-  const choose = async (plan) => {
-    setBusyPlan(plan);
+  const startCheckout = async (plan, provider) => {
+    setBusyProvider(provider);
     setNotice('');
     try {
-      const r = await BillingApi.checkout(plan);
-      setNotice(`✅ ${t("To'lov yaratildi")} #${r.paymentId} — ${money(r.amountUzs)} UZS. `
-        + t("To'lov tizimi (Payme/Click) ulanganda shu yerda davom etadi."));
+      const r = await BillingApi.checkout(plan, 1, provider);
+      // Click / Payme return their external hosted-checkout URL → redirect out.
+      if (r.checkoutUrl && /^https?:\/\//i.test(r.checkoutUrl)) {
+        window.location.href = r.checkoutUrl;
+        return;
+      }
+      setNotice(`✅ ${t("To'lov yaratildi")} #${r.paymentId} — ${money(r.amountUzs)} UZS.`);
+      setPendingPlan(null);
       reloadPayments();
       reload();
     } catch (err) {
       setNotice('⚠️ ' + (err.message || 'Xatolik'));
     } finally {
-      setBusyPlan(null);
+      setBusyProvider(null);
     }
   };
 
@@ -139,14 +152,42 @@ export function Billing() {
                 <button
                   className="btn btn-primary"
                   style={{ marginTop: 12, width: '100%' }}
-                  disabled={busyPlan === p.key}
-                  onClick={() => choose(p.key)}
+                  onClick={() => { setPendingPlan(p.key); setNotice(''); }}
                 >
-                  {busyPlan === p.key ? '...' : s.plan === p.key ? t('Uzaytirish') : t('Tanlash')}
+                  {s.plan === p.key ? t('Uzaytirish') : t('Tanlash')}
                 </button>
               </div>
             ))}
           </div>
+          {pendingPlan && (
+            <div className="card" style={{ marginTop: 12, padding: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                {PLAN_LABEL[pendingPlan]} — {t("to'lov usulini tanlang")}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {PROVIDERS.map((pv) => (
+                  <button
+                    key={pv.key}
+                    className="btn btn-primary"
+                    disabled={busyProvider !== null}
+                    onClick={() => startCheckout(pendingPlan, pv.key)}
+                  >
+                    {busyProvider === pv.key ? '...' : pv.label}
+                  </button>
+                ))}
+                <button
+                  className="btn"
+                  disabled={busyProvider !== null}
+                  onClick={() => setPendingPlan(null)}
+                >
+                  {t('Bekor')}
+                </button>
+              </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                {t("To'lov tizimiga yo'naltirilasiz; to'lov tasdiqlangach obuna avtomatik uzayadi.")}
+              </div>
+            </div>
+          )}
           {notice && <div className="card" style={{ marginTop: 12, padding: 12 }}>{notice}</div>}
         </div>
       )}

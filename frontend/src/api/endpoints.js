@@ -103,7 +103,9 @@ export const AuthApi = {
 
 export const BillingApi = {
   status: () => licenseApi.get('/api/billing/status'),
-  checkout: (plan, months) => licenseApi.post('/api/billing/checkout', { plan, months }),
+  // provider: 'CLICK' | 'PAYME' | undefined (undefined → MANUAL placeholder).
+  checkout: (plan, months, provider) =>
+    licenseApi.post('/api/billing/checkout', { plan, months, provider }),
   payments: () => licenseApi.get('/api/billing/payments'),
 };
 
