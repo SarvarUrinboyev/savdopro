@@ -55,8 +55,8 @@ script, Sentry error-tracking scaffolding (env-gated).
 
 - **Payme/Click go-live**: paste merchant keys into `*.env`, register webhook
   URLs, run the sandbox test plan (`GO-LIVE.md` §4/§6). Code is complete.
-- **Real SMS provider** (Eskiz/PlayMobile): sending is currently a stub —
-  integrate before advertising SMS recovery / SMS login.
+- **SMS provider**: the Eskiz adapter is implemented; set `SMS_PROVIDER=eskiz`
+  + Eskiz credentials to send real OTP / reset codes (blank = codes logged only).
 - **Sentry DSN**: set `SENTRY_DSN` to activate error reporting.
 
 ## Branch

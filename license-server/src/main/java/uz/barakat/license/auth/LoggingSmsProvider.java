@@ -2,7 +2,9 @@ package uz.barakat.license.auth;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
 
@@ -16,6 +18,18 @@ import org.springframework.context.annotation.Bean;
  */
 @Configuration
 class LoggingSmsProviderConfig {
+
+    // Real gateway when sms.provider=eskiz; declared before the logging bean so
+    // the @ConditionalOnMissingBean below sees it and steps aside.
+    @Bean
+    @ConditionalOnProperty(name = "sms.provider", havingValue = "eskiz")
+    public SmsProvider eskizSmsProvider(
+            @Value("${sms.eskiz.email:}") String email,
+            @Value("${sms.eskiz.password:}") String password,
+            @Value("${sms.eskiz.from:4546}") String from,
+            @Value("${sms.eskiz.base-url:https://notify.eskiz.uz}") String baseUrl) {
+        return new EskizSmsProvider(email, password, from, baseUrl);
+    }
 
     @Bean
     @ConditionalOnMissingBean(SmsProvider.class)

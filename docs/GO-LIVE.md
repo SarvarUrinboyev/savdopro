@@ -81,9 +81,10 @@ cabinet and paste the credentials into `license-server/.env`.
       (authenticated — scrape with a service bearer token, or expose it only on
       an internal management port).
 - [ ] **Sentry**: set `SENTRY_DSN` to start receiving unhandled-exception reports.
-- [ ] **SMS** (forgot-password / SMS login): a real provider (Eskiz / PlayMobile)
-      is **not yet wired** — sending is currently a stub. Integrate the provider
-      before advertising SMS recovery. (Tracked separately.)
+- [ ] **SMS** (forgot-password / SMS login): the **Eskiz** adapter is wired.
+      Set `SMS_PROVIDER=eskiz` + `SMS_ESKIZ_EMAIL` / `SMS_ESKIZ_PASSWORD` and your
+      approved `SMS_ESKIZ_FROM` sender nick. Blank leaves codes logged only
+      (dev). Send a real test code before advertising SMS recovery.
 
 ## 6. PSP sandbox test plan
 
