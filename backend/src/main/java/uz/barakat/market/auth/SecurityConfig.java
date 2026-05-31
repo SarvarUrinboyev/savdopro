@@ -45,6 +45,9 @@ public class SecurityConfig {
                         // Actuator health/info — public so load balancers can probe;
                         // details are gated (show-details=when-authorized).
                         .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        // Other actuator endpoints (e.g. /actuator/prometheus) are not
+                        // public — scrape them with an authenticated service token.
+                        .requestMatchers("/actuator/**").authenticated()
                         // WebSocket handshake — STOMP CONNECT frame can carry
                         // the JWT in its native auth header; we don't gate it
                         // at the HTTP layer.

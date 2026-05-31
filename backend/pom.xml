@@ -49,6 +49,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Prometheus metrics registry (version managed by the Spring Boot BOM).
+             Exposes /actuator/prometheus for scraping; secured to authenticated. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
 
         <!-- Auth: Spring Security (login, BCrypt password hashing, filter chain) -->
         <dependency>
