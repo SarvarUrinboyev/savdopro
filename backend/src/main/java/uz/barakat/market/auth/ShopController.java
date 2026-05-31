@@ -42,7 +42,7 @@ public class ShopController {
     public ShopResponse create(HttpServletRequest request,
                                 @Valid @RequestBody CreateShopRequest body) {
         requireOwner(request);
-        return service.create(currentAccountId(request), body);
+        return service.create(currentAccountId(request), currentMaxShops(request), body);
     }
 
     @PutMapping("/{id}")
@@ -74,6 +74,12 @@ public class ShopController {
             throw new BadRequestException("Sessiya yaroqsiz");
         }
         return id;
+    }
+
+    /** The plan's shop limit from the JWT; missing (legacy token) = unlimited. */
+    private static int currentMaxShops(HttpServletRequest request) {
+        Object ms = request.getAttribute(JwtAuthFilter.ATTR_MAX_SHOPS);
+        return (ms instanceof Integer i) ? i : Integer.MAX_VALUE;
     }
 
     /** Mutations require ACCOUNT_OWNER or SUPER_ADMIN. */

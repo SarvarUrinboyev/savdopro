@@ -131,6 +131,7 @@ public class JwtService {
         long subExp = (account != null && account.getSubscriptionExpires() != null)
                 ? account.getSubscriptionExpires().toEpochDay() : -1L;
         boolean blocked = account != null && account.isBlocked();
+        int maxShops = account != null ? account.getPlan().maxShops() : Integer.MAX_VALUE;
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("username", user.getUsername())
@@ -142,6 +143,7 @@ public class JwtService {
                 .claim("perms", List.copyOf(permissions.effective(user)))
                 .claim("subExp", subExp)
                 .claim("blk", blocked)
+                .claim("maxShops", maxShops)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(exp))
                 .signWith(signingKey)

@@ -61,7 +61,12 @@ public class ShopService {
                 .toList();
     }
 
-    public ShopResponse create(Long accountId, CreateShopRequest request) {
+    public ShopResponse create(Long accountId, int maxShops, CreateShopRequest request) {
+        if (shops.countByAccountId(accountId) >= maxShops) {
+            throw new BadRequestException(
+                    "Tarif rejangiz bo'yicha do'konlar chegarasi (" + maxShops + ") to'ldi. "
+                            + "Rejani yangilang.");
+        }
         Shop s = new Shop();
         s.setAccountId(accountId);
         s.setName(request.name().trim());
