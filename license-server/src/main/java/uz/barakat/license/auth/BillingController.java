@@ -32,12 +32,15 @@ public class BillingController {
 
     private final AuthService service;
     private final BillingService billing;
+    private final PaymentProviders providers;
     private final String webhookSecret;
 
     public BillingController(AuthService service, BillingService billing,
+                             PaymentProviders providers,
                              @Value("${billing.webhook.secret:}") String webhookSecret) {
         this.service = service;
         this.billing = billing;
+        this.providers = providers;
         this.webhookSecret = webhookSecret;
     }
 
@@ -52,9 +55,20 @@ public class BillingController {
         Long accountId = requireAccountId(request);
         SubscriptionPlan plan = parsePlan(req.plan());
         int months = (req.months() == null) ? 1 : req.months();
+        if (req.provider() != null && !req.provider().isBlank()) {
+            PaymentProvider provider = providers.find(req.provider())
+                    .orElseThrow(() -> new BadRequestException(
+                            "Noma'lum to'lov provayderi: " + req.provider()));
+            if (!provider.isConfigured()) {
+                throw new BadRequestException(
+                        provider.name() + " to'lov provayderi hali sozlanmagan");
+            }
+            Payment p = billing.startCheckout(accountId, plan, months, provider.name());
+            return new CheckoutResponse(p.getId(), p.getAmountUzs(), provider.checkoutUrl(p));
+        }
+        // No PSP selected → record a MANUAL pending payment and return a
+        // placeholder the frontend can show until a provider is wired up.
         Payment p = billing.startCheckout(accountId, plan, months, "MANUAL");
-        // A real PSP adapter returns its hosted-checkout URL here; until then we
-        // return a placeholder the frontend can show / poll.
         return new CheckoutResponse(p.getId(), p.getAmountUzs(), "/billing/pay/" + p.getId());
     }
 

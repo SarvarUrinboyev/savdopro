@@ -77,6 +77,21 @@ public class BillingService {
     }
 
     /**
+     * Mark a PENDING payment FAILED (e.g. the customer cancelled at the PSP).
+     * Never downgrades an already-PAID payment — a late cancel callback after
+     * a successful charge must not revoke a subscription.
+     */
+    @Transactional
+    public void markFailed(Long paymentId) {
+        payments.findById(paymentId).ifPresent(p -> {
+            if (p.getStatus() != PaymentStatus.PAID) {
+                p.setStatus(PaymentStatus.FAILED);
+                payments.save(p);
+            }
+        });
+    }
+
+    /**
      * Set the plan, extend the subscription by {@code months} (stacking onto
      * an already-active one rather than truncating it), and clear any block.
      */

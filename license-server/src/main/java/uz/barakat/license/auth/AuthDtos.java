@@ -59,10 +59,15 @@ public final class AuthDtos {
             int maxShops) {
     }
 
-    /** Start a checkout for a paid plan (months defaults to 1). */
+    /**
+     * Start a checkout for a paid plan (months defaults to 1). {@code provider}
+     * selects the PSP ("CLICK" / "PAYME"); when blank, a MANUAL pending payment
+     * is recorded and a placeholder URL is returned (super-admin confirms it).
+     */
     public record CheckoutRequest(
             @NotBlank(message = "Reja tanlanishi shart") String plan,
-            Integer months) {
+            Integer months,
+            String provider) {
     }
 
     /** Result of starting a checkout — the PSP hosted-checkout reference. */
