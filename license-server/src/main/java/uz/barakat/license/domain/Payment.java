@@ -48,4 +48,31 @@ public class Payment extends BaseEntity {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+    // ----- Payme (Paycom) transaction state machine -----
+    // Payme's Merchant API tracks a transaction separately from our payment:
+    // it is Created (state 1), then Performed (2) or Cancelled (-1 before /
+    // -2 after perform). These mirror that state so CreateTransaction /
+    // PerformTransaction / CancelTransaction / CheckTransaction are idempotent.
+    // Null on payments that never went through Payme (Click / MANUAL).
+
+    /** Payme's transaction id (params.id), unique per Payme transaction. */
+    @Column(name = "payme_tx_id", length = 120)
+    private String paymeTxId;
+
+    /** 1=created, 2=performed, -1=cancelled (pre-perform), -2=cancelled (post-perform). */
+    @Column(name = "payme_state")
+    private Integer paymeState;
+
+    @Column(name = "payme_create_time")
+    private Long paymeCreateTime;
+
+    @Column(name = "payme_perform_time")
+    private Long paymePerformTime;
+
+    @Column(name = "payme_cancel_time")
+    private Long paymeCancelTime;
+
+    @Column(name = "payme_reason")
+    private Integer paymeReason;
 }
