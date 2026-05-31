@@ -91,6 +91,28 @@ public class BillingService {
         accounts.save(account);
     }
 
+    /**
+     * Super-admin manual grant (no charge): records a MANUAL PAID payment for
+     * the audit trail and activates the plan. Used to comp an account or
+     * extend a trial from the admin panel.
+     */
+    @Transactional
+    public void grantSubscription(Long accountId, SubscriptionPlan plan, int months) {
+        Account account = accounts.findById(accountId)
+                .orElseThrow(() -> NotFoundException.of("Akkaunt", accountId));
+        int m = Math.max(months, 1);
+        Payment p = new Payment();
+        p.setAccountId(accountId);
+        p.setPlan(plan);
+        p.setMonths(m);
+        p.setAmountUzs(0);
+        p.setStatus(PaymentStatus.PAID);
+        p.setProvider("MANUAL");
+        p.setPaidAt(LocalDateTime.now());
+        payments.save(p);
+        activate(account, plan, m);
+    }
+
     @Transactional(readOnly = true)
     public List<Payment> history(Long accountId) {
         return payments.findByAccountIdOrderByCreatedAtDescIdDesc(accountId);

@@ -244,7 +244,7 @@ public class AdminService {
         return new AdminAccountResponse(
                 a.getId(), a.getName(), a.getContactPhone(), a.getContactNote(),
                 a.getSubscriptionExpires(), Math.max(0, days),
-                a.isBlocked(), expired, userCount, a.getCreatedAt(),
+                a.isBlocked(), expired, a.getPlan().name(), userCount, a.getCreatedAt(),
                 a.getEnabledModules());
     }
 

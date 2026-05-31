@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -99,5 +100,27 @@ class BillingServiceTest {
     void startCheckoutRejectsTrialPlan() {
         assertThatThrownBy(() -> billing.startCheckout(7L, SubscriptionPlan.TRIAL, 1, "MANUAL"))
                 .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void grantSubscriptionRecordsManualPaidPaymentAndActivates() {
+        Account acc = new Account();
+        acc.setPlan(SubscriptionPlan.TRIAL);
+        acc.setSubscriptionExpires(null);
+        acc.setBlocked(true);
+        when(accounts.findById(7L)).thenReturn(Optional.of(acc));
+        when(payments.save(any(Payment.class))).thenAnswer(i -> i.getArgument(0));
+        when(accounts.save(any(Account.class))).thenAnswer(i -> i.getArgument(0));
+
+        billing.grantSubscription(7L, SubscriptionPlan.PRO, 3);
+
+        assertThat(acc.getPlan()).isEqualTo(SubscriptionPlan.PRO);
+        assertThat(acc.getSubscriptionExpires()).isEqualTo(LocalDate.now().plusMonths(3));
+        assertThat(acc.isBlocked()).isFalse();
+        ArgumentCaptor<Payment> cap = ArgumentCaptor.forClass(Payment.class);
+        verify(payments).save(cap.capture());
+        assertThat(cap.getValue().getStatus()).isEqualTo(PaymentStatus.PAID);
+        assertThat(cap.getValue().getProvider()).isEqualTo("MANUAL");
+        assertThat(cap.getValue().getAmountUzs()).isZero();
     }
 }

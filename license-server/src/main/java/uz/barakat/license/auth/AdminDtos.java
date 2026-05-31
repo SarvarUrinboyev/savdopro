@@ -22,6 +22,7 @@ public final class AdminDtos {
             int daysUntilBlock,
             boolean blocked,
             boolean expired,
+            String plan,
             int userCount,
             LocalDateTime createdAt,
             /** Comma-separated module keys; null = all modules visible. */
@@ -83,6 +84,12 @@ public final class AdminDtos {
     public record SetPasswordRequest(
             @NotBlank(message = "Parol kiritilishi shart")
             @Size(min = 4, max = 80) String password) {
+    }
+
+    /** Super-admin manual subscription grant: set a plan for N months. */
+    public record GrantSubscriptionRequest(
+            @NotBlank(message = "Reja tanlanishi shart") String plan,
+            Integer months) {
     }
 
     public record CreateUserRequest(

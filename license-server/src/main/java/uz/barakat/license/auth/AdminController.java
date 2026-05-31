@@ -25,11 +25,14 @@ import uz.barakat.license.auth.AdminDtos.AdminUserResponse;
 import uz.barakat.license.auth.AdminDtos.BlockRequest;
 import uz.barakat.license.auth.AdminDtos.CreateAccountRequest;
 import uz.barakat.license.auth.AdminDtos.CreateUserRequest;
+import uz.barakat.license.auth.AdminDtos.GrantSubscriptionRequest;
 import uz.barakat.license.auth.AdminDtos.ModulesRequest;
 import uz.barakat.license.auth.AdminDtos.SetPasswordRequest;
 import uz.barakat.license.auth.AdminDtos.SetPermissionsRequest;
 import uz.barakat.license.auth.AdminDtos.UpdateAccountRequest;
 import uz.barakat.license.domain.AdminAuditEntry;
+import uz.barakat.license.domain.SubscriptionPlan;
+import uz.barakat.license.exception.BadRequestException;
 
 /**
  * Super-admin REST API. All endpoints require the caller to hold the
@@ -44,12 +47,14 @@ public class AdminController {
     private final AdminService service;
     private final AuditService audit;
     private final PermissionService permissions;
+    private final BillingService billing;
 
     public AdminController(AdminService service, AuditService audit,
-                           PermissionService permissions) {
+                           PermissionService permissions, BillingService billing) {
         this.service = service;
         this.audit = audit;
         this.permissions = permissions;
+        this.billing = billing;
     }
 
     /**
@@ -111,6 +116,24 @@ public class AdminController {
     public AdminAccountResponse setBlocked(@PathVariable Long id,
                                            @RequestBody BlockRequest request) {
         return service.setBlocked(id, request.blocked());
+    }
+
+    /** Manually grant / extend a subscription (set the plan for N months, no
+     *  charge) — comp an account or extend a trial from the admin panel. */
+    @PostMapping("/accounts/{id}/grant")
+    public AdminAccountResponse grantSubscription(@PathVariable Long id,
+                                                  @Valid @RequestBody GrantSubscriptionRequest request) {
+        SubscriptionPlan plan;
+        try {
+            plan = SubscriptionPlan.valueOf(request.plan().trim().toUpperCase());
+        } catch (RuntimeException e) {
+            throw new BadRequestException("Noma'lum reja: " + request.plan());
+        }
+        int months = request.months() == null ? 1 : request.months();
+        billing.grantSubscription(id, plan, months);
+        audit.record("SUBSCRIPTION_GRANT", "ACCOUNT", id, null,
+                "plan=" + plan + ", months=" + months);
+        return service.accountDetail(id).account();
     }
 
     /**
