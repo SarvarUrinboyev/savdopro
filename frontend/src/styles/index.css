@@ -1004,19 +1004,44 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 }
 
 /* Subscription expiry warning banner under the topbar. */
-.sub-warning {
+/* Subscription nudge above the page content. Amber = expiring soon,
+   red = lapsed (the shop backend is read-only until the owner renews). */
+.sub-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 24px;
+  font-size: 12.5px;
+}
+.sub-banner-ico { font-size: 16px; flex-shrink: 0; }
+.sub-banner-text { flex: 1; min-width: 0; }
+.sub-banner b { font-weight: 800; }
+.sub-banner.warn {
   background: linear-gradient(135deg,
               rgba(245, 158, 11, .14) 0%,
               rgba(245, 158, 11, .06) 100%);
   border-bottom: 1px solid rgba(245, 158, 11, .35);
   color: #b45309;
-  padding: 10px 24px;
-  font-size: 12.5px;
-  display: flex; align-items: center; gap: 10px;
 }
-[data-theme="dark"] .sub-warning { color: #fbbf24; }
-.sub-warning-ico { font-size: 16px; }
-.sub-warning b { font-weight: 800; }
+[data-theme="dark"] .sub-banner.warn { color: #fbbf24; }
+.sub-banner.expired {
+  background: linear-gradient(135deg,
+              rgba(220, 38, 38, .16) 0%,
+              rgba(220, 38, 38, .07) 100%);
+  border-bottom: 1px solid rgba(220, 38, 38, .4);
+  color: #b91c1c;
+}
+[data-theme="dark"] .sub-banner.expired { color: #f87171; }
+.sub-banner-cta {
+  flex-shrink: 0;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 5px 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+  color: #fff;
+}
+.sub-banner.warn .sub-banner-cta { background: #d97706; }
+.sub-banner.expired .sub-banner-cta { background: #dc2626; }
+.sub-banner-cta:hover { filter: brightness(1.08); }
 
 /* Sidebar logout button inside the operator pill. */
 .operator-pill .op-logout {

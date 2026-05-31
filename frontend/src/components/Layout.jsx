@@ -5,16 +5,13 @@ import { QuickSearch } from './QuickSearch.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { ShopSwitcher } from './ShopSwitcher.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
+import { SubscriptionBanner } from './SubscriptionBanner.jsx';
 import { Spinner } from './ui.jsx';
 import { useKeyboard } from '../hooks/useKeyboard.js';
-import { useAuth } from '../context/Auth.jsx';
 import { useSettings } from '../context/Settings.jsx';
 import { useShop } from '../context/Shop.jsx';
 import { LANGUAGES } from '../i18n/i18n.js';
 import { formatDate, formatTime, todayIso } from '../lib/format.js';
-
-/** Warn 4 days before the subscription cuts off. */
-const WARNING_DAYS = 4;
 
 const PAGE_TITLES = {
   '/dashboard': 'Boshqaruv',
@@ -54,16 +51,11 @@ function resolveTitle(pathname) {
 export function Layout({ shift }) {
   const { pathname } = useLocation();
   const { theme, toggleTheme, lang, setLang, t } = useSettings();
-  const { user } = useAuth();
   const { isConsolidated, shops } = useShop();
   const title = resolveTitle(pathname);
   // Mobile off-canvas nav. Closes automatically whenever the route changes.
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => { setNavOpen(false); }, [pathname]);
-  const showSubWarning = user
-    && user.subscriptionExpires
-    && user.daysUntilBlock <= WARNING_DAYS
-    && user.daysUntilBlock >= 0;
 
   const navigate = useNavigate();
   // Global function-key shortcuts: jump to common pages without using the mouse.
@@ -140,17 +132,7 @@ export function Layout({ shift }) {
             )}
           </div>
         </header>
-        {showSubWarning && (
-          <div className="sub-warning">
-            <span className="sub-warning-ico">⏰</span>
-            <span>
-              <b>{t('Obuna muddati tugashiga')} {user.daysUntilBlock}{' '}
-                {t('kun qoldi')}.</b>{' '}
-              {t('To\'lov muddati')}: {user.subscriptionExpires}.{' '}
-              {t('To\'lamasangiz akkaunt avtomatik bloklanadi.')}
-            </span>
-          </div>
-        )}
+        <SubscriptionBanner />
         {isConsolidated && (
           <div className="consolidated-banner">
             <span className="cb-ico">🌐</span>
