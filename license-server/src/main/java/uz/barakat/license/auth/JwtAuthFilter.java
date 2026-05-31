@@ -50,12 +50,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 Long userId = Long.parseLong(claims.getSubject());
                 Long accountId = claims.get("accountId", Long.class);
                 String role = claims.get("role", String.class);
-                // Block expired / banned accounts mid-session.
-                if (accountId != null && !auth.isAccountUsable(accountId)) {
+                // Hard-block only a manually BLOCKED account. An expired
+                // subscription is NOT blocked here: the merchant must still
+                // reach /me + /billing to see status and renew. Read-only is
+                // enforced on the shop backend, not on the license API.
+                if (accountId != null && auth.isAccountBlocked(accountId)) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.getWriter().write(
-                            "{\"message\":\"Akkaunt bloklangan yoki obuna tugagan\"}");
+                            "{\"code\":\"BLOCKED\",\"message\":\"Akkaunt bloklangan. "
+                                    + "Super-admin bilan bog'laning.\"}");
                     return;
                 }
                 request.setAttribute(ATTR_USER_ID, userId);

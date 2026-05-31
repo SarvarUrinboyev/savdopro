@@ -415,6 +415,17 @@ public class AuthService {
         }).orElse(false);
     }
 
+    /**
+     * True only when the account is manually BLOCKED by a super-admin. An
+     * expired subscription is deliberately NOT treated as blocked here — the
+     * merchant must still reach /me + /billing to see status and renew
+     * (read-only is enforced on the shop backend, not the license API).
+     */
+    @Transactional(readOnly = true)
+    public boolean isAccountBlocked(Long accountId) {
+        return accounts.findById(accountId).map(Account::isBlocked).orElse(false);
+    }
+
     private Account requireUsableAccount(Long accountId) {
         Account account = accounts.findById(accountId)
                 .orElseThrow(() -> new BadRequestException("Akkaunt topilmadi"));
