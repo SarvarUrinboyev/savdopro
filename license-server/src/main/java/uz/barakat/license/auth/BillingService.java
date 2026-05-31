@@ -1,0 +1,98 @@
+package uz.barakat.license.auth;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.license.domain.Account;
+import uz.barakat.license.domain.Payment;
+import uz.barakat.license.domain.PaymentStatus;
+import uz.barakat.license.domain.SubscriptionPlan;
+import uz.barakat.license.exception.BadRequestException;
+import uz.barakat.license.exception.NotFoundException;
+import uz.barakat.license.repository.AccountRepository;
+import uz.barakat.license.repository.PaymentRepository;
+
+/**
+ * Subscription billing — provider-agnostic. Start a checkout (a PENDING
+ * payment), confirm it from the PSP webhook (PAID → extend the subscription),
+ * and list history. The PSP-specific signature check + hosted-checkout URL
+ * belong in the webhook adapter; this owns the money→subscription logic so it
+ * can be unit-tested without any payment provider.
+ */
+@Service
+public class BillingService {
+
+    private final PaymentRepository payments;
+    private final AccountRepository accounts;
+
+    public BillingService(PaymentRepository payments, AccountRepository accounts) {
+        this.payments = payments;
+        this.accounts = accounts;
+    }
+
+    /**
+     * Create a PENDING payment for a paid plan. The controller turns it into a
+     * PSP hosted-checkout reference. {@code months} is clamped to >= 1.
+     */
+    @Transactional
+    public Payment startCheckout(Long accountId, SubscriptionPlan plan, int months, String provider) {
+        if (plan == SubscriptionPlan.TRIAL) {
+            throw new BadRequestException("Sinov rejasini sotib bo'lmaydi");
+        }
+        Account account = accounts.findById(accountId)
+                .orElseThrow(() -> NotFoundException.of("Akkaunt", accountId));
+        int m = Math.max(months, 1);
+        Payment p = new Payment();
+        p.setAccountId(account.getId());
+        p.setPlan(plan);
+        p.setMonths(m);
+        p.setAmountUzs(plan.monthlyPriceUzs() * m);
+        p.setStatus(PaymentStatus.PENDING);
+        p.setProvider(provider);
+        return payments.save(p);
+    }
+
+    /**
+     * Mark a PENDING payment PAID and extend the subscription. Idempotent —
+     * a PSP may deliver the same callback more than once.
+     */
+    @Transactional
+    public Payment confirmPayment(Long paymentId, String externalId) {
+        Payment p = payments.findById(paymentId)
+                .orElseThrow(() -> NotFoundException.of("To'lov", paymentId));
+        if (p.getStatus() == PaymentStatus.PAID) {
+            return p;
+        }
+        p.setStatus(PaymentStatus.PAID);
+        p.setExternalId(externalId);
+        p.setPaidAt(LocalDateTime.now());
+        payments.save(p);
+
+        Account account = accounts.findById(p.getAccountId())
+                .orElseThrow(() -> NotFoundException.of("Akkaunt", p.getAccountId()));
+        activate(account, p.getPlan(), p.getMonths());
+        return p;
+    }
+
+    /**
+     * Set the plan, extend the subscription by {@code months} (stacking onto
+     * an already-active one rather than truncating it), and clear any block.
+     */
+    @Transactional
+    public void activate(Account account, SubscriptionPlan plan, int months) {
+        LocalDate today = LocalDate.now();
+        LocalDate current = account.getSubscriptionExpires();
+        LocalDate base = (current != null && current.isAfter(today)) ? current : today;
+        account.setSubscriptionExpires(base.plusMonths(Math.max(months, 1)));
+        account.setPlan(plan);
+        account.setBlocked(false);
+        accounts.save(account);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Payment> history(Long accountId) {
+        return payments.findByAccountIdOrderByCreatedAtDescIdDesc(accountId);
+    }
+}

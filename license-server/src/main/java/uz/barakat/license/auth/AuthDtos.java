@@ -59,6 +59,37 @@ public final class AuthDtos {
             int maxShops) {
     }
 
+    /** Start a checkout for a paid plan (months defaults to 1). */
+    public record CheckoutRequest(
+            @NotBlank(message = "Reja tanlanishi shart") String plan,
+            Integer months) {
+    }
+
+    /** Result of starting a checkout — the PSP hosted-checkout reference. */
+    public record CheckoutResponse(
+            Long paymentId,
+            long amountUzs,
+            String checkoutUrl) {
+    }
+
+    /** One row of the billing history. */
+    public record PaymentView(
+            Long id,
+            String plan,
+            long amountUzs,
+            int months,
+            String status,
+            String provider,
+            LocalDateTime createdAt,
+            LocalDateTime paidAt) {
+    }
+
+    /** PSP confirmation webhook body (generic placeholder until a real adapter). */
+    public record WebhookRequest(
+            Long paymentId,
+            String externalId) {
+    }
+
     /** One-time payload returned by the TOTP setup endpoint. */
     public record TotpSetupResponse(String secret, String otpauthUri) { }
 
