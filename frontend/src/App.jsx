@@ -8,6 +8,7 @@ import { useApi } from './hooks/useApi.js';
 import { Login } from './pages/Login.jsx';
 import { Register } from './pages/Register.jsx';
 import { ForgotPassword } from './pages/ForgotPassword.jsx';
+import { Landing } from './pages/Landing.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
 import { IS_WEB } from './config.js';
 import { isModuleEnabled } from './lib/modules.js';
@@ -86,8 +87,13 @@ export default function App() {
     // build is single-tenant so it only ever shows Login.
     return (
       <Routes>
+        {/* Hosted web build: marketing landing at "/" with login/signup CTAs.
+            The desktop build skips it (IS_WEB false) and falls straight to
+            Login via the catch-all, as before. */}
+        {IS_WEB && <Route path="/" element={<Landing />} />}
         {IS_WEB && <Route path="/register" element={<Register />} />}
         {IS_WEB && <Route path="/forgot-password" element={<ForgotPassword />} />}
+        <Route path="/login" element={<Login />} />
         <Route path="*" element={<Login />} />
       </Routes>
     );
