@@ -50,3 +50,7 @@ desktop.ini
 *.log
 logs/
 build_*.txt
+
+# Mobile server H2 runtime DB (regenerated at runtime)
+mobile/server/data/
+*.lock.db
