@@ -71,9 +71,30 @@ function Row({ label, value, strong, tone }) {
 
 function ReportView({ report, busy, onSend, onPrint, onClose }) {
   const t = useT();
+  const s = report.sales;
   return (
     <div className="grid grid-2">
       <div>
+        {s && (
+          <div className="card section">
+            <div className="card-head">
+              <h2>🛒 {t('Savdo (bugun)')}</h2>
+            </div>
+            <div className="card-pad">
+              <div className="flex-between" style={{ padding: '6px 0' }}>
+                <span className="muted">{t('Cheklar')}</span>
+                <span className="mono" style={{ fontWeight: 600 }}>{s.count} {t('ta')}</span>
+              </div>
+              <Row label={t('Sof savdo')} value={s.net} />
+              {Number(s.refunded) > 0 && (
+                <Row label={t('Qaytarilgan')} value={s.refunded} tone="red" />
+              )}
+              <Row label={t('Tannarx (taxminiy)')} value={s.cogs} />
+              <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
+              <Row label={t('Sof foyda (taxminiy)')} value={s.profit} strong tone="green" />
+            </div>
+          </div>
+        )}
         <div className="card section">
           <div className="card-head">
             <h2>🛒 {t('Supermarket xarajati')}</h2>

@@ -15,9 +15,11 @@ import uz.barakat.market.dto.PaymentResponse;
 import uz.barakat.market.dto.SupplierDetailResponse;
 import uz.barakat.market.dto.SupplierRequest;
 import uz.barakat.market.dto.SupplierResponse;
+import uz.barakat.market.exception.BadRequestException;
 import uz.barakat.market.exception.NotFoundException;
 import uz.barakat.market.repository.PaymentRepository;
 import uz.barakat.market.repository.SupplierRepository;
+import uz.barakat.market.util.PhoneUtil;
 
 /**
  * Suppliers ("Yetkazib beruvchilar"): basic CRUD + a derived balance
@@ -70,13 +72,26 @@ public class SupplierService {
     public SupplierResponse create(SupplierRequest request) {
         Supplier s = new Supplier();
         apply(s, request);
+        requirePhoneUnique(s.getPhone(), null);
         return toResponse(suppliers.save(s), List.of());
     }
 
     public SupplierResponse update(Long id, SupplierRequest request) {
         Supplier s = find(id);
         apply(s, request);
+        requirePhoneUnique(s.getPhone(), id);
         return toResponse(suppliers.save(s), supplierPayments());
+    }
+
+    /** Rejects the save when another supplier in this tenant already uses the phone. */
+    private void requirePhoneUnique(String phone, Long selfId) {
+        if (phone == null || phone.isBlank()) return;
+        boolean taken = selfId == null
+                ? suppliers.existsByPhone(phone)
+                : suppliers.existsByPhoneAndIdNot(phone, selfId);
+        if (taken) {
+            throw new BadRequestException("Bu telefon raqam allaqachon yetkazib beruvchiga biriktirilgan: " + phone);
+        }
     }
 
     public void delete(Long id) {
@@ -109,7 +124,7 @@ public class SupplierService {
 
     private static void apply(Supplier s, SupplierRequest request) {
         s.setName(request.name().strip());
-        s.setPhone(blankToNull(request.phone()));
+        s.setPhone(PhoneUtil.normalize(request.phone()));
         s.setAddress(blankToNull(request.address()));
         s.setNote(blankToNull(request.note()));
     }

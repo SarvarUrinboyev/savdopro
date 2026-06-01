@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useT } from '../context/Settings.jsx';
+import { ContactButtons } from '../components/ContactButtons.jsx';
 
 // Pricing mirrors SubscriptionPlan on the License Server (BASIC/STANDARD/PRO).
 // The real charge is always the backend's — these are the display catalogue.
@@ -40,6 +41,8 @@ export function Landing() {
           SavdoPRO <span className="lp-logo-tag">POS</span>
         </div>
         <nav className="lp-nav-links">
+          <a href="#about" className="lp-link">{t('Dastur haqida')}</a>
+          <a href="#contact" className="lp-link">{t('Bog\'lanish')}</a>
           <Link to="/login" className="lp-link">{t('Kirish')}</Link>
           <Link to="/register" className="btn btn-primary lp-nav-cta">
             {t('Bepul boshlash')}
@@ -75,6 +78,13 @@ export function Landing() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="lp-section" id="about">
+        <h2 className="lp-h2">{t('Dastur haqida')}</h2>
+        <p className="lp-h2-sub" style={{ maxWidth: 760, margin: '0 auto', lineHeight: 1.7 }}>
+          {t("SavdoPRO — O'zbekiston bizneslari uchun bulutli savdo boshqaruv tizimi. Kassa (POS), ombor, mijozlar va qarz, hisobotlar hamda AI yordamchi — barchasi bitta tizimda. Telefon, planshet yoki kompyuterdan, istalgan vaqtda, o'rnatishsiz ishlang. Kichik do'kondan ko'p filialli tarmoqqacha mos keladi.")}
+        </p>
       </section>
 
       <section className="lp-section">
@@ -114,9 +124,19 @@ export function Landing() {
         </Link>
       </section>
 
+      <section className="lp-section" id="contact">
+        <h2 className="lp-h2">{t('Bog\'lanish')}</h2>
+        <p className="lp-h2-sub">
+          {t("Admin va sotuv bo'limi bilan to'g'ridan-to'g'ri bog'laning. Ish vaqti: Du–Sha, 9:00–18:00.")}
+        </p>
+        <ContactButtons />
+      </section>
+
       <footer className="lp-footer">
         <div className="lp-logo">SavdoPRO <span className="lp-logo-tag">POS</span></div>
         <div className="lp-footer-links">
+          <a href="#about" className="lp-link">{t('Dastur haqida')}</a>
+          <a href="#contact" className="lp-link">{t('Bog\'lanish')}</a>
           <Link to="/login" className="lp-link">{t('Kirish')}</Link>
           <Link to="/register" className="lp-link">{t('Ro\'yxatdan o\'tish')}</Link>
         </div>

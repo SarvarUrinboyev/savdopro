@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PrintApi, ShopApi } from '../api/endpoints.js';
 import { IS_WEB } from '../config.js';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import {
   EmptyState, Loader, PageHeader,
@@ -251,8 +252,7 @@ function ShopFormModal({ title, initial, onSubmit, onClose }) {
       </div>
       <div className="field">
         <label>{t('Telefon')}</label>
-        <input className="input" value={phone}
-               onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput value={phone} onChange={setPhone} />
       </div>
       {/* Phase 3.3: per-shop register profile. Collapsible header so
           single-shop users don't see noise; multi-shop owners can

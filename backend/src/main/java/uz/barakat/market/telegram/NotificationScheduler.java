@@ -10,6 +10,7 @@ import uz.barakat.market.dto.DashboardResponse;
 import uz.barakat.market.dto.OrderResponse;
 import uz.barakat.market.service.DashboardService;
 import uz.barakat.market.service.MoneyFormat;
+import uz.barakat.market.service.ReportService;
 import uz.barakat.market.service.StockAlertService;
 
 /**
@@ -26,13 +27,16 @@ public class NotificationScheduler {
     private final DashboardService dashboardService;
     private final TelegramService telegramService;
     private final StockAlertService stockAlertService;
+    private final ReportService reportService;
 
     public NotificationScheduler(DashboardService dashboardService,
                                  TelegramService telegramService,
-                                 StockAlertService stockAlertService) {
+                                 StockAlertService stockAlertService,
+                                 ReportService reportService) {
         this.dashboardService = dashboardService;
         this.telegramService = telegramService;
         this.stockAlertService = stockAlertService;
+        this.reportService = reportService;
     }
 
     /** Morning briefing: today's deliveries, overdue orders and total debt. */
@@ -73,15 +77,26 @@ public class NotificationScheduler {
         stockAlertService.checkAndAlert();
     }
 
-    /** Evening nudge to close the shift. */
+    /**
+     * Evening owner briefing: the full end-of-day report (today's sales,
+     * estimated profit, cash state, expenses, debts and upcoming orders),
+     * followed by a short nudge to close the shift. This is the owner's
+     * automatic daily Telegram report.
+     */
     @Scheduled(cron = "${telegram.evening-reminder-cron}")
     public void eveningReminder() {
-        log.info("Running evening Telegram reminder");
-        DashboardResponse dash = dashboardService.today();
-        String message = "BARAKAT SUPERMARKET\n"
-                + "Smena yopish eslatmasi - " + LocalDate.now().format(DATE) + "\n\n"
-                + "Bugungi xarajat: " + MoneyFormat.usd(dash.todayExpenseTotal()) + "\n"
-                + "Smenani yopishni va hisobotni yuborishni unutmang.";
-        telegramService.sendMessage(message);
+        log.info("Running evening Telegram report");
+        try {
+            reportService.sendToTelegram(LocalDate.now());
+        } catch (RuntimeException ex) {
+            log.warn("Daily report failed, sending fallback nudge: {}", ex.getMessage());
+            DashboardResponse dash = dashboardService.today();
+            telegramService.sendMessage("BARAKAT SUPERMARKET\n"
+                    + "Smena yopish eslatmasi - " + LocalDate.now().format(DATE) + "\n\n"
+                    + "Bugungi xarajat: " + MoneyFormat.usd(dash.todayExpenseTotal()) + "\n"
+                    + "Smenani yopishni va hisobotni yuborishni unutmang.");
+            return;
+        }
+        telegramService.sendMessage("Smenani yopishni unutmang. Yaxshi dam oling!");
     }
 }

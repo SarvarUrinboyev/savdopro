@@ -113,7 +113,7 @@ public final class Mappers {
                 p.getImei2(), p.getPurchasePrice(), p.getSalePrice(), p.getQuantity(),
                 p.getCategoryId(), categoryName, p.getDescription(), p.getLowStockThreshold(),
                 margin, stockValue, stockStatus(p),
-                p.getMxikCode(), p.getVatRate(), p.getUnit(), p.getCreatedAt());
+                p.getMxikCode(), p.getVatRate(), p.getUnit(), p.getExpiryDate(), p.getCreatedAt());
     }
 
     /** Derived stock bucket: OUT (0) / LOW (at or below threshold) / IN_STOCK. */
@@ -138,10 +138,31 @@ public final class Mappers {
      */
     public static CustomerResponse customer(Customer c, BigDecimal goodsTotal,
                                             BigDecimal paidTotal, int transactionCount) {
+        String tier = customerTier(c.getPointsTotalEarned());
+        boolean bdayMonth = c.getBirthday() != null
+                && c.getBirthday().getMonthValue() == java.time.LocalDate.now().getMonthValue();
         return new CustomerResponse(c.getId(), c.getName(), c.getPhone(), c.getAddress(),
                 c.getNote(), goodsTotal, paidTotal, goodsTotal.subtract(paidTotal),
                 transactionCount, c.getCreatedAt(),
-                c.getPointsBalance(), c.getPointsTotalEarned());
+                c.getPointsBalance(), c.getPointsTotalEarned(),
+                c.getBirthday(), tier, tierDiscountPercent(tier), bdayMonth,
+                c.getTelegramChatId() != null);
+    }
+
+    /** Loyalty tier from lifetime points: GOLD >= 200, SILVER >= 50, else BRONZE. */
+    public static String customerTier(long pointsEarned) {
+        if (pointsEarned >= 200) return "GOLD";
+        if (pointsEarned >= 50) return "SILVER";
+        return "BRONZE";
+    }
+
+    /** Suggested per-tier discount (%). */
+    public static int tierDiscountPercent(String tier) {
+        return switch (tier) {
+            case "GOLD" -> 5;
+            case "SILVER" -> 3;
+            default -> 0;
+        };
     }
 
     public static CustomerTransactionResponse customerTransaction(CustomerTransaction t) {

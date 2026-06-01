@@ -11,6 +11,9 @@ import java.util.List;
 public record EndOfDayReport(
         LocalDate date,
 
+        // SAVDO (bugungi sotuv, qaytarish, taxminiy foyda)
+        SalesSummary sales,
+
         // SUPERMARKET XARAJATI
         BigDecimal marketKassa,
         BigDecimal marketNaqd,

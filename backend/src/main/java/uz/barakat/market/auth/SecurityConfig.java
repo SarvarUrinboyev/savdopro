@@ -59,6 +59,11 @@ public class SecurityConfig {
                         // Static frontend bundle.
                         .requestMatchers("/", "/index.html", "/assets/**",
                                 "/favicon.ico", "/icon.svg").permitAll()
+                        // Payment provider webhooks (Click / Payme). These
+                        // self-authenticate per call: Payme via the Basic
+                        // merchant key, Click via the MD5 sign_string. They
+                        // carry no JWT, so they are open at the HTTP layer.
+                        .requestMatchers("/api/pay/**").permitAll()
                         // --- Per-resource RESOURCE:ACTION authorization ---
                         // The required permission is carried in the JWT (minted
                         // by the License Server). Convention: GET = READ, any

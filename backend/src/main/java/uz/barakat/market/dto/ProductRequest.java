@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Create / update payload for a warehouse product. {@code quantity} is the
@@ -25,5 +26,6 @@ public record ProductRequest(
         @PositiveOrZero(message = "Chegara manfiy bo'la olmaydi") Integer lowStockThreshold,
         String mxikCode,
         @PositiveOrZero(message = "QQS stavkasi manfiy bo'la olmaydi") BigDecimal vatRate,
-        String unit) {
+        String unit,
+        LocalDate expiryDate) {
 }

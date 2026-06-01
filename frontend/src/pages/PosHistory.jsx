@@ -24,7 +24,27 @@ export function PosHistory() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(null); // {sale}
+  const [sendingId, setSendingId] = useState(null);
+  const toast = useToast();
   const rows = items;
+
+  const sendReceipt = async (sale) => {
+    setSendingId(sale.id);
+    try {
+      const r = await PosApi.sendReceipt(sale.id);
+      const label = r.channel === 'TELEGRAM' ? 'Telegram'
+        : r.channel === 'SMS' ? 'SMS' : null;
+      if (label) {
+        toast.success(`${t('Chek yuborildi')} (${label})`);
+      } else {
+        toast.error(t("Kanal yo'q: mijoz Telegram botga ulanmagan va SMS sozlanmagan"));
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const fetchPage = async (p, append) => {
     if (append) setLoadingMore(true); else setLoading(true);
@@ -109,7 +129,17 @@ export function PosHistory() {
                             ? <span className="badge badge-aralash">{t('Qisman')}</span>
                             : <span className="badge badge-naqd">{t('Faol')}</span>}
                       </td>
-                      <td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {s.customerId && (
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            disabled={sendingId === s.id}
+                            title={t('Chekni mijozga yuborish (Telegram/SMS)')}
+                            onClick={() => sendReceipt(s)}
+                          >
+                            {sendingId === s.id ? '⏳' : '📨'}
+                          </button>
+                        )}
                         <button className="btn btn-ghost btn-sm" onClick={() => setOpen({ sale: s })}>
                           {t('Batafsil')}
                         </button>

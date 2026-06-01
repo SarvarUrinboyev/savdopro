@@ -87,6 +87,7 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         Product product = new Product();
         applyFields(product, request);
+        requireNoDuplicate(product, null);
         int initial = request.quantity() != null ? request.quantity() : 0;
         product.setQuantity(initial);
         products.save(product);
@@ -100,8 +101,29 @@ public class ProductService {
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = find(id);
         applyFields(product, request);
+        requireNoDuplicate(product, id);
         products.save(product);
         return Mappers.product(product, categoryName(product.getCategoryId()));
+    }
+
+    /** Blocks entering the same product twice — by name (case-insensitive) or barcode. */
+    private void requireNoDuplicate(Product product, Long selfId) {
+        String name = product.getName();
+        boolean nameTaken = selfId == null
+                ? products.existsByNameIgnoreCase(name)
+                : products.existsByNameIgnoreCaseAndIdNot(name, selfId);
+        if (nameTaken) {
+            throw new BadRequestException("Bu nomli mahsulot allaqachon mavjud: " + name);
+        }
+        String barcode = product.getBarcode();
+        if (barcode != null && !barcode.isBlank()) {
+            boolean barcodeTaken = selfId == null
+                    ? products.existsByBarcode(barcode)
+                    : products.existsByBarcodeAndIdNot(barcode, selfId);
+            if (barcodeTaken) {
+                throw new BadRequestException("Bu shtrix-kod allaqachon mavjud: " + barcode);
+            }
+        }
     }
 
     public void delete(Long id) {
@@ -129,6 +151,33 @@ public class ProductService {
         // already-low product would re-spam the owner.
         maybeAlertLowStock(product, before);
         return Mappers.product(product, categoryName(product.getCategoryId()));
+    }
+
+    /**
+     * Bulk stock count ("Inventarizatsiya"). Sets each listed product to its
+     * counted quantity and logs the difference as a CORRECTION. Lines with no
+     * change (or invalid data) are skipped. Returns only the rows that changed.
+     */
+    public List<ProductResponse> stocktake(uz.barakat.market.dto.StocktakeRequest request) {
+        List<ProductResponse> changed = new ArrayList<>();
+        if (request == null || request.counts() == null) return changed;
+        for (var line : request.counts()) {
+            if (line == null || line.productId() == null
+                    || line.actual() == null || line.actual() < 0) {
+                continue;
+            }
+            Product product = find(line.productId());
+            int before = product.getQuantity();
+            int actual = line.actual();
+            if (actual == before) continue;
+            product.setQuantity(actual);
+            products.save(product);
+            logMovement(product, actual - before, actual, StockReason.CORRECTION,
+                    "Inventarizatsiya (sanaldi: " + actual + ", edi: " + before + ")");
+            maybeAlertLowStock(product, before);
+            changed.add(Mappers.product(product, categoryName(product.getCategoryId())));
+        }
+        return changed;
     }
 
     /** Fires only on a fresh in→below-threshold transition. */
@@ -242,6 +291,7 @@ public class ProductService {
         product.setVatRate(request.vatRate());
         String unit = blankToNull(request.unit());
         product.setUnit(unit != null ? unit : "dona");
+        product.setExpiryDate(request.expiryDate());
     }
 
     private void logMovement(Product product, int delta, int resulting,

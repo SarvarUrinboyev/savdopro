@@ -56,4 +56,12 @@ public class PosController {
                                @Valid @RequestBody(required = false) RefundRequest request) {
         return service.refund(id, request);
     }
+
+    /** Re-sends the receipt to the sale's customer (Telegram or SMS). */
+    @PostMapping("/sales/{id}/send-receipt")
+    public SendReceiptResponse sendReceipt(@PathVariable Long id) {
+        return new SendReceiptResponse(service.sendReceipt(id));
+    }
+
+    public record SendReceiptResponse(String channel) { }
 }

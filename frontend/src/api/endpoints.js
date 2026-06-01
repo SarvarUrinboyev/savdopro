@@ -138,6 +138,8 @@ export const AdminApi = {
     licenseApi.post(`/api/admin/accounts/${accountId}/users`, body),
   resetPassword: (userId, password) =>
     licenseApi.patch(`/api/admin/users/${userId}/password`, { password }),
+  setPermissions: (userId, permissions) =>
+    licenseApi.patch(`/api/admin/users/${userId}/permissions`, { permissions }),
   deleteUser: (userId) => licenseApi.del(`/api/admin/users/${userId}`),
   auditList: (page = 0, size = 50) => licenseApi.get(`/api/admin/audit?page=${page}&size=${size}`),
 };
@@ -167,6 +169,8 @@ export const PosApi = {
   recent: (page = 0, size = 50) => api.get(`/pos/sales?page=${page}&size=${size}`),
   get: (id) => api.get(`/pos/sales/${id}`),
   refund: (id, body) => api.post(`/pos/sales/${id}/refund`, body ?? { items: [] }),
+  // Send/re-send the receipt to the sale's customer. Returns { channel }.
+  sendReceipt: (id) => api.post(`/pos/sales/${id}/send-receipt`, {}),
 };
 
 export const ProductApi = {
@@ -177,6 +181,7 @@ export const ProductApi = {
   remove: (id) => api.del(`/products/${id}`),
   adjust: (id, body) => api.patch(`/products/${id}/adjust`, body),
   movements: (id) => api.get(`/products/${id}/movements`),
+  stocktake: (body) => api.post('/products/stocktake', body),
   lowStock: () => api.get('/products/low-stock'),
   scan: (body) => api.post('/products/scan', body),
   importFile: (file) => uploadFile('/products/import', file),
@@ -231,6 +236,15 @@ export const CustomerApi = {
   // Phase 4.4 loyalty: burn N points → returns updated customer.
   redeemPoints: (id, points) =>
     api.post(`/customers/${id}/loyalty/redeem`, { points }),
+  // Notify a customer over the best channel (Telegram bot, else SMS).
+  // template: 'DEBT' | 'ORDER_READY' | 'CUSTOM'. Returns { channel }.
+  notify: (id, body) => api.post(`/customers/${id}/notify`, body),
+  // Remind every customer who owes money. Returns per-channel counts.
+  remindDebtors: () => api.post('/customers/remind-debtors', {}),
+  // Online-payment context: { debtUsd, suggestedSom, paymeEnabled, clickEnabled }.
+  payInfo: (id) => api.get(`/customers/${id}/pay-info`),
+  // Generate a Click/Payme checkout link. body: { provider, amountSom } → { url }.
+  payLink: (id, body) => api.post(`/customers/${id}/pay-link`, body),
 };
 
 export const ManagementApi = {

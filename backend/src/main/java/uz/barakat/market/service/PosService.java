@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -58,6 +59,9 @@ import uz.barakat.market.repository.StockMovementRepository;
 @Transactional
 public class PosService {
 
+    private static final DateTimeFormatter RECEIPT_DT =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
+
     private final SaleRepository sales;
     private final ProductRepository products;
     private final PaymentRepository payments;
@@ -66,11 +70,13 @@ public class PosService {
     private final RealtimeBus realtime;
     private final PromoService promos;
     private final LoyaltyService loyalty;
+    private final CustomerNotificationService notifications;
 
     public PosService(SaleRepository sales, ProductRepository products,
                       PaymentRepository payments, StockMovementRepository movements,
                       CustomerRepository customers, RealtimeBus realtime,
-                      PromoService promos, LoyaltyService loyalty) {
+                      PromoService promos, LoyaltyService loyalty,
+                      CustomerNotificationService notifications) {
         this.sales = sales;
         this.products = products;
         this.payments = payments;
@@ -79,6 +85,7 @@ public class PosService {
         this.realtime = realtime;
         this.promos = promos;
         this.loyalty = loyalty;
+        this.notifications = notifications;
     }
 
     // =============================================================== checkout
@@ -217,15 +224,74 @@ public class PosService {
         }
 
         Sale saved = sales.save(sale);
-        // Credit loyalty points if this sale is tied to a customer.
+        // Credit loyalty points and push the receipt if tied to a customer.
         if (saved.getCustomerId() != null) {
-            customers.findById(saved.getCustomerId())
-                    .ifPresent(c -> loyalty.credit(c, saved.getTotalUzs()));
+            customers.findById(saved.getCustomerId()).ifPresent(c -> {
+                loyalty.credit(c, saved.getTotalUzs());
+                // Best-effort: send the receipt to the customer's channel.
+                notifications.notify(c, customerReceiptText(saved, c));
+            });
         }
         // Broadcast the sale itself — POS history / monitor pages live-update.
         realtime.publishSale(saved.getId(), saved.getTotalUzs(),
                 saved.getPaymentMethod(), saved.getShopId());
         return toResponse(saved);
+    }
+
+    // ========================================================= receipt send
+
+    /**
+     * Re-sends the receipt for a past sale to its customer over the best
+     * channel. Returns the channel name (TELEGRAM / SMS / NONE). Fails only
+     * if the sale has no customer attached.
+     */
+    @Transactional(readOnly = true)
+    public String sendReceipt(Long saleId) {
+        Sale sale = sales.findById(saleId)
+                .orElseThrow(() -> NotFoundException.of("Sotuv", saleId));
+        if (sale.getCustomerId() == null) {
+            throw new BadRequestException("Bu sotuvga mijoz biriktirilmagan");
+        }
+        Customer customer = customers.findById(sale.getCustomerId())
+                .orElseThrow(() -> NotFoundException.of("Mijoz", sale.getCustomerId()));
+        return notifications.notify(customer, customerReceiptText(sale, customer)).name();
+    }
+
+    /** Concise, human-friendly receipt text for a customer message. */
+    private String customerReceiptText(Sale sale, Customer customer) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("🧾 BARAKAT SUPERMARKET\n");
+        sb.append("Chek #").append(sale.getId());
+        if (sale.getCreatedAt() != null) {
+            sb.append(" — ").append(sale.getCreatedAt().format(RECEIPT_DT));
+        }
+        sb.append("\n\n");
+        if (customer.getName() != null && !customer.getName().isBlank()) {
+            sb.append("Hurmatli ").append(customer.getName()).append("! 👋\n\n");
+        }
+        for (SaleItem i : sale.getItems()) {
+            sb.append("• ").append(i.getProductName())
+              .append(" x").append(i.getQuantity())
+              .append(" — ").append(MoneyFormat.usd(i.getLineTotalUzs())).append('\n');
+        }
+        sb.append("————————————\n");
+        sb.append("Jami: ").append(MoneyFormat.usd(sale.getTotalUzs())).append('\n');
+        if ("QARZGA".equalsIgnoreCase(sale.getPaymentMethod())) {
+            sb.append("To'lov: Qarzga yozildi\n");
+        } else if (sale.getPaymentMethod() != null) {
+            sb.append("To'lov: ").append(paymentLabel(sale.getPaymentMethod())).append('\n');
+        }
+        sb.append("\nXaridingiz uchun rahmat! Yana keling 😊");
+        return sb.toString();
+    }
+
+    private static String paymentLabel(String method) {
+        return switch (method == null ? "" : method.toUpperCase()) {
+            case "NAQD" -> "Naqd";
+            case "KARTA" -> "Karta";
+            case "QARZGA" -> "Qarzga";
+            default -> method;
+        };
     }
 
     // ================================================================ refund

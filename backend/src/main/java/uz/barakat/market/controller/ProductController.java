@@ -95,6 +95,13 @@ public class ProductController {
         return service.movements(id);
     }
 
+    /** Bulk stock count ("Inventarizatsiya"): set counted quantities, log corrections. */
+    @PostMapping("/stocktake")
+    public List<ProductResponse> stocktake(
+            @RequestBody uz.barakat.market.dto.StocktakeRequest request) {
+        return service.stocktake(request);
+    }
+
     /** Barcode scan: +1 stock for a known product, or "not found" for a new one. */
     @PostMapping("/scan")
     public ScanResponse scan(@Valid @RequestBody ScanRequest request) {

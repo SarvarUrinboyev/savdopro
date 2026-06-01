@@ -12,6 +12,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findFirstByBarcode(String barcode);
 
+    // ---- duplicate guards (tenant-scoped via the shop @Filter) ----
+    boolean existsByBarcode(String barcode);
+
+    boolean existsByBarcodeAndIdNot(String barcode, Long id);
+
+    boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+
     /**
      * Returns every product whose current quantity is at or below its
      * low-stock threshold. Products with {@code lowStockThreshold = 0} are

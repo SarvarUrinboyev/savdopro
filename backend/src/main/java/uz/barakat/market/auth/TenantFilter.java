@@ -80,7 +80,7 @@ public class TenantFilter extends OncePerRequestFilter {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.getWriter().write(
-                            "{\"message\":\"Hamma do'konlar rejimi sizga ruxsat etilmagan\"}");
+                            "{\"code\":\"FORBIDDEN\",\"shop\":true,\"message\":\"Hamma do'konlar rejimi sizga ruxsat etilmagan\"}");
                     return;
                 } else {
                     List<Long> ids = shops
@@ -124,7 +124,7 @@ public class TenantFilter extends OncePerRequestFilter {
                         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                         response.setContentType("application/json");
                         response.getWriter().write(
-                                "{\"message\":\"Bu do'kon sizning akkauntingizga tegishli emas\"}");
+                                "{\"code\":\"FORBIDDEN\",\"shop\":true,\"message\":\"Bu do'kon sizning akkauntingizga tegishli emas\"}");
                         return;
                     }
                 }

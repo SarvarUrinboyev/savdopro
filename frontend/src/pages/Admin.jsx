@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AdminApi } from '../api/endpoints.js';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import {
   EmptyState, Loader, PageHeader,
@@ -296,9 +297,8 @@ function CreateAccountModal({ onSubmit, onClose }) {
         </div>
         <div className="field">
           <label>{t('Telefon')}</label>
-          <input className="input" value={form.contactPhone}
-                 onChange={update('contactPhone')}
-                 placeholder="+998 90 123 45 67" />
+          <PhoneInput value={form.contactPhone}
+                      onChange={(v) => setForm({ ...form, contactPhone: v })} />
         </div>
       </div>
       <div className="field">
@@ -408,8 +408,8 @@ function EditAccountModal({ account, onSubmit, onClose }) {
       <div className="form-row">
         <div className="field">
           <label>{t('Telefon')}</label>
-          <input className="input" value={form.contactPhone}
-                 onChange={update('contactPhone')} />
+          <PhoneInput value={form.contactPhone}
+                      onChange={(v) => setForm({ ...form, contactPhone: v })} />
         </div>
         <div className="field">
           <label>{t('Obuna tugashi')}</label>

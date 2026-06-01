@@ -3,6 +3,7 @@ package uz.barakat.market.domain;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
@@ -57,4 +58,8 @@ public class Customer extends TenantScopedEntity {
      */
     @Column(name = "card_code", length = 36, unique = true)
     private String cardCode;
+
+    /** Optional birthday — drives the greeting and birthday-month discount. */
+    @Column(name = "birthday")
+    private LocalDate birthday;
 }

@@ -8,6 +8,7 @@ import uz.barakat.market.domain.Shop;
 import uz.barakat.market.exception.BadRequestException;
 import uz.barakat.market.exception.NotFoundException;
 import uz.barakat.market.repository.ShopRepository;
+import uz.barakat.market.util.PhoneUtil;
 
 /**
  * Shop CRUD scoped to a single account. Every operation takes the
@@ -71,12 +72,13 @@ public class ShopService {
         s.setAccountId(accountId);
         s.setName(request.name().trim());
         s.setAddress(blankToNull(request.address()));
-        s.setContactPhone(blankToNull(request.contactPhone()));
+        s.setContactPhone(PhoneUtil.normalize(request.contactPhone()));
         s.setPrinterName(blankToNull(request.printerName()));
         s.setCashRegisterNo(blankToNull(request.cashRegisterNo()));
         s.setReceiptFooter(blankToNull(request.receiptFooter()));
         // First shop of an account auto-becomes the main shop.
         s.setMain(shops.countByAccountId(accountId) == 0);
+        requirePhoneUnique(s.getContactPhone(), accountId, null);
         return toResponse(shops.save(s));
     }
 
@@ -84,11 +86,23 @@ public class ShopService {
         Shop s = requireOwned(accountId, id);
         s.setName(request.name().trim());
         s.setAddress(blankToNull(request.address()));
-        s.setContactPhone(blankToNull(request.contactPhone()));
+        s.setContactPhone(PhoneUtil.normalize(request.contactPhone()));
         s.setPrinterName(blankToNull(request.printerName()));
         s.setCashRegisterNo(blankToNull(request.cashRegisterNo()));
         s.setReceiptFooter(blankToNull(request.receiptFooter()));
+        requirePhoneUnique(s.getContactPhone(), accountId, id);
         return toResponse(shops.save(s));
+    }
+
+    /** Rejects a save when another shop in the same account already uses the phone. */
+    private void requirePhoneUnique(String phone, Long accountId, Long selfId) {
+        if (phone == null || phone.isBlank()) return;
+        boolean taken = selfId == null
+                ? shops.existsByContactPhoneAndAccountId(phone, accountId)
+                : shops.existsByContactPhoneAndAccountIdAndIdNot(phone, accountId, selfId);
+        if (taken) {
+            throw new BadRequestException("Bu telefon raqam boshqa do'konga biriktirilgan: " + phone);
+        }
     }
 
     public void delete(Long accountId, Long id) {

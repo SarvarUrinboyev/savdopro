@@ -115,6 +115,24 @@ async function request(method, path, body) {
     }
   }
 
+  // Self-heal a stale active-shop id: one left over from a previous account /
+  // login makes the backend reject the call as a "foreign shop" (403 shop:true).
+  // Drop it and replay once WITHOUT the header so the backend resolves the
+  // account's own main shop — fixes "saqlanmadi + tizimdan chiqib ketdi" with
+  // no re-login.
+  if (response.status === 403 && localStorage.getItem(ACTIVE_SHOP_KEY)) {
+    const shopDenial = safeParse(await response.clone().text());
+    if (shopDenial?.shop) {
+      localStorage.removeItem(ACTIVE_SHOP_KEY);
+      delete options.headers['X-Shop-Id'];
+      try {
+        response = await fetch(BASE + path, options);
+      } catch {
+        throw new ApiError("Serverga ulanib bo'lmadi. Backend ishlayaptimi?", 0);
+      }
+    }
+  }
+
   if (response.status === 403) {
     // Distinguish a permission denial from a dead session. The backend tags
     // pure authorization failures with {"code":"FORBIDDEN"}; those must NOT

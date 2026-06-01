@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/Auth.jsx';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useT } from '../context/Settings.jsx';
 
 /**
@@ -110,13 +111,7 @@ export function Register() {
 
         <div className="field">
           <label>{t('Telefon (ixtiyoriy)')}</label>
-          <input
-            className="input"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+998 90 123 45 67"
-          />
+          <PhoneInput value={phone} onChange={setPhone} />
         </div>
 
         {error && <div className="login-error">⚠️ {error}</div>}

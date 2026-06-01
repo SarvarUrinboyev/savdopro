@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CustomerApi } from '../api/endpoints.js';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, MetricCard, PageHeader } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
@@ -30,9 +31,37 @@ export function Customers() {
   const { data, loading, error, reload } = useApi(() => CustomerApi.list(), []);
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(null);
+  const [reminding, setReminding] = useState(false);
   const toast = useToast();
 
   const customers = data || [];
+
+  const debtorCount = useMemo(
+    () => customers.filter((c) => Number(c.balance) > 0).length,
+    [customers],
+  );
+
+  const remindDebtors = async () => {
+    setReminding(true);
+    try {
+      const r = await CustomerApi.remindDebtors();
+      const sent = (r.telegram || 0) + (r.sms || 0);
+      if (sent > 0) {
+        const parts = [];
+        if (r.telegram) parts.push(`${r.telegram} Telegram`);
+        if (r.sms) parts.push(`${r.sms} SMS`);
+        toast.success(`${sent} ${t('qarzdorga eslatma yuborildi')}: ${parts.join(', ')}`);
+      } else if (r.debtors > 0) {
+        toast.error(t("Hech kimga yuborilmadi — kanal sozlanmagan (Telegram bot / SMS)"));
+      } else {
+        toast.success(t('Qarzdor mijoz yo‘q 👍'));
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setReminding(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -79,6 +108,15 @@ export function Customers() {
           title={t('Yetkazib beruvchilar bo\'limiga o\'tish')}
         >
           🏭 {t('Yetkazib beruvchilar')}
+        </button>
+        <button
+          className="btn btn-ghost"
+          onClick={remindDebtors}
+          disabled={reminding || debtorCount === 0}
+          title={t('Qarzi bor barcha mijozlarga eslatma yuborish')}
+        >
+          {reminding ? `📨 ${t('Yuborilmoqda...')}` : `📨 ${t('Qarzdorlarga eslatma')}`}
+          {debtorCount > 0 ? ` (${debtorCount})` : ''}
         </button>
         <button className="btn btn-primary" onClick={() => setModal({ type: 'add' })}>
           + {t('Yangi mijoz')}
@@ -221,6 +259,7 @@ export function CustomerFormModal({ initial, onSubmit, onClose }) {
   const [phone, setPhone] = useState(initial?.phone ?? '');
   const [address, setAddress] = useState(initial?.address ?? '');
   const [note, setNote] = useState(initial?.note ?? '');
+  const [birthday, setBirthday] = useState(initial?.birthday ?? '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -236,6 +275,7 @@ export function CustomerFormModal({ initial, onSubmit, onClose }) {
         phone: phone.trim() || null,
         address: address.trim() || null,
         note: note.trim() || null,
+        birthday: birthday || null,
       });
       onClose();
     } catch (err) {
@@ -267,15 +307,18 @@ export function CustomerFormModal({ initial, onSubmit, onClose }) {
       </div>
       <div className="field">
         <label>{t('Telefon raqami')}</label>
-        <input className="input" value={phone}
-               onChange={(e) => setPhone(e.target.value)}
-               placeholder="+998 90 123 45 67" />
+        <PhoneInput value={phone} onChange={setPhone} />
       </div>
       <div className="field">
         <label>{t('Manzil')}</label>
         <input className="input" value={address}
                onChange={(e) => setAddress(e.target.value)}
                placeholder={t("Shahar, ko'cha, uy")} />
+      </div>
+      <div className="field">
+        <label>{t("Tug'ilgan kun (ixtiyoriy)")}</label>
+        <input className="input" type="date" value={birthday || ''}
+               onChange={(e) => setBirthday(e.target.value)} />
       </div>
       <div className="field">
         <label>{t('Izoh (ixtiyoriy)')}</label>

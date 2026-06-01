@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import org.hibernate.annotations.Filter;
 import lombok.Getter;
 import lombok.Setter;
@@ -69,4 +70,8 @@ public class Product extends TenantScopedEntity {
     /** Unit of measure ("dona", "kg", "litr", ...). Defaults to pieces. */
     @Column(nullable = false, length = 24)
     private String unit = "dona";
+
+    /** Optional best-before / expiry date (perishable goods). Null = not tracked. */
+    @Column(name = "expiry_date")
+    private LocalDate expiryDate;
 }

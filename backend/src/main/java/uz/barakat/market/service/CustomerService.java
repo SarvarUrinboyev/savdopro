@@ -3,6 +3,7 @@ package uz.barakat.market.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -26,6 +27,7 @@ import uz.barakat.market.repository.CustomerRepository;
 import uz.barakat.market.repository.CustomerTransactionRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.ShiftRepository;
+import uz.barakat.market.util.PhoneUtil;
 import uz.barakat.market.telegram.CustomerBotNotifier;
 
 /** Customers ("Mijozlar"): contact details plus the goods / payment ledger. */
@@ -41,19 +43,105 @@ public class CustomerService {
     private final ProductService productService;
     private final CustomerBotNotifier botNotifier;
     private final ShiftRepository shifts;
+    private final CustomerNotificationService notifications;
 
     public CustomerService(CustomerRepository customers,
                            CustomerTransactionRepository transactions,
                            ProductRepository products,
                            ProductService productService,
                            CustomerBotNotifier botNotifier,
-                           ShiftRepository shifts) {
+                           ShiftRepository shifts,
+                           CustomerNotificationService notifications) {
         this.customers = customers;
         this.transactions = transactions;
         this.products = products;
         this.productService = productService;
         this.botNotifier = botNotifier;
         this.shifts = shifts;
+        this.notifications = notifications;
+    }
+
+    /**
+     * Sends a one-off message to a customer over the best available channel
+     * (linked Telegram bot, else SMS). {@code template} is one of
+     * {@code DEBT} (auto-builds the balance reminder), {@code ORDER_READY}
+     * or {@code CUSTOM} (uses {@code customText}). Returns the channel used.
+     */
+    public String sendNotification(Long id, String template, String customText) {
+        Customer customer = customers.findById(id)
+                .orElseThrow(() -> NotFoundException.of("Mijoz", id));
+        String text = switch (template == null ? "" : template.toUpperCase()) {
+            case "DEBT" -> debtReminderText(customer);
+            case "ORDER_READY" -> "Hurmatli " + customer.getName()
+                    + "! Buyurtmangiz tayyor. Olib ketishingiz mumkin. Rahmat!";
+            default -> customText;
+        };
+        if (text == null || text.isBlank()) {
+            throw new BadRequestException("Xabar matni bo'sh");
+        }
+        return notifications.notify(customer, text).name();
+    }
+
+    /** Builds the debt-reminder text from the customer's current balance. */
+    private String debtReminderText(Customer customer) {
+        BigDecimal balance = balanceOf(customer.getId());
+        if (balance.signum() <= 0) {
+            return "Hurmatli " + customer.getName()
+                    + "! Sizda qarz yo'q. Rahmat! 🙏";
+        }
+        return "Hurmatli " + customer.getName() + "! 👋\n\n"
+                + "Eslatma: sizning qarzingiz " + MoneyFormat.usd(balance) + ".\n"
+                + "Iltimos, qulay vaqtda to'lovni amalga oshiring. Rahmat!";
+    }
+
+    /** Result of a bulk debt reminder: how many debtors, and per channel. */
+    public record BulkReminderResult(int debtors, int telegram, int sms, int noChannel) { }
+
+    /**
+     * Sends a debt reminder to every customer with a positive balance, over
+     * each one's best channel. Balances come from a single GROUP BY so this
+     * stays one query regardless of customer count.
+     */
+    public BulkReminderResult remindAllDebtors() {
+        Map<Long, BigDecimal> balances = new HashMap<>();
+        for (CustomerTransactionRepository.LedgerTotals lt
+                : transactions.aggregateLedgerTotals(CustomerTxType.GOODS, CustomerTxType.PAYMENT)) {
+            BigDecimal goods = lt.getGoods() == null ? ZERO : lt.getGoods();
+            BigDecimal paid = lt.getPaid() == null ? ZERO : lt.getPaid();
+            balances.put(lt.getCustomerId(), goods.subtract(paid));
+        }
+        int debtors = 0;
+        int telegram = 0;
+        int sms = 0;
+        int none = 0;
+        for (Customer c : customers.findAll()) {
+            BigDecimal bal = balances.getOrDefault(c.getId(), ZERO);
+            if (bal.signum() <= 0) {
+                continue;
+            }
+            debtors++;
+            String text = "Hurmatli " + c.getName() + "! 👋\n\n"
+                    + "Eslatma: sizning qarzingiz " + MoneyFormat.usd(bal) + ".\n"
+                    + "Iltimos, qulay vaqtda to'lovni amalga oshiring. Rahmat!";
+            switch (notifications.notify(c, text)) {
+                case TELEGRAM -> telegram++;
+                case SMS -> sms++;
+                case NONE -> none++;
+            }
+        }
+        return new BulkReminderResult(debtors, telegram, sms, none);
+    }
+
+    /** Running balance = sum(GOODS) - sum(PAYMENT). */
+    private BigDecimal balanceOf(Long customerId) {
+        BigDecimal balance = ZERO;
+        for (CustomerTransaction tx
+                : transactions.findByCustomerIdOrderByDateDescIdDesc(customerId)) {
+            balance = tx.getType() == CustomerTxType.GOODS
+                    ? balance.add(tx.getAmount())
+                    : balance.subtract(tx.getAmount());
+        }
+        return balance;
     }
 
     /** Defense-in-depth: warehouse-touching sales are only allowed when a shift is open. */
@@ -101,6 +189,7 @@ public class CustomerService {
     public CustomerResponse create(CustomerRequest request) {
         Customer customer = new Customer();
         apply(customer, request);
+        requirePhoneUnique(customer.getPhone(), null);
         customers.save(customer);
         return toResponse(customer, List.of());
     }
@@ -108,8 +197,20 @@ public class CustomerService {
     public CustomerResponse update(Long id, CustomerRequest request) {
         Customer customer = find(id);
         apply(customer, request);
+        requirePhoneUnique(customer.getPhone(), id);
         customers.save(customer);
         return toResponse(customer, transactions.findByCustomerIdOrderByDateDescIdDesc(id));
+    }
+
+    /** Rejects the save when another customer in this tenant already uses the phone. */
+    private void requirePhoneUnique(String phone, Long selfId) {
+        if (phone == null || phone.isBlank()) return;
+        boolean taken = selfId == null
+                ? customers.existsByPhone(phone)
+                : customers.existsByPhoneAndIdNot(phone, selfId);
+        if (taken) {
+            throw new BadRequestException("Bu telefon raqam allaqachon mijozga biriktirilgan: " + phone);
+        }
     }
 
     /** Removes the customer; the database cascade removes the ledger rows. */
@@ -291,9 +392,10 @@ public class CustomerService {
 
     private static void apply(Customer customer, CustomerRequest request) {
         customer.setName(request.name().strip());
-        customer.setPhone(blankToNull(request.phone()));
+        customer.setPhone(PhoneUtil.normalize(request.phone()));
         customer.setAddress(blankToNull(request.address()));
         customer.setNote(blankToNull(request.note()));
+        customer.setBirthday(request.birthday());
     }
 
     private static String blankToNull(String value) {

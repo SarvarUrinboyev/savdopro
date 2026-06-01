@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AuthApi } from '../api/endpoints.js';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useT } from '../context/Settings.jsx';
 
 /**
@@ -72,15 +73,12 @@ export function ForgotPassword() {
 
         <div className="field">
           <label>{t('Telefon')}</label>
-          <input
-            className="input"
-            inputMode="tel"
+          <PhoneInput
             required
             autoFocus={step === 1}
             disabled={step === 2 || busy}
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+998 90 123 45 67"
+            onChange={setPhone}
           />
         </div>
 

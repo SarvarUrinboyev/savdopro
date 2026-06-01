@@ -69,7 +69,7 @@ public final class GeminiProvider implements AiProvider {
                 + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(45))
+                .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)))
                 .build();

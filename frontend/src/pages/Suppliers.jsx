@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SupplierApi } from '../api/endpoints.js';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
+import { PhoneInput } from '../components/PhoneInput.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, MetricCard, PageHeader } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
@@ -218,9 +219,7 @@ export function SupplierFormModal({ initial, onSubmit, onClose }) {
       </div>
       <div className="field">
         <label>{t('Telefon')}</label>
-        <input className="input" value={phone}
-               onChange={(e) => setPhone(e.target.value)}
-               placeholder="+998..." />
+        <PhoneInput value={phone} onChange={setPhone} />
       </div>
       <div className="field">
         <label>{t('Manzil')}</label>

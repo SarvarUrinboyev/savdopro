@@ -1,11 +1,35 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminApi } from '../api/endpoints.js';
+import { Modal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Loader, PageHeader } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
 import { ALL_MODULES, modulesFromCsv } from '../lib/modules.js';
+
+// Per-user permission editor: each toggle grants a module's RESOURCE:ACTION set.
+// Checking a module gives the user read+write for it; an empty override means
+// "fall back to the role's defaults".
+const MODULE_PERMS = {
+  pos: ['SALES:READ', 'SALES:WRITE', 'PAYMENTS:READ', 'PAYMENTS:WRITE'],
+  'pos-history': ['SALES:READ'],
+  promos: ['PROMOS:READ', 'PROMOS:WRITE'],
+  management: ['MANAGEMENT:READ', 'MANAGEMENT:WRITE'],
+  'home-expenses': ['EXPENSES:READ', 'EXPENSES:WRITE'],
+  payments: ['PAYMENTS:READ', 'PAYMENTS:WRITE'],
+  orders: ['ORDERS:READ', 'ORDERS:WRITE'],
+  warehouse: ['PRODUCTS:READ', 'PRODUCTS:WRITE'],
+  customers: ['CUSTOMERS:READ', 'CUSTOMERS:WRITE'],
+  suppliers: ['SUPPLIERS:READ', 'SUPPLIERS:WRITE'],
+  debt: ['DEBTS:READ', 'DEBTS:WRITE'],
+  'shift-history': ['SHIFTS:READ'],
+  'shift-close': ['SHIFTS:READ', 'SHIFTS:WRITE', 'SHIFTS:ADMIN'],
+  reports: ['REPORTS:READ', 'REPORTS:WRITE'],
+  shops: ['SHOPS:READ', 'SHOPS:WRITE'],
+  transfers: ['TRANSFERS:READ', 'TRANSFERS:WRITE'],
+};
+const PERM_MODULES = ALL_MODULES.filter((m) => MODULE_PERMS[m.key]);
 
 /**
  * Per-account permissions / sidebar configuration page.
@@ -35,6 +59,7 @@ export function AccountDetail() {
   const [grantPlan, setGrantPlan] = useState('BASIC');
   const [grantMonths, setGrantMonths] = useState(1);
   const [granting, setGranting] = useState(false);
+  const [permUser, setPermUser] = useState(null); // user whose permissions are being edited
 
   useEffect(() => {
     if (!data) return;
@@ -207,6 +232,7 @@ export function AccountDetail() {
                 <th>{t('Ism')}</th>
                 <th>{t('Rol')}</th>
                 <th>{t('Oxirgi kirish')}</th>
+                <th>{t('Ruxsat')}</th>
               </tr>
             </thead>
             <tbody>
@@ -216,12 +242,86 @@ export function AccountDetail() {
                   <td>{u.fullName || '—'}</td>
                   <td><span className="badge">{u.role}</span></td>
                   <td className="faint mono">{u.lastLoginAt || '—'}</td>
+                  <td>
+                    <button className="btn btn-ghost" style={{ padding: '4px 10px' }}
+                            onClick={() => setPermUser(u)}>
+                      🔐 {t('Ruxsatlar')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+      {permUser && (
+        <PermModal
+          user={permUser}
+          onClose={() => setPermUser(null)}
+          onSaved={() => { setPermUser(null); reload(); }}
+          toast={toast}
+          t={t}
+        />
+      )}
     </>
+  );
+}
+
+function PermModal({ user, onClose, onSaved, toast, t }) {
+  const ownerLike = user.role === 'ACCOUNT_OWNER' || user.role === 'SUPER_ADMIN';
+  // Selected module keys: derived from the user's current override CSV.
+  const [sel, setSel] = useState(() => {
+    const have = new Set((user.permissions || '').split(',').map((s) => s.trim()).filter(Boolean));
+    if (have.has('*:*')) return new Set(PERM_MODULES.map((m) => m.key));
+    return new Set(PERM_MODULES.filter((m) =>
+      MODULE_PERMS[m.key].every((p) => have.has(p))).map((m) => m.key));
+  });
+  const [busy, setBusy] = useState(false);
+
+  const toggle = (key) => setSel((s) => {
+    const n = new Set(s);
+    n.has(key) ? n.delete(key) : n.add(key);
+    return n;
+  });
+
+  const save = async () => {
+    const csv = [...sel].flatMap((k) => MODULE_PERMS[k]).join(',');
+    setBusy(true);
+    try {
+      await AdminApi.setPermissions(user.id, csv || null);
+      toast.success(t('Ruxsatlar saqlandi — foydalanuvchi keyingi kirishda yangilanadi'));
+      onSaved();
+    } catch (e) {
+      toast.error(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={`🔐 ${user.username} — ${t('ruxsatlar')}`} onClose={onClose} footer={
+      <>
+        <button className="btn btn-ghost" onClick={() => setSel(new Set())}>{t('Tozalash')}</button>
+        <button className="btn btn-primary" onClick={save} disabled={busy}>
+          {busy ? t('Saqlanmoqda...') : t('Saqlash')}
+        </button>
+      </>
+    }>
+      <p className="faint" style={{ marginTop: 0 }}>
+        {t("Foydalanuvchi ko'ra/o'zgartira oladigan bo'limlarni belgilang. Hech narsa belgilanmasa — rol bo'yicha standart ruxsatlar ishlatiladi.")}
+      </p>
+      {ownerLike && (
+        <p style={{ color: '#f59e0b', fontWeight: 600 }}>
+          ⚠️ {t("Bu — akkaunt egasi. Cheklov qo'ysangiz, o'zining ba'zi bo'limlarini yo'qotadi.")}
+        </p>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {PERM_MODULES.map((m) => (
+          <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 4px', cursor: 'pointer' }}>
+            <input type="checkbox" checked={sel.has(m.key)} onChange={() => toggle(m.key)} />
+            <span>{t(m.label)}</span>
+          </label>
+        ))}
+      </div>
+    </Modal>
   );
 }

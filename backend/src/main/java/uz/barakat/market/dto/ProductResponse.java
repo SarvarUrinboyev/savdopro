@@ -1,6 +1,7 @@
 package uz.barakat.market.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -27,5 +28,6 @@ public record ProductResponse(
         String mxikCode,
         BigDecimal vatRate,
         String unit,
+        LocalDate expiryDate,
         LocalDateTime createdAt) {
 }

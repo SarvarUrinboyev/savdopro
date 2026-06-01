@@ -72,7 +72,7 @@ public final class OpenAiCompatProvider implements AiProvider {
 
         HttpRequest.Builder rb = HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl.replaceAll("/+$", "") + "/chat/completions"))
-                .timeout(Duration.ofSeconds(45))
+                .timeout(Duration.ofSeconds(30))
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json");

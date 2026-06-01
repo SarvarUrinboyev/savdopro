@@ -19,6 +19,7 @@ import uz.barakat.license.domain.UserRole;
 import uz.barakat.license.exception.BadRequestException;
 import uz.barakat.license.exception.NotFoundException;
 import uz.barakat.license.repository.AccountRepository;
+import uz.barakat.license.util.PhoneUtil;
 import uz.barakat.license.repository.AppUserRepository;
 
 /**
@@ -83,7 +84,8 @@ public class AdminService {
         }
         Account account = new Account();
         account.setName(request.name().trim());
-        account.setContactPhone(blankToNull(request.contactPhone()));
+        account.setContactPhone(PhoneUtil.normalize(request.contactPhone()));
+        requireAccountPhoneUnique(account.getContactPhone(), null);
         account.setContactNote(blankToNull(request.contactNote()));
         account.setSubscriptionExpires(request.subscriptionExpires());
         account.setBlocked(false);
@@ -112,7 +114,8 @@ public class AdminService {
         Account a = accounts.findById(id)
                 .orElseThrow(() -> NotFoundException.of("Akkaunt", id));
         a.setName(request.name().trim());
-        a.setContactPhone(blankToNull(request.contactPhone()));
+        a.setContactPhone(PhoneUtil.normalize(request.contactPhone()));
+        requireAccountPhoneUnique(a.getContactPhone(), id);
         a.setContactNote(blankToNull(request.contactNote()));
         a.setSubscriptionExpires(request.subscriptionExpires());
         // Phase 4.6 white-label — null-safe so old API clients that don't
@@ -284,11 +287,23 @@ public class AdminService {
     private static AdminUserResponse toUserResponse(AppUser u) {
         return new AdminUserResponse(
                 u.getId(), u.getUsername(), u.getFullName(),
-                u.getRole().name(), u.getLastLoginAt(), u.getCreatedAt());
+                u.getRole().name(), u.getLastLoginAt(), u.getCreatedAt(),
+                u.getPermissions());
     }
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.strip();
+    }
+
+    /** Rejects a save when another account already uses this contact phone. */
+    private void requireAccountPhoneUnique(String phone, Long selfId) {
+        if (phone == null || phone.isBlank()) return;
+        boolean taken = selfId == null
+                ? accounts.existsByContactPhone(phone)
+                : accounts.existsByContactPhoneAndIdNot(phone, selfId);
+        if (taken) {
+            throw new BadRequestException("Bu telefon raqam allaqachon boshqa akkauntga biriktirilgan: " + phone);
+        }
     }
 
     private static UserRole parseRole(String name, UserRole fallback) {

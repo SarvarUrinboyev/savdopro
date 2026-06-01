@@ -61,14 +61,24 @@ public class AiChatService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Matches a tool request line: {@code TOOL <name> {..json..}} (json optional). */
+    /**
+     * Matches a tool request: {@code TOOL <name> {..json..}} (json optional)
+     * at the START OF A LINE. Not anchored to the whole reply — some models
+     * append a hallucinated answer after the TOOL line; we take the first
+     * TOOL call and ignore the trailing text. {@code [^{}]*} keeps the args
+     * to one flat JSON object (all our tool args are flat).
+     */
     private static final Pattern TOOL_RE =
-            Pattern.compile("(?is)^TOOL\\s+([a-zA-Z]+)\\s*(\\{.*})?\\s*$");
+            Pattern.compile("(?im)^\\s*TOOL\\s+([a-zA-Z]+)\\s*(\\{[^{}]*})?");
 
     private static final String SYSTEM_PROMPT =
-            "Sen — SavdoPRO POS tizimining yordamchisisan. Foydalanuvchi savoliga "
-            + "qisqa, aniq, raqamli javob ber. Faqat berilgan ma'lumotga asoslan, "
-            + "yetishmasa to'g'ridan-to'g'ri ayt. Javob faqat o'zbek tilida bo'lsin.";
+            "Sen — SavdoPRO POS tizimining yordamchisisan. Sen shu do'konning BARCHA "
+            + "ma'lumotini bilasan: savdo, foyda, xarajat, kassa, mijozlar va ularning "
+            + "qarzi, yetkazib beruvchilar, bizning qarzlarimiz, ombor qoldig'i, "
+            + "yaroqlilik muddati va buyurtmalar. Bu ma'lumotlarni quyidagi ASBOBLAR "
+            + "orqali olasan — savolga mos asbobni chaqir, keyin aniq raqamli javob ber. "
+            + "Hech qachon raqam to'qima; faqat asbob qaytargan ma'lumotga asoslan. "
+            + "Ma'lumot bo'lmasa to'g'ridan-to'g'ri ayt. Javob qisqa va faqat o'zbek tilida bo'lsin.";
 
     private final ReportService reports;
     private final AnalyticsService analytics;
@@ -254,7 +264,7 @@ public class AiChatService {
             t = t.replaceAll("(?s)```[a-zA-Z]*", "").trim();
         }
         Matcher m = TOOL_RE.matcher(t);
-        if (!m.matches()) return null;
+        if (!m.find()) return null;
         String name = m.group(1);
         Map<String, Object> args = Map.of();
         String json = m.group(2);

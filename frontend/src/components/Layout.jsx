@@ -125,10 +125,16 @@ export function Layout({ shift }) {
                 {t('Smena ochiq')} &middot; {formatTime(shift.openedAt)}
               </span>
             ) : (
-              <span className="shift-pill closed">
+              <button
+                type="button"
+                className="shift-pill closed"
+                onClick={() => navigate('/shift-open')}
+                title={t('Smenani ochish')}
+                style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}
+              >
                 <span className="dot" />
-                {t('Smena yopiq')}
-              </span>
+                {t('Smena yopiq')} · {t('ochish')}
+              </button>
             )}
           </div>
         </header>

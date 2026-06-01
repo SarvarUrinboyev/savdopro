@@ -14,6 +14,31 @@ import { money, usd } from '../lib/format.js';
 const STATUS_LABEL = { IN_STOCK: 'Mavjud', LOW: 'Kam qoldi', OUT: 'Tugagan' };
 const STATUS_BADGE = { IN_STOCK: 'badge-naqd', LOW: 'badge-karta', OUT: 'badge-qarzga' };
 
+// Expiry helper: red if already expired, amber within 30 days, otherwise none.
+function expiryInfo(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = Math.round((d - today) / 86400000);
+  if (days < 0) return { label: "Muddati o'tgan", color: '#ef4444' };
+  if (days <= 30) return { label: days + ' kun qoldi', color: '#f59e0b' };
+  return null;
+}
+
+function ExpiryBadge({ date }) {
+  const info = expiryInfo(date);
+  if (!info) return null;
+  return (
+    <span style={{
+      marginLeft: 8, fontSize: 11, fontWeight: 700, padding: '2px 7px',
+      borderRadius: 6, color: '#fff', background: info.color, whiteSpace: 'nowrap',
+    }}>
+      ⏰ {info.label}
+    </span>
+  );
+}
+
 export function Warehouse() {
   const t = useT();
   const navigate = useNavigate();
@@ -108,6 +133,9 @@ export function Warehouse() {
           <button className="btn btn-accent" onClick={() => setModal('scan')}>
             📷 {t('Skaner')}
           </button>
+          <button className="btn btn-ghost" onClick={() => navigate('/stocktake')}>
+            📋 {t('Inventarizatsiya')}
+          </button>
           <button className="btn btn-primary" onClick={() => navigate('/warehouse/new')}>
             + {t('Yangi mahsulot')}
           </button>
@@ -195,7 +223,7 @@ export function Warehouse() {
                       style={{ cursor: 'pointer' }}
                       onClick={() => navigate(`/warehouse/${p.id}`)}
                     >
-                      <td className="name-cell">{p.name}</td>
+                      <td className="name-cell">{p.name}<ExpiryBadge date={p.expiryDate} /></td>
                       <td className="faint mono">{p.imei1 || '—'}</td>
                       <td className="num">{usd(p.salePrice)}</td>
                       <td

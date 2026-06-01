@@ -138,7 +138,58 @@ const ICON = {
       <path d="M3 12a9 9 0 109-9M3 12l3-3M3 12l3 3M12 7v5l3 2" />
     </svg>
   ),
+  '/billing': (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L3 13V4h9l8.59 8.59a2 2 0 010 2.82z" />
+      <circle cx="7.5" cy="7.5" r="1.3" />
+    </svg>
+  ),
+  '/promos': (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+         strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="7.5" cy="7.5" r="1.4" />
+      <circle cx="16.5" cy="16.5" r="1.4" />
+      <path d="M6 18 18 6" />
+    </svg>
+  ),
+  '/help': (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+    </svg>
+  ),
 };
+
+/**
+ * A distinct, vibrant colour per route so the sidebar reads as a colourful set
+ * (like the pricing cards). Icons use currentColor, so we just set `color` on
+ * the wrapper; labels and the active state are unaffected.
+ */
+const ICON_COLOR = {
+  '/admin':         '#f59e0b',
+  '/shops':         '#3b82f6',
+  '/transfers':     '#06b6d4',
+  '/billing':       '#22c55e',
+  '/dashboard':     '#6366f1',
+  '/pos':           '#16a34a',
+  '/pos/history':   '#8b5cf6',
+  '/promos':        '#ec4899',
+  '/management':    '#0ea5e9',
+  '/home-expenses': '#f97316',
+  '/payments':      '#14b8a6',
+  '/orders':        '#eab308',
+  '/warehouse':     '#a855f7',
+  '/customers':     '#2563eb',
+  '/suppliers':     '#0891b2',
+  '/debt':          '#ef4444',
+  '/calculator':    '#64748b',
+  '/shift-history': '#7c3aed',
+  '/shift-close':   '#dc2626',
+  '/reports':       '#f59e0b',
+  '/help':          '#10b981',
+};
+const iconColor = (to) => ICON_COLOR[to] || 'currentColor';
 
 // Each item carries the module `key` used in accounts.enabled_modules.
 // The Sidebar filters out items whose key is not in the current user's
@@ -213,7 +264,7 @@ export function Sidebar({ shift, open }) {
             to="/admin"
             className={({ isActive }) => `nav-link nav-link-admin ${isActive ? 'active' : ''}`}
           >
-            <span className="ico">{ICON['/admin']}</span>
+            <span className="ico" style={{ color: iconColor('/admin') }}>{ICON['/admin']}</span>
             <span>{t('Super-admin')}</span>
           </NavLink>
         )}
@@ -222,7 +273,7 @@ export function Sidebar({ shift, open }) {
             to="/shops"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <span className="ico">{ICON['/shops']}</span>
+            <span className="ico" style={{ color: iconColor('/shops') }}>{ICON['/shops']}</span>
             <span>{t("Do'konlar")}</span>
           </NavLink>
         )}
@@ -231,7 +282,7 @@ export function Sidebar({ shift, open }) {
             to="/transfers"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <span className="ico">{ICON['/transfers']}</span>
+            <span className="ico" style={{ color: iconColor('/transfers') }}>{ICON['/transfers']}</span>
             <span>{t("Tovar transferi")}</span>
           </NavLink>
         )}
@@ -240,7 +291,7 @@ export function Sidebar({ shift, open }) {
             to="/billing"
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <span className="ico">💳</span>
+            <span className="ico" style={{ color: iconColor('/billing') }}>{ICON['/billing']}</span>
             <span>{t("Tarif va to'lov")}</span>
           </NavLink>
         )}
@@ -250,10 +301,17 @@ export function Sidebar({ shift, open }) {
             to={item.to}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
-            <span className="ico">{ICON[item.to]}</span>
+            <span className="ico" style={{ color: iconColor(item.to) }}>{ICON[item.to]}</span>
             <span>{t(item.label)}</span>
           </NavLink>
         ))}
+        <NavLink
+          to="/help"
+          className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+        >
+          <span className="ico" style={{ color: iconColor('/help') }}>{ICON['/help']}</span>
+          <span>{t("Bog'lanish")}</span>
+        </NavLink>
       </nav>
       <div className="sidebar-foot">
         <div className="operator-pill">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CustomerApi, ProductApi, ReportApi } from '../api/endpoints.js';
 import { downloadAuthed } from '../lib/download.js';
@@ -69,7 +69,14 @@ function Detail({ data, reload }) {
             {'  /  '}
             {customer.name.toUpperCase()}
           </div>
-          <h1>{customer.name}</h1>
+          <h1>
+            {customer.name} <TierBadge tier={customer.tier} discount={customer.tierDiscountPercent} />
+            {customer.birthdayThisMonth && (
+              <span style={{ marginLeft: 8, fontSize: 13, fontWeight: 700, color: '#ec4899' }}>
+                🎂 {tr('Tug\'ilgan kun oyi')}
+              </span>
+            )}
+          </h1>
         </div>
         <div className="actions">
           <button className="btn btn-ghost" onClick={() => navigate('/customers')}>
@@ -88,6 +95,12 @@ function Detail({ data, reload }) {
             }}
           >
             📄 {tr('PDF eksport')}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setModal({ type: 'notify' })}>
+            📨 {tr('Xabar yuborish')}
+          </button>
+          <button className="btn btn-ghost" onClick={() => setModal({ type: 'pay' })}>
+            💳 {tr('Onlayn to‘lov')}
           </button>
           <button className="btn btn-ghost" onClick={() => setModal({ type: 'edit' })}>
             ✏️ {tr('Tahrirlash')}
@@ -176,6 +189,7 @@ function Detail({ data, reload }) {
               <InfoRow label={tr('Ism')} value={customer.name} />
               <InfoRow label={tr('Telefon')} value={customer.phone || '—'} />
               <InfoRow label={tr('Manzil')} value={customer.address || '—'} />
+              <InfoRow label={tr("Tug'ilgan kun")} value={customer.birthday || '—'} />
               <InfoRow label={tr('Izoh')} value={customer.note || '—'} last />
             </div>
           </div>
@@ -279,6 +293,27 @@ function Detail({ data, reload }) {
           onConfirm={removeCustomer}
           onCancel={close}
         />
+      )}
+
+      {modal?.type === 'notify' && (
+        <NotifyModal
+          customer={customer}
+          onClose={close}
+          onSent={(channel) => {
+            const label = channel === 'TELEGRAM' ? 'Telegram'
+              : channel === 'SMS' ? 'SMS' : null;
+            if (label) {
+              toast.success(`${tr('Xabar yuborildi')} (${label})`);
+            } else {
+              toast.error(tr("Kanal yo'q: mijoz Telegram botga ulanmagan va SMS sozlanmagan"));
+            }
+            close();
+          }}
+        />
+      )}
+
+      {modal?.type === 'pay' && (
+        <PayModal customer={customer} onClose={close} toast={toast} />
       )}
     </>
   );
@@ -468,6 +503,24 @@ function InfoRow({ label, value, last }) {
       <span className="faint" style={{ fontSize: 13 }}>{label}</span>
       <span style={{ fontWeight: 600, fontSize: 13, textAlign: 'right' }}>{value}</span>
     </div>
+  );
+}
+
+const TIER_STYLE = {
+  GOLD: { bg: '#f59e0b', label: 'GOLD' },
+  SILVER: { bg: '#94a3b8', label: 'SILVER' },
+  BRONZE: { bg: '#b45309', label: 'BRONZE' },
+};
+
+function TierBadge({ tier, discount }) {
+  const s = TIER_STYLE[tier] || TIER_STYLE.BRONZE;
+  return (
+    <span style={{
+      fontSize: 12, fontWeight: 800, padding: '3px 9px', borderRadius: 7,
+      color: '#fff', background: s.bg, verticalAlign: 'middle', letterSpacing: 0.4,
+    }}>
+      ⭐ {s.label}{discount > 0 ? ` · −${discount}%` : ''}
+    </span>
   );
 }
 
@@ -925,6 +978,232 @@ function RedeemPointsModal({ customer, onClose, onDone }) {
         <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>
           ⚠ {error}
         </div>
+      )}
+    </Modal>
+  );
+}
+
+const NOTIFY_TEMPLATES = [
+  { key: 'DEBT', label: 'Qarz eslatmasi', icon: '📒' },
+  { key: 'ORDER_READY', label: 'Buyurtma tayyor', icon: '✅' },
+  { key: 'CUSTOM', label: 'Erkin matn', icon: '✍️' },
+];
+
+function NotifyModal({ customer, onClose, onSent }) {
+  const t = useT();
+  const [template, setTemplate] = useState('DEBT');
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const hasTelegram = Boolean(customer.telegramLinked);
+  const hasPhone = Boolean(customer.phone && String(customer.phone).trim());
+  const channelHint = hasTelegram
+    ? t('Telegram bot orqali yuboriladi')
+    : hasPhone
+      ? t('SMS orqali yuboriladi (agar SMS sozlangan bo‘lsa)')
+      : t('Mijozda na Telegram, na telefon bor — yuborib bo‘lmaydi');
+
+  const valid = template !== 'CUSTOM' || text.trim().length > 0;
+
+  const submit = async () => {
+    setError('');
+    if (!valid) { setError(t('Matn kiriting')); return; }
+    setBusy(true);
+    try {
+      const res = await CustomerApi.notify(customer.id, {
+        template,
+        text: template === 'CUSTOM' ? text.trim() : null,
+      });
+      onSent(res.channel);
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={t('Mijozga xabar yuborish')}
+      onClose={onClose}
+      footer={(
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy}>
+            {t('Bekor qilish')}
+          </button>
+          <button className="btn btn-primary" onClick={submit}
+                  disabled={busy || !valid || (!hasTelegram && !hasPhone)}>
+            {busy ? t('Yuborilmoqda...') : `📨 ${t('Yuborish')}`}
+          </button>
+        </>
+      )}
+    >
+      <div className="field">
+        <label>{t('Xabar turi')}</label>
+        <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
+          {NOTIFY_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.key}
+              type="button"
+              className={`btn btn-sm ${template === tpl.key ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setTemplate(tpl.key)}
+            >
+              {tpl.icon} {t(tpl.label)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {template === 'CUSTOM' && (
+        <div className="field">
+          <label>{t('Matn')}</label>
+          <textarea
+            className="input" rows={4} value={text} autoFocus
+            placeholder={t('Mijozga yuboriladigan xabar...')}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </div>
+      )}
+
+      <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+        {hasTelegram ? '📲' : hasPhone ? '✉️' : '⚠'} {channelHint}
+      </p>
+
+      {error && (
+        <div style={{ color: 'var(--red)', fontSize: 12, marginTop: 8 }}>
+          ⚠ {error}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function PayModal({ customer, onClose, toast }) {
+  const t = useT();
+  const [info, setInfo] = useState(null);
+  const [loadErr, setLoadErr] = useState('');
+  const [provider, setProvider] = useState('');
+  const [amount, setAmount] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    CustomerApi.payInfo(customer.id)
+      .then((d) => {
+        if (!alive) return;
+        setInfo(d);
+        setAmount(d.suggestedSom ? String(d.suggestedSom) : '');
+        setProvider(d.paymeEnabled ? 'payme' : d.clickEnabled ? 'click' : '');
+      })
+      .catch((e) => alive && setLoadErr(e.message));
+    return () => { alive = false; };
+  }, [customer.id]);
+
+  const anyEnabled = info && (info.paymeEnabled || info.clickEnabled);
+  const som = Number(amount);
+  const valid = provider && Number.isFinite(som) && som > 0;
+
+  const make = async () => {
+    setBusy(true); setUrl('');
+    try {
+      const r = await CustomerApi.payLink(customer.id, { provider, amountSom: Math.round(som) });
+      setUrl(r.url);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const copy = () => {
+    try { navigator.clipboard && navigator.clipboard.writeText(url); toast.success(t('Nusxalandi')); }
+    catch { /* ignore */ }
+  };
+
+  const sendToCustomer = async () => {
+    setBusy(true);
+    try {
+      const text = `Hurmatli ${customer.name}! To'lov havolasi:\n${url}`;
+      const res = await CustomerApi.notify(customer.id, { template: 'CUSTOM', text });
+      const label = res.channel === 'TELEGRAM' ? 'Telegram' : res.channel === 'SMS' ? 'SMS' : null;
+      if (label) toast.success(`${t('Havola yuborildi')} (${label})`);
+      else toast.error(t("Kanal yo'q: mijoz Telegram botga ulanmagan va SMS sozlanmagan"));
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title={t('Onlayn to‘lov havolasi')} onClose={onClose}>
+      {loadErr && <div style={{ color: 'var(--red)', fontSize: 13 }}>⚠ {loadErr}</div>}
+      {!info && !loadErr && <p className="muted">{t('Yuklanmoqda...')}</p>}
+
+      {info && !anyEnabled && (
+        <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+          <p style={{ marginTop: 0 }}>
+            ⚠ {t('Onlayn to‘lov hali sozlanmagan.')}
+          </p>
+          <p className="muted">
+            {t('Click yoki Payme bilan ishlash uchun avval ularda merchant (savdogar) hisobini ochib, kalitlarni serverga kiritish kerak. Kalitlar kiritilgach, bu yerda havola yaratiladi.')}
+          </p>
+        </div>
+      )}
+
+      {info && anyEnabled && (
+        <>
+          <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
+            {t('Joriy qarz')}: <b>{usd(info.debtUsd)}</b>
+            {info.suggestedSom ? ` ≈ ${info.suggestedSom.toLocaleString()} ${t("so'm")}` : ''}
+          </p>
+
+          <div className="field">
+            <label>{t('Provayder')}</label>
+            <div className="flex gap-8">
+              <button type="button"
+                      className={`btn btn-sm ${provider === 'payme' ? 'btn-primary' : 'btn-ghost'}`}
+                      disabled={!info.paymeEnabled}
+                      onClick={() => { setProvider('payme'); setUrl(''); }}>
+                Payme
+              </button>
+              <button type="button"
+                      className={`btn btn-sm ${provider === 'click' ? 'btn-primary' : 'btn-ghost'}`}
+                      disabled={!info.clickEnabled}
+                      onClick={() => { setProvider('click'); setUrl(''); }}>
+                Click
+              </button>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>{t('Summa (so‘m)')}</label>
+            <input className="input" type="number" min="1" value={amount}
+                   onChange={(e) => { setAmount(e.target.value); setUrl(''); }} />
+          </div>
+
+          {!url ? (
+            <button className="btn btn-primary" onClick={make} disabled={busy || !valid}>
+              {busy ? t('Yaratilmoqda...') : `🔗 ${t('Havola yaratish')}`}
+            </button>
+          ) : (
+            <div className="field" style={{ marginTop: 8 }}>
+              <label>{t('To‘lov havolasi')}</label>
+              <input className="input mono" readOnly value={url}
+                     onFocus={(e) => e.target.select()} style={{ fontSize: 12 }} />
+              <div className="flex gap-8" style={{ marginTop: 8 }}>
+                <button className="btn btn-ghost btn-sm" onClick={copy}>📋 {t('Nusxalash')}</button>
+                <a className="btn btn-ghost btn-sm" href={url} target="_blank" rel="noreferrer">
+                  ↗ {t('Ochish')}
+                </a>
+                <button className="btn btn-green btn-sm" onClick={sendToCustomer} disabled={busy}>
+                  📨 {t('Mijozga yuborish')}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </Modal>
   );

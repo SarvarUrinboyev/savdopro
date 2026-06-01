@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { ShiftApi } from './api/endpoints.js';
 import { Layout } from './components/Layout.jsx';
 import { Spinner } from './components/ui.jsx';
@@ -10,6 +10,8 @@ import { Register } from './pages/Register.jsx';
 import { ForgotPassword } from './pages/ForgotPassword.jsx';
 import { Landing } from './pages/Landing.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
+import { Help } from './pages/Help.jsx';
+import { Stocktake } from './pages/Stocktake.jsx';
 import { IS_WEB } from './config.js';
 import { isModuleEnabled } from './lib/modules.js';
 
@@ -104,6 +106,7 @@ export default function App() {
 
 function Authenticated() {
   const auth = useAuth();
+  const navigate = useNavigate();
   const { data: shift, loading, error, reload } = useApi(() => ShiftApi.current(), []);
 
   if (loading) {
@@ -155,6 +158,7 @@ function Authenticated() {
         <Route path="payments" element={g(<Payments />, { module: 'payments' })} />
         <Route path="orders" element={g(<Orders />, { module: 'orders' })} />
         <Route path="warehouse" element={g(<Warehouse />, { module: 'warehouse' })} />
+        <Route path="stocktake" element={g(<Stocktake />, { module: 'warehouse' })} />
         <Route path="warehouse/new" element={g(<ProductEditor />, { module: 'warehouse' })} />
         <Route path="warehouse/:id" element={g(<ProductEditor />, { module: 'warehouse' })} />
         <Route path="customers" element={g(<Customers />, { module: 'customers' })} />
@@ -165,6 +169,8 @@ function Authenticated() {
         <Route path="calculator" element={g(<Calculator />, { module: 'calculator' })} />
         <Route path="shift-history" element={g(<ShiftHistory />, { module: 'shift-history' })} />
         <Route path="shift-close" element={g(<ShiftClose onClosed={reload} />, { module: 'shift-close' })} />
+        <Route path="shift-open" element={<ShiftOpen onOpened={() => { reload(); navigate('/dashboard'); }} />} />
+        <Route path="help" element={<Help />} />
         <Route path="admin" element={g(<Admin />, { roles: ['SUPER_ADMIN'] })} />
         <Route path="admin/accounts/:id" element={g(<AccountDetail />, { roles: ['SUPER_ADMIN'] })} />
         <Route path="admin/audit" element={g(<AuditLog />, { roles: ['SUPER_ADMIN'] })} />

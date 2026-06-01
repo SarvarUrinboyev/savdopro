@@ -14,4 +14,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     /** Finds the customer whose loyalty card QR matches the scanned code. */
     Optional<Customer> findByCardCode(String cardCode);
+
+    /** True if any customer in the active tenant already has this phone. */
+    boolean existsByPhone(String phone);
+
+    /** Same, excluding one id — used on edit so a row keeps its own number. */
+    boolean existsByPhoneAndIdNot(String phone, Long id);
 }

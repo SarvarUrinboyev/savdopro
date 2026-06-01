@@ -76,6 +76,7 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
     product?.vatRate != null ? String(product.vatRate) : '',
   );
   const [unit, setUnit] = useState(product?.unit ?? 'dona');
+  const [expiryDate, setExpiryDate] = useState(product?.expiryDate ?? '');
   const [initialQty, setInitialQty] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -113,6 +114,7 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
       mxikCode: mxikCode.trim() || null,
       vatRate: vatRate === '' ? null : Number(vatRate),
       unit: unit || 'dona',
+      expiryDate: expiryDate || null,
     };
     if (isNew) {
       body.quantity = Number(initialQty) || 0;
@@ -288,6 +290,11 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
                     <option value="quti">{t('quti')}</option>
                     <option value="to'plam">{t("to'plam")}</option>
                   </select>
+                </div>
+                <div className="field">
+                  <label>{t('Yaroqlilik muddati (ixtiyoriy)')}</label>
+                  <input className="input" type="date" value={expiryDate || ''}
+                         onChange={(e) => setExpiryDate(e.target.value)} />
                 </div>
               </div>
             </div>

@@ -41,7 +41,8 @@ public final class AdminDtos {
             String fullName,
             String role,
             LocalDateTime lastLoginAt,
-            LocalDateTime createdAt) {
+            LocalDateTime createdAt,
+            String permissions) {
     }
 
     public record AccountDetailResponse(

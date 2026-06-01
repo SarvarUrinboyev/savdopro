@@ -17,6 +17,7 @@ import uz.barakat.market.dto.CustomerRequest;
 import uz.barakat.market.dto.CustomerResponse;
 import uz.barakat.market.dto.CustomerTransactionRequest;
 import uz.barakat.market.service.CustomerService;
+import uz.barakat.market.service.OnlinePaymentService;
 
 /** REST API for customers ("Mijozlar") and their goods / payment ledger. */
 @RestController
@@ -24,9 +25,11 @@ import uz.barakat.market.service.CustomerService;
 public class CustomerController {
 
     private final CustomerService service;
+    private final OnlinePaymentService onlinePayments;
 
-    public CustomerController(CustomerService service) {
+    public CustomerController(CustomerService service, OnlinePaymentService onlinePayments) {
         this.service = service;
+        this.onlinePayments = onlinePayments;
     }
 
     @GetMapping
@@ -100,4 +103,61 @@ public class CustomerController {
     }
 
     public record LoyaltyRedeemRequest(@jakarta.validation.constraints.Positive long points) { }
+
+    /**
+     * Sends a one-off message to the customer over the best available
+     * channel (linked Telegram bot, else SMS). {@code template} is
+     * {@code DEBT}, {@code ORDER_READY} or {@code CUSTOM}. The response
+     * tells the cashier which channel carried the message.
+     */
+    @PostMapping("/{id}/notify")
+    public NotifyResponse notify(@PathVariable Long id, @RequestBody NotifyRequest body) {
+        String channel = service.sendNotification(id, body.template(), body.text());
+        return new NotifyResponse(channel);
+    }
+
+    public record NotifyRequest(String template, String text) { }
+
+    public record NotifyResponse(String channel) { }
+
+    /**
+     * Sends a debt reminder to every customer who currently owes money,
+     * over each one's best channel. Returns how many debtors were reminded
+     * and the per-channel breakdown.
+     */
+    @PostMapping("/remind-debtors")
+    public CustomerService.BulkReminderResult remindDebtors() {
+        return service.remindAllDebtors();
+    }
+
+    /**
+     * Online-payment context for a customer: outstanding debt (USD), the
+     * suggested charge in UZS so'm, and which providers are configured.
+     */
+    @GetMapping("/{id}/pay-info")
+    public PayInfoResponse payInfo(@PathVariable Long id) {
+        return new PayInfoResponse(
+                onlinePayments.debtUsd(id),
+                onlinePayments.suggestedSom(id),
+                onlinePayments.paymeEnabled(),
+                onlinePayments.clickEnabled());
+    }
+
+    /**
+     * Generates a hosted-checkout link for the customer's debt.
+     * {@code provider} is "payme" or "click"; {@code amountSom} is the
+     * charge in UZS so'm.
+     */
+    @PostMapping("/{id}/pay-link")
+    public PayLinkResponse payLink(@PathVariable Long id, @RequestBody PayLinkRequest body) {
+        String url = onlinePayments.generateLink(id, body.provider(), body.amountSom());
+        return new PayLinkResponse(url, body.provider(), body.amountSom());
+    }
+
+    public record PayInfoResponse(java.math.BigDecimal debtUsd, long suggestedSom,
+                                  boolean paymeEnabled, boolean clickEnabled) { }
+
+    public record PayLinkRequest(String provider, long amountSom) { }
+
+    public record PayLinkResponse(String url, String provider, long amountSom) { }
 }
