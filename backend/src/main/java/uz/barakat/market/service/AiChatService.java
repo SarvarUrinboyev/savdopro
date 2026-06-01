@@ -305,11 +305,11 @@ public class AiChatService {
         try {
             var rep = reports.forDate(today);
             sb.append("BUGUNGI MOLIYA:\n");
-            sb.append("  Do'kon xarajati: ").append(money(rep.marketTotal())).append(" UZS\n");
-            sb.append("  Uy xarajati:     ").append(money(rep.homeTotal())).append(" UZS\n");
-            sb.append("  Kassa qoldiq:    ").append(money(rep.estimatedCash())).append(" UZS\n");
-            sb.append("  Bizning qarz:    ").append(money(rep.myDebtTotal())).append(" UZS\n");
-            sb.append("  Mijozdan qarz:   ").append(money(rep.customerDebtTotal())).append(" UZS\n\n");
+            sb.append("  Do'kon xarajati: ").append(money(rep.marketTotal())).append(" USD\n");
+            sb.append("  Uy xarajati:     ").append(money(rep.homeTotal())).append(" USD\n");
+            sb.append("  Kassa qoldiq:    ").append(money(rep.estimatedCash())).append(" USD\n");
+            sb.append("  Bizning qarz:    ").append(money(rep.myDebtTotal())).append(" USD\n");
+            sb.append("  Mijozdan qarz:   ").append(money(rep.customerDebtTotal())).append(" USD\n\n");
         } catch (Exception ignore) { /* report not available */ }
 
         // -------- Top profitable products (30 days) --------
@@ -342,7 +342,7 @@ public class AiChatService {
         return sb.toString();
     }
 
-    /** Helper — appends "label: N ta savdo, X UZS jami" line. */
+    /** Helper — appends "label: N ta savdo, X USD jami" line. */
     private void appendSalesLine(StringBuilder sb, String label,
                                  LocalDateTime from, LocalDateTime to) {
         try {
@@ -359,7 +359,7 @@ public class AiChatService {
             BigDecimal net = total.subtract(refunded);
             sb.append(label).append(": ")
               .append(count).append(" ta savdo, ")
-              .append(money(net)).append(" UZS");
+              .append(money(net)).append(" USD");
             if (refunded.signum() > 0) {
                 sb.append(" (qaytarilgan ").append(money(refunded)).append(")");
             }
