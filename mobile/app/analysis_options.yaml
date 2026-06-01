@@ -1,0 +1,13 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    avoid_print: true
+
+analyzer:
+  errors:
+    # Color.withOpacity Flutter 3.27+ da deprecated, lekin 3.22+ da ishlaydi —
+    # buildni to'xtatmasligi uchun ogohlantirish darajasida qoldiramiz.
+    deprecated_member_use: warning
