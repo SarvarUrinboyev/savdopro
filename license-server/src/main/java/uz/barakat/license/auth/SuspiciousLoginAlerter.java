@@ -80,6 +80,27 @@ public class SuspiciousLoginAlerter {
         CompletableFuture.runAsync(() -> sendMessage(text));
     }
 
+    /**
+     * Fire-and-forget: tells the super-admin a new merchant just signed up
+     * for the free trial. Never blocks or fails the signup flow.
+     */
+    public void notifyNewSignup(String businessName, String phone,
+                                String username, int trialDays) {
+        if (!isConfigured()) {
+            log.info("New-signup alert skipped (Telegram not configured): {}", businessName);
+            return;
+        }
+        String text = String.format(
+                "🆕 SavdoPRO — Yangi mijoz qo'shildi!%n"
+                        + "🏪 Biznes: %s%n"
+                        + "📞 Telefon: %s%n"
+                        + "👤 Login: %s%n"
+                        + "🎁 %d kunlik bepul sinov boshlandi.",
+                businessName, (phone == null || phone.isBlank()) ? "—" : phone,
+                username, trialDays);
+        CompletableFuture.runAsync(() -> sendMessage(text));
+    }
+
     /** Visible for testing — direct send, no background thread. */
     void sendMessage(String text) {
         try {

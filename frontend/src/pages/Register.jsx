@@ -52,7 +52,7 @@ export function Register() {
     <div className="login-shell">
       <form className="login-card" onSubmit={submit}>
         <h2 className="login-title">{t('Ro\'yxatdan o\'tish')}</h2>
-        <p className="login-sub">{t('14 kunlik bepul sinov — kartasiz boshlang')}</p>
+        <p className="login-sub">{t('3 kunlik bepul sinov — kartasiz boshlang')}</p>
 
         <div className="field">
           <label>{t('Biznes / do\'kon nomi')}</label>

@@ -26,6 +26,11 @@ export function Admin() {
   const totalAccounts = accounts.length;
   const blockedCount = accounts.filter((a) => a.blocked || a.expired).length;
   const activeCount = totalAccounts - blockedCount;
+  // "New" = signed up in the last 3 days (the trial window) — surfaced so the
+  // super-admin sees fresh signups at a glance in the panel.
+  const isNew = (a) => a.createdAt
+    && (Date.now() - new Date(a.createdAt).getTime()) < 3 * 86400000;
+  const newSignups = accounts.filter(isNew).length;
 
   const setBlocked = async (acc) => {
     try {
@@ -66,6 +71,14 @@ export function Admin() {
         <div className="admin-stat tone-emerald">
           <span className="ds-eyebrow recv">{t('Jami akkauntlar')}</span>
           <div className="admin-stat-value">{totalAccounts}</div>
+        </div>
+        <div className="admin-stat tone-blue">
+          <span className="ds-eyebrow" style={{ color: '#10b981',
+            background: 'rgba(16, 185, 129, .10)',
+            border: '1px solid rgba(16, 185, 129, .28)' }}>
+            🆕 {t('Yangi (3 kun)')}
+          </span>
+          <div className="admin-stat-value">{newSignups}</div>
         </div>
         <div className="admin-stat tone-blue">
           <span className="ds-eyebrow" style={{ color: '#3b82f6',
@@ -113,6 +126,11 @@ export function Admin() {
                         >
                           <strong>{a.name}</strong>
                         </Link>
+                        {isNew(a) && (
+                          <span className="badge badge-naqd" style={{ marginLeft: 6 }}>
+                            🆕 {t('Yangi')}
+                          </span>
+                        )}
                         {a.contactNote && (
                           <div className="faint" style={{ fontSize: 11 }}>
                             {a.contactNote}

@@ -51,7 +51,7 @@ export function Landing() {
       </header>
 
       <section className="lp-hero">
-        <div className="lp-hero-badge">{t('14 kun bepul — kartasiz')}</div>
+        <div className="lp-hero-badge">{t('3 kun bepul — kartasiz')}</div>
         <h1 className="lp-hero-title">
           {t("Do'koningizni bitta tizimda boshqaring")}
         </h1>
@@ -60,7 +60,7 @@ export function Landing() {
         </p>
         <div className="lp-hero-cta">
           <Link to="/register" className="btn btn-primary lp-cta-lg">
-            {t('14 kun bepul sinab ko\'rish')}
+            {t('3 kun bepul sinab ko\'rish')}
           </Link>
           <Link to="/login" className="btn lp-cta-ghost">{t('Hisobga kirish')}</Link>
         </div>
@@ -89,7 +89,7 @@ export function Landing() {
 
       <section className="lp-section">
         <h2 className="lp-h2">{t('Oddiy narxlar')}</h2>
-        <p className="lp-h2-sub">{t('Har bir reja 14 kunlik bepul sinov bilan boshlanadi.')}</p>
+        <p className="lp-h2-sub">{t('Har bir reja 3 kunlik bepul sinov bilan boshlanadi.')}</p>
         <div className="lp-plans">
           {PLANS.map((p) => (
             <div key={p.key} className={`lp-plan card${p.featured ? ' lp-plan-featured' : ''}`}>

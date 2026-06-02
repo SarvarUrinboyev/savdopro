@@ -39,6 +39,7 @@ public class AuthService {
     private final OtpService otp;
     private final SmsProvider sms;
     private final PermissionService permissions;
+    private final SuspiciousLoginAlerter alerter;
     // Cost 12 — see AdminBootstrap; old hashes (cost 10) still verify
     // because BCrypt stores the cost inside the hash, so existing users
     // keep logging in until their next password reset re-hashes at 12.
@@ -48,7 +49,7 @@ public class AuthService {
                        JwtService jwt, RefreshTokenService refreshTokens,
                        TotpService totp, TelegramOAuthVerifier telegramVerifier,
                        OtpService otp, SmsProvider sms,
-                       PermissionService permissions) {
+                       PermissionService permissions, SuspiciousLoginAlerter alerter) {
         this.users = users;
         this.accounts = accounts;
         this.jwt = jwt;
@@ -58,10 +59,11 @@ public class AuthService {
         this.otp = otp;
         this.sms = sms;
         this.permissions = permissions;
+        this.alerter = alerter;
     }
 
     /** Trial length granted to a brand-new self-service signup. */
-    public static final int TRIAL_DAYS = 14;
+    public static final int TRIAL_DAYS = 3;
 
     /**
      * Self-service merchant signup: creates a trial account + its owner user
@@ -96,6 +98,10 @@ public class AuthService {
             // Lost the race for this username — friendly 400, not a 500.
             throw new BadRequestException("Bu login band: " + username);
         }
+
+        // Tell the super-admin a new merchant just signed up (best-effort).
+        alerter.notifyNewSignup(saved.getName(), saved.getContactPhone(),
+                owner.getUsername(), TRIAL_DAYS);
 
         RefreshTokenService.Issued refresh =
                 refreshTokens.issue(owner.getId(), saved.getId(), clientIp);

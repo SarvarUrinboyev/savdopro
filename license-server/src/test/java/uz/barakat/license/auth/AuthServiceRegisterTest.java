@@ -42,13 +42,14 @@ class AuthServiceRegisterTest {
     @Mock private OtpService otp;
     @Mock private SmsProvider sms;
     @Mock private PermissionService permissions;
+    @Mock private SuspiciousLoginAlerter alerter;
 
     private AuthService service;
 
     @BeforeEach
     void setUp() {
         service = new AuthService(users, accounts, jwt, refreshTokens, totp,
-                telegramVerifier, otp, sms, permissions);
+                telegramVerifier, otp, sms, permissions, alerter);
     }
 
     @Test
