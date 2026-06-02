@@ -265,8 +265,10 @@ public class ReportService {
      * where COGS uses each product's current purchase price against the
      * quantity actually sold (sold = quantity - refundedQty). Deleted
      * products contribute zero cost, so profit is an upper-bound estimate.
+     *
+     * <p>Public so the interactive owner bot ({@code /bugun}) can reuse it.
      */
-    private SalesSummary salesFor(LocalDate date) {
+    public SalesSummary salesFor(LocalDate date) {
         LocalDateTime from = date.atStartOfDay();
         LocalDateTime to = date.plusDays(1).atStartOfDay();
 
