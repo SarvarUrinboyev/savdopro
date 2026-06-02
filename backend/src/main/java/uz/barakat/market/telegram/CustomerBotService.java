@@ -172,10 +172,21 @@ public class CustomerBotService {
                     "Mahsulot narxlari va savollar uchun do'konga murojaat qiling.");
             return;
         }
-        api.sendMessage(chatId,
-                "Qarzingizni bilish uchun pastdagi \"📱 Telefon raqamni yuborish\" "
-                + "tugmasini bosing.\nYoki: /balans, /help",
-                contactKeyboard());
+        // Unknown text. If the customer is ALREADY linked (e.g. they typed an
+        // owner-bot command like /bugun by mistake), just show their summary —
+        // never make a linked customer re-share their phone.
+        Optional<Customer> known = customers.findByTelegramChatId(chatId);
+        if (known.isPresent()) {
+            api.sendMessage(chatId,
+                    "Bu buyruq mavjud emas. Quyidagidan foydalaning 👇\n\n"
+                    + summaryText(known.get()),
+                    rangeKeyboard());
+        } else {
+            api.sendMessage(chatId,
+                    "Qarzingizni bilish uchun pastdagi \"📱 Telefon raqamni yuborish\" "
+                    + "tugmasini bosing.\nYoki: /balans, /help",
+                    contactKeyboard());
+        }
     }
 
     private void handleCallback(JsonNode callback) {
