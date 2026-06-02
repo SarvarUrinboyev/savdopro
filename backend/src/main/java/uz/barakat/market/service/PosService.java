@@ -72,12 +72,14 @@ public class PosService {
     private final PromoService promos;
     private final LoyaltyService loyalty;
     private final CustomerNotificationService notifications;
+    private final AnomalyAlertService anomalyAlerts;
 
     public PosService(SaleRepository sales, ProductRepository products,
                       PaymentRepository payments, StockMovementRepository movements,
                       CustomerRepository customers, RealtimeBus realtime,
                       PromoService promos, LoyaltyService loyalty,
-                      CustomerNotificationService notifications) {
+                      CustomerNotificationService notifications,
+                      AnomalyAlertService anomalyAlerts) {
         this.sales = sales;
         this.products = products;
         this.payments = payments;
@@ -87,6 +89,7 @@ public class PosService {
         this.promos = promos;
         this.loyalty = loyalty;
         this.notifications = notifications;
+        this.anomalyAlerts = anomalyAlerts;
     }
 
     // =============================================================== checkout
@@ -238,6 +241,8 @@ public class PosService {
         }
 
         Sale saved = sales.save(sale);
+        // Best-effort owner alert if any line sold below cost (loss / mis-pricing).
+        anomalyAlerts.checkBelowCost(saved);
         // Credit loyalty points and push the receipt if tied to a customer.
         if (saved.getCustomerId() != null) {
             customers.findById(saved.getCustomerId()).ifPresent(c -> {
