@@ -31,16 +31,19 @@ public class AutoPurchaseOrderService {
     private final ForecastService forecast;
     private final SupplierRepository suppliers;
     private final TelegramService telegram;
+    private final GlobalScope globalScope;
     private final boolean enabled;
 
     public AutoPurchaseOrderService(
             ForecastService forecast,
             SupplierRepository suppliers,
             TelegramService telegram,
+            GlobalScope globalScope,
             @Value("${auto-po.enabled:true}") boolean enabled) {
         this.forecast = forecast;
         this.suppliers = suppliers;
         this.telegram = telegram;
+        this.globalScope = globalScope;
         this.enabled = enabled;
     }
 
@@ -64,7 +67,7 @@ public class AutoPurchaseOrderService {
 
     public synchronized void runDigest(String trigger) {
         try {
-            List<ProductForecast> queue = forecast.reorderQueue();
+            List<ProductForecast> queue = globalScope.call(forecast::reorderQueue);
             if (queue.isEmpty()) {
                 log.info("Auto-PO [{}]: hech qanday qayta buyurtma kerak emas", trigger);
                 return;

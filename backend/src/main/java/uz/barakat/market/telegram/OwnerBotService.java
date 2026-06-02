@@ -23,6 +23,7 @@ import uz.barakat.market.dto.DashboardResponse;
 import uz.barakat.market.dto.ProductResponse;
 import uz.barakat.market.dto.SalesSummary;
 import uz.barakat.market.service.DashboardService;
+import uz.barakat.market.service.GlobalScope;
 import uz.barakat.market.service.MoneyFormat;
 import uz.barakat.market.service.ProductService;
 import uz.barakat.market.service.ReportService;
@@ -57,6 +58,7 @@ public class OwnerBotService {
     private final DashboardService dashboard;
     private final ReportService reports;
     private final ProductService products;
+    private final GlobalScope globalScope;
     private final ObjectMapper mapper;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10)).build();
@@ -67,11 +69,13 @@ public class OwnerBotService {
     private Set<String> ownerChats = Set.of();
 
     public OwnerBotService(TelegramProperties properties, DashboardService dashboard,
-                           ReportService reports, ProductService products, ObjectMapper mapper) {
+                           ReportService reports, ProductService products,
+                           GlobalScope globalScope, ObjectMapper mapper) {
         this.properties = properties;
         this.dashboard = dashboard;
         this.reports = reports;
         this.products = products;
+        this.globalScope = globalScope;
         this.mapper = mapper;
     }
 
@@ -141,13 +145,16 @@ public class OwnerBotService {
             if (at > 0) {
                 cmd = cmd.substring(0, at);
             }
-            String reply = switch (cmd) {
+            final String command = cmd;
+            // Run inside an all-shops tenant scope so native-query reports
+            // (salesFor) aren't empty off-request — see GlobalScope.
+            String reply = globalScope.call(() -> switch (command) {
                 case "/start", "/help", "/yordam" -> helpText();
                 case "/bugun", "/today" -> todayText();
                 case "/kam_qoldiq", "/kam" -> lowStockText();
                 case "/qarzdorlar", "/qarz" -> debtorsText();
                 default -> null;
-            };
+            });
             if (reply != null) {
                 send(chatId, reply);
             }

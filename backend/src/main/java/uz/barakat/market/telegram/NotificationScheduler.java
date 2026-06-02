@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import uz.barakat.market.dto.DashboardResponse;
 import uz.barakat.market.dto.OrderResponse;
 import uz.barakat.market.service.DashboardService;
+import uz.barakat.market.service.GlobalScope;
 import uz.barakat.market.service.MoneyFormat;
 import uz.barakat.market.service.ReportService;
 import uz.barakat.market.service.StockAlertService;
@@ -28,15 +29,18 @@ public class NotificationScheduler {
     private final TelegramService telegramService;
     private final StockAlertService stockAlertService;
     private final ReportService reportService;
+    private final GlobalScope globalScope;
 
     public NotificationScheduler(DashboardService dashboardService,
                                  TelegramService telegramService,
                                  StockAlertService stockAlertService,
-                                 ReportService reportService) {
+                                 ReportService reportService,
+                                 GlobalScope globalScope) {
         this.dashboardService = dashboardService;
         this.telegramService = telegramService;
         this.stockAlertService = stockAlertService;
         this.reportService = reportService;
+        this.globalScope = globalScope;
     }
 
     /** Morning briefing: today's deliveries, overdue orders and total debt. */
@@ -87,7 +91,9 @@ public class NotificationScheduler {
     public void eveningReminder() {
         log.info("Running evening Telegram report");
         try {
-            reportService.sendToTelegram(LocalDate.now());
+            // All-shops scope so the report's SAVDO/FOYDA block (salesFor, a
+            // native query) isn't empty off-request — see GlobalScope.
+            globalScope.run(() -> reportService.sendToTelegram(LocalDate.now()));
         } catch (RuntimeException ex) {
             log.warn("Daily report failed, sending fallback nudge: {}", ex.getMessage());
             DashboardResponse dash = dashboardService.today();
