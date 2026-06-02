@@ -206,11 +206,11 @@ const NAV_ITEMS = [
   { key: 'orders',        to: '/orders',        label: 'Buyurtmalar' },
   { key: 'warehouse',     to: '/warehouse',     label: 'Ombor' },
   { key: 'customers',     to: '/customers',     label: 'Mijozlar' },
-  { key: 'suppliers',     to: '/suppliers',     label: 'Yetkazib beruvchilar' },
+  // Yetkazib beruvchilar reached from the Mijozlar page header button (/suppliers route stays).
   { key: 'debt',          to: '/debt',          label: 'Qarz' },
   { key: 'calculator',    to: '/calculator',    label: 'Kalkulyator' },
   { key: 'shift-history', to: '/shift-history', label: 'Smena tarixi' },
-  { key: 'shift-close',   to: '/shift-close',   label: 'Smena yopish' },
+  // Smena yopish moved to the header shift-pill dropdown (ochish / yopish).
   { key: 'reports',       to: '/reports',       label: 'Hisobotlar' },
 ];
 

@@ -13,6 +13,50 @@ import { useShop } from '../context/Shop.jsx';
 import { LANGUAGES } from '../i18n/i18n.js';
 import { formatDate, formatTime, todayIso } from '../lib/format.js';
 
+/** Header shift status pill — click to open a small "ochish / yopish" menu. */
+function ShiftPill({ shift, t }) {
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const go = (path) => { setOpen(false); navigate(path); };
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className={`shift-pill ${shift ? 'open' : 'closed'}`}
+        onClick={() => setOpen((v) => !v)}
+        title={t('Smena')}
+        style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}
+      >
+        <span className="dot" />
+        {shift
+          ? `${t('Smena ochiq')} · ${formatTime(shift.openedAt)}`
+          : t('Smena yopiq')}
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)}
+               style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+          <div style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 61,
+            background: 'var(--surface)', border: '1px solid var(--border-strong)',
+            borderRadius: 12, boxShadow: '0 14px 34px -12px rgba(0,0,0,.55)',
+            padding: 6, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 2,
+          }}>
+            <button className="btn btn-ghost" style={{ justifyContent: 'flex-start' }}
+                    onClick={() => go('/shift-open')}>
+              🔓 {t('Smena ochish')}
+            </button>
+            <button className="btn btn-ghost" style={{ justifyContent: 'flex-start' }}
+                    onClick={() => go('/shift-close')}>
+              🔒 {t('Smena yopish')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const PAGE_TITLES = {
   '/dashboard': 'Boshqaruv',
   '/pos': 'Kassa (POS)',
@@ -119,23 +163,7 @@ export function Layout({ shift }) {
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
             <span className="date">📅 {formatDate(todayIso())}</span>
-            {shift ? (
-              <span className="shift-pill open">
-                <span className="dot" />
-                {t('Smena ochiq')} &middot; {formatTime(shift.openedAt)}
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="shift-pill closed"
-                onClick={() => navigate('/shift-open')}
-                title={t('Smenani ochish')}
-                style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}
-              >
-                <span className="dot" />
-                {t('Smena yopiq')} · {t('ochish')}
-              </button>
-            )}
+            <ShiftPill shift={shift} t={t} />
           </div>
         </header>
         <SubscriptionBanner />
