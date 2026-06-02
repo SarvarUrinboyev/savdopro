@@ -52,6 +52,9 @@ public class BackupService {
     private final Path backupDir;
     private final int retainDays;
     private final int freshHours;
+    /** True on PostgreSQL — then this service MONITORS the cron pg_dump instead
+     *  of running H2's BACKUP TO (which Postgres rejects with a syntax error). */
+    private final boolean isPostgres;
 
     public BackupService(
             TelegramService telegram,
@@ -66,6 +69,7 @@ public class BackupService {
         this.backupDir = Paths.get(backupDir).toAbsolutePath();
         this.retainDays = retainDays;
         this.freshHours = freshHours;
+        this.isPostgres = jdbcUrl != null && jdbcUrl.startsWith("jdbc:postgresql");
     }
 
     @PostConstruct
@@ -91,6 +95,10 @@ public class BackupService {
     }
 
     public synchronized void runBackup(String trigger) {
+        if (isPostgres) {
+            monitorCronBackup(trigger);
+            return;
+        }
         String stamp = STAMP.format(LocalDateTime.now());
         // H2's BACKUP TO writes a ZIP that includes the consistent
         // .mv.db snapshot. Safe to run while the DB is open — unlike
@@ -131,11 +139,60 @@ public class BackupService {
     // ------------------------------------------------------------ helpers
 
     private boolean needsFreshBackup() {
-        return listBackups()
+        return (isPostgres ? listPgBackups() : listBackups())
                 .map(BackupService::lastModified)
                 .max(Comparator.naturalOrder())
                 .map(t -> Duration.between(t, Instant.now()).toHours() >= freshHours)
                 .orElse(true);
+    }
+
+    /**
+     * On PostgreSQL the real backup is the system cron's {@code pg_dump}
+     * (pg-*.sql.gz in the backups dir). We don't duplicate it — we VERIFY it is
+     * fresh and report to the owner, so a silently-failing cron is caught, and
+     * the broken H2 {@code BACKUP TO} (rejected by Postgres) is never run.
+     */
+    private void monitorCronBackup(String trigger) {
+        try {
+            List<Path> pg = listPgBackups()
+                    .sorted(Comparator.comparing(BackupService::lastModified).reversed())
+                    .toList();
+            if (pg.isEmpty()) {
+                telegram.sendMessage("[!] Backup OGOHLANTIRISH: zaxira fayli topilmadi ("
+                        + backupDir + "). Cron pg_dump'ni tekshiring!");
+                log.warn("Backup monitor [{}]: no pg_dump backup in {}", trigger, backupDir);
+                return;
+            }
+            Path latest = pg.get(0);
+            long ageHours = Duration.between(lastModified(latest), Instant.now()).toHours();
+            String size = humanBytes(Files.size(latest));
+            if (ageHours >= freshHours) {
+                telegram.sendMessage(String.format(
+                        "[!] Backup OGOHLANTIRISH [%s]: oxirgi zaxira %d soat oldin (%s). "
+                        + "Cron pg_dump'ni tekshiring!", trigger, ageHours, latest.getFileName()));
+                log.warn("Backup monitor [{}]: latest pg_dump {}h old ({})",
+                        trigger, ageHours, latest.getFileName());
+            } else {
+                telegram.sendMessage(String.format(
+                        "[*] Backup OK (pg_dump) [%s]%nFayl: %s%nHajm: %s%nSaqlangan: %d ta",
+                        trigger, latest.getFileName(), size, pg.size()));
+                log.info("Backup monitor [{}]: {} ({}, {}h old), {} kept",
+                        trigger, latest.getFileName(), size, ageHours, pg.size());
+            }
+        } catch (Exception ex) {
+            log.warn("Backup monitor failed [{}]: {}", trigger, ex.toString());
+        }
+    }
+
+    private Stream<Path> listPgBackups() {
+        try {
+            return Files.list(backupDir).filter(p -> {
+                String n = p.getFileName().toString();
+                return n.startsWith("pg-") && n.endsWith(".sql.gz");
+            });
+        } catch (IOException ex) {
+            return Stream.empty();
+        }
     }
 
     private Stream<Path> listBackups() {
