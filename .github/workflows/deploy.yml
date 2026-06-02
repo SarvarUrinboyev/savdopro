@@ -54,15 +54,21 @@ jobs:
         run: |
           chmod +x ./mvnw
           ./mvnw -B --no-transfer-progress -DskipTests clean package
-          # Repackage a second time over the fully-populated target/classes.
-          # Guards against a lifecycle quirk where the in-build jar:jar can omit
-          # src/main/resources (no application.properties / db migrations /
-          # static) — see memory/prod-deploy.md INCIDENT 2026-06-02.
-          ./mvnw -B --no-transfer-progress -o jar:jar spring-boot:repackage
-          echo "Resource sanity check:"
-          jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/application.properties'
-          jar tf target/barakat-market.jar | grep -cE 'db/migration/V.*\.sql'
-          jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/static/index.html'
+          # jar:jar can intermittently omit src/main/resources from the jar
+          # (no application.properties / db migrations / static) — see
+          # memory/prod-deploy.md INCIDENT 2026-06-02. Repackage the fully
+          # populated target/classes and ASSERT the resources are present;
+          # retry a few times, then fail loudly rather than ship a broken jar.
+          ok=0
+          for attempt in 1 2 3; do
+            ./mvnw -B --no-transfer-progress -o jar:jar spring-boot:repackage
+            props=$(jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/application.properties' || true)
+            sql=$(jar tf target/barakat-market.jar | grep -cE 'db/migration/V.*\.sql' || true)
+            ui=$(jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/static/index.html' || true)
+            echo "attempt $attempt: props=$props sql=$sql static=$ui"
+            if [ "$props" -ge 1 ] && [ "$sql" -ge 20 ] && [ "$ui" -ge 1 ]; then ok=1; break; fi
+          done
+          [ "$ok" = "1" ] || { echo "::error::jar is missing bundled resources after 3 attempts"; exit 1; }
       - name: Build license-server jar
         working-directory: license-server
         run: |
