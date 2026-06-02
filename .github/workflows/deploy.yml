@@ -54,6 +54,15 @@ jobs:
         run: |
           chmod +x ./mvnw
           ./mvnw -B --no-transfer-progress -DskipTests clean package
+          # Repackage a second time over the fully-populated target/classes.
+          # Guards against a lifecycle quirk where the in-build jar:jar can omit
+          # src/main/resources (no application.properties / db migrations /
+          # static) — see memory/prod-deploy.md INCIDENT 2026-06-02.
+          ./mvnw -B --no-transfer-progress -o jar:jar spring-boot:repackage
+          echo "Resource sanity check:"
+          jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/application.properties'
+          jar tf target/barakat-market.jar | grep -cE 'db/migration/V.*\.sql'
+          jar tf target/barakat-market.jar | grep -c 'BOOT-INF/classes/static/index.html'
       - name: Build license-server jar
         working-directory: license-server
         run: |
