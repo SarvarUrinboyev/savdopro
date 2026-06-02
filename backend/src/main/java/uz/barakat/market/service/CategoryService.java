@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.market.auth.TenantContext;
 import uz.barakat.market.domain.Category;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.dto.CategoryRequest;
@@ -19,6 +20,14 @@ import uz.barakat.market.repository.ProductRepository;
 @Transactional
 public class CategoryService {
 
+    /**
+     * Starter categories seeded the first time a brand-new shop opens its
+     * category list, so the product editor's "Toifa" dropdown is never empty
+     * for a fresh account. The shop can rename/delete these or add its own.
+     */
+    private static final List<String> DEFAULT_CATEGORIES = List.of(
+            "Umumiy", "Oziq-ovqat", "Ichimliklar", "Maishiy tovarlar", "Gigiyena", "Boshqa");
+
     private final CategoryRepository categories;
     private final ProductRepository products;
 
@@ -27,8 +36,10 @@ public class CategoryService {
         this.products = products;
     }
 
-    @Transactional(readOnly = true)
+    // Writable (not readOnly) so a fresh shop can be seeded with defaults on
+    // its first category load. After the one-time seed this only reads.
     public List<CategoryResponse> list() {
+        seedDefaultsIfEmpty();
         Map<Long, Long> counts = products.findAll().stream()
                 .filter(p -> p.getCategoryId() != null)
                 .collect(Collectors.groupingBy(Product::getCategoryId, Collectors.counting()));
@@ -36,6 +47,26 @@ public class CategoryService {
                 .map(c -> new CategoryResponse(c.getId(), c.getName(),
                         counts.getOrDefault(c.getId(), 0L)))
                 .toList();
+    }
+
+    /**
+     * Seeds the default categories for the current shop the first time it has
+     * none. Only runs in single-shop mode (a concrete shop is active) — in the
+     * consolidated "all shops" view there is no single shop_id to attribute the
+     * new rows to, so seeding is skipped (each shop is seeded when opened).
+     */
+    private void seedDefaultsIfEmpty() {
+        if (TenantContext.currentShopId() == null) {
+            return;
+        }
+        if (!categories.findAllByOrderByNameAsc().isEmpty()) {
+            return;
+        }
+        for (String name : DEFAULT_CATEGORIES) {
+            Category category = new Category();
+            category.setName(name);
+            categories.save(category);
+        }
     }
 
     public CategoryResponse create(CategoryRequest request) {

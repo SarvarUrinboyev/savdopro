@@ -35,7 +35,9 @@ public final class PosDtos {
             /** Optional customer link (loyalty + receipt name). */
             Long customerId,
             /** Free-text receipt note. */
-            String note) {
+            String note,
+            /** Optional client idempotency key for offline replay (V27). */
+            String clientRef) {
     }
 
     public record RefundItemRequest(

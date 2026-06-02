@@ -8,6 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
@@ -94,10 +95,23 @@ public class PosService {
         if (req == null || req.items() == null || req.items().isEmpty()) {
             throw new BadRequestException("Savatcha bo'sh");
         }
+        // Idempotency: if this checkout was already accepted under the same
+        // client_ref (offline replay after a lost response), return the
+        // existing sale instead of creating a duplicate — never double-charge.
+        String clientRef = req.clientRef() == null ? null : req.clientRef().strip();
+        if (clientRef != null && !clientRef.isEmpty()) {
+            Optional<Sale> existing = sales.findFirstByClientRef(clientRef);
+            if (existing.isPresent()) {
+                return toResponse(existing.get());
+            }
+        }
         PaymentType method = parseMethod(req.paymentMethod());
 
         Sale sale = new Sale();
         sale.setPaymentMethod(method.name());
+        if (clientRef != null && !clientRef.isEmpty()) {
+            sale.setClientRef(clientRef);
+        }
         sale.setNote(blankToNull(req.note()));
         sale.setDiscountAmount(nz(req.discountAmount()));
         sale.setDiscountPercent(nz(req.discountPercent()));

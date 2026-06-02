@@ -49,6 +49,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Transactional email (invoices / notifications). No-op until SMTP
+             credentials are configured (see app.email.* / spring.mail.*). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
         <!-- Prometheus metrics registry (version managed by the Spring Boot BOM).
              Exposes /actuator/prometheus for scraping; secured to authenticated. -->
         <dependency>

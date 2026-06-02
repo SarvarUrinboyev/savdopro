@@ -1,0 +1,100 @@
+name: Deploy
+
+# Build + deploy to the production droplet. Manual by default (Run workflow),
+# and automatically on a version tag. Mirrors the hand-deploy runbook:
+# build → upload .new → verify SHA256 → systemctl swap → health-verify.
+#
+# REQUIRED GitHub repo secrets (Settings → Secrets and variables → Actions):
+#   DEPLOY_SSH_KEY   — private SSH key authorised on the droplet (root)
+#   DEPLOY_HOST      — 167.172.164.214
+#   DEPLOY_USER      — root
+# Optional variables (Settings → Variables), with sensible defaults:
+#   LICENSE_URL      — https://167-172-164-214.nip.io  (VITE_LICENSE_URL for the web build)
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & deploy to prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 1) Frontend → bundled into the backend's static resources
+      - name: Build web frontend
+        working-directory: frontend
+        env:
+          VITE_TARGET: web
+          VITE_LICENSE_URL: ${{ vars.LICENSE_URL || 'https://167-172-164-214.nip.io' }}
+        run: |
+          npm ci
+          npm run build
+
+      # 2) Backend jar (bundles the freshly built frontend) + license jar
+      - name: Build backend jar
+        working-directory: backend
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B --no-transfer-progress -DskipTests clean package
+      - name: Build license-server jar
+        working-directory: license-server
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B --no-transfer-progress -DskipTests clean package
+
+      # 3) Deploy over SSH: upload .new, verify SHA256, swap, restart, verify
+      - name: Deploy
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          BE=$(ls backend/target/*.jar | grep -v original | head -1)
+          LS=$(ls license-server/target/*.jar | grep -v original | head -1)
+          BE_SHA=$(sha256sum "$BE" | cut -d' ' -f1)
+          LS_SHA=$(sha256sum "$LS" | cut -d' ' -f1)
+
+          scp -i ~/.ssh/id_deploy "$BE" "$USER@$HOST:/opt/barakat/barakat-market.jar.new"
+          scp -i ~/.ssh/id_deploy "$LS" "$USER@$HOST:/opt/savdopro/savdopro-license-server.jar.new"
+
+          ssh -i ~/.ssh/id_deploy "$USER@$HOST" \
+            BE_SHA="$BE_SHA" LS_SHA="$LS_SHA" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          [ "$(sha256sum /opt/barakat/barakat-market.jar.new | cut -d" " -f1)" = "$BE_SHA" ] || { echo "backend SHA mismatch"; exit 1; }
+          [ "$(sha256sum /opt/savdopro/savdopro-license-server.jar.new | cut -d" " -f1)" = "$LS_SHA" ] || { echo "license SHA mismatch"; exit 1; }
+          systemctl stop savdopro-backend savdopro-license
+          cp -f /opt/barakat/barakat-market.jar /opt/barakat/barakat-market.jar.bak-ci 2>/dev/null || true
+          cp -f /opt/savdopro/savdopro-license-server.jar /opt/savdopro/savdopro-license-server.jar.bak-ci 2>/dev/null || true
+          mv -f /opt/barakat/barakat-market.jar.new /opt/barakat/barakat-market.jar
+          mv -f /opt/savdopro/savdopro-license-server.jar.new /opt/savdopro/savdopro-license-server.jar
+          systemctl start savdopro-license
+          for i in $(seq 1 30); do sleep 4; curl -sf -m4 http://127.0.0.1:9090/actuator/health >/dev/null 2>&1 && break; done
+          systemctl start savdopro-backend
+          ok=0; for i in $(seq 1 40); do sleep 4; c=$(curl -s -m4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8086/actuator/health 2>/dev/null); [ "$c" = "200" ] && { ok=1; break; }; done
+          [ "$ok" = "1" ] || { echo "backend health check FAILED"; exit 1; }
+          echo "deploy OK"
+          REMOTE

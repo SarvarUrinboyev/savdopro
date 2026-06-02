@@ -8,7 +8,9 @@ import { useApi } from '../hooks/useApi.js';
 import { useKeyboard } from '../hooks/useKeyboard.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { useVoiceInput } from '../hooks/useVoiceInput.js';
-import { cacheProducts, enqueueCheckout, flushQueue, pendingCount } from '../lib/offlineDb.js';
+import {
+  cacheProducts, enqueueCheckout, failedCount, flushQueue, pendingCount,
+} from '../lib/offlineDb.js';
 import { money } from '../lib/format.js';
 
 const PAYMENT_METHODS = [
@@ -46,6 +48,7 @@ export function Pos() {
   const [busy, setBusy] = useState(false);
   const [lastSale, setLastSale] = useState(null);
   const [pendingOffline, setPendingOffline] = useState(0);
+  const [failedOffline, setFailedOffline] = useState(0);
   const searchRef = useRef(null);
   const online = useOnline();
   const voice = useVoiceInput({ lang: 'ru-RU' });
@@ -58,6 +61,7 @@ export function Pos() {
   }, [products]);
   useEffect(() => {
     void pendingCount().then(setPendingOffline);
+    void failedCount().then(setFailedOffline);
   }, [lastSale]);
 
   // Auto-flush queue when connectivity returns.
@@ -68,8 +72,9 @@ export function Pos() {
       }).then((n) => {
         if (n > 0) {
           toast.success(`${n} ${t('ta offline savdo sinxronlandi')}`);
-          pendingCount().then(setPendingOffline);
         }
+        pendingCount().then(setPendingOffline);
+        failedCount().then(setFailedOffline);
       });
     }
   }, [online, pendingOffline, toast, t]);
@@ -182,7 +187,12 @@ export function Pos() {
       // keep payment method and customer for the next sale
     } catch (err) {
       // Offline fallback — enqueue, show pending count, recover later.
-      if (!online || /Failed to fetch|NetworkError|ECONN|timeout/i.test(err.message || '')) {
+      // err.status === 0 is the api client's "couldn't reach server" signal
+      // (the message is localized, so don't rely on matching its text).
+      const isNetwork = !online
+        || err.status === 0
+        || /Failed to fetch|NetworkError|ECONN|timeout|ulanib bo'lmadi/i.test(err.message || '');
+      if (isNetwork) {
         await enqueueCheckout(payload);
         const n = await pendingCount();
         setPendingOffline(n);
@@ -200,6 +210,11 @@ export function Pos() {
     <>
       <PageHeader title={t('Kassa (POS)')} desc={t('Yangi sotuv — savatcha, chegirma, to\'lov')}>
         {!online && <span className="badge badge-qarzga">⚠ {t('Offline')}</span>}
+        {failedOffline > 0 && (
+          <span className="badge badge-qarzga" title={t('Bu savdolar yuborilmadi — tekshiring')}>
+            ❌ {failedOffline} {t('xato')}
+          </span>
+        )}
         {pendingOffline > 0 && (
           <span className="badge badge-aralash">📤 {pendingOffline} {t('navbatda')}</span>
         )}

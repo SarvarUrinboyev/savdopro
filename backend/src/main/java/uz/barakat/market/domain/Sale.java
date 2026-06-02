@@ -59,6 +59,10 @@ public class Sale extends TenantScopedEntity {
     @Column(length = 500)
     private String note;
 
+    /** Client-generated idempotency key for offline checkout replay (V27). */
+    @Column(name = "client_ref", length = 64)
+    private String clientRef;
+
     @Column(name = "refunded_total_uzs", nullable = false, precision = 15, scale = 2)
     private BigDecimal refundedTotalUzs = BigDecimal.ZERO;
 

@@ -48,7 +48,9 @@ export async function enqueueCheckout(payload) {
   await offlineDb.queue.add({
     id,
     status: 'pending',
-    payload,
+    // Stamp the queue id as the checkout's clientRef so a replay after a lost
+    // response is idempotent on the backend (V27) — never a double sale.
+    payload: { ...payload, clientRef: payload.clientRef || id },
     createdAt: Date.now(),
     lastTriedAt: null,
     lastError: null,
@@ -75,7 +77,14 @@ export async function markFailed(id, error) {
   });
 }
 
-/** Periodically retry every pending checkout. Returns # successfully flushed. */
+/**
+ * Retry every pending checkout. Returns # successfully flushed. Safe to call
+ * repeatedly: each payload carries a clientRef, so the backend dedups a replay
+ * of a sale that actually went through (no double-charge). Errors are split:
+ *  - server unreachable (status 0/undefined) → stop, keep all pending, retry later;
+ *  - real server rejection (e.g. out of stock) → count attempts, give up after 5
+ *    (status 'failed') so it doesn't loop forever — surfaced for the cashier.
+ */
 export async function flushQueue(checkoutFn) {
   const pending = await listPending();
   let ok = 0;
@@ -85,8 +94,21 @@ export async function flushQueue(checkoutFn) {
       await markSynced(row.id);
       ok++;
     } catch (err) {
-      await markFailed(row.id, err);
+      const status = err?.status;
+      if (status === undefined || status === 0) {
+        await offlineDb.queue.update(row.id, { lastTriedAt: Date.now(), lastError: 'offline' });
+        break; // server unreachable — try the whole queue again later
+      }
+      const attempts = (row.attempts || 0) + 1;
+      const patch = { attempts, lastTriedAt: Date.now(), lastError: String(err?.message || err) };
+      if (attempts >= 5) patch.status = 'failed';
+      await offlineDb.queue.update(row.id, patch);
     }
   }
   return ok;
+}
+
+/** Count of checkouts that exhausted their retries and need cashier attention. */
+export async function failedCount() {
+  return offlineDb.queue.where('status').equals('failed').count();
 }

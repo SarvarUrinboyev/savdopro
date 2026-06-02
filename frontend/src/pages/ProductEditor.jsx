@@ -80,6 +80,25 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
   const [initialQty, setInitialQty] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Local copy so creating a category inline doesn't reload the whole form.
+  const [cats, setCats] = useState(categories ?? []);
+
+  const createCategory = async () => {
+    const name = window.prompt(t('Yangi toifa nomi:'));
+    if (!name || !name.trim()) {
+      return;
+    }
+    try {
+      const created = await CategoryApi.create({ name: name.trim() });
+      setCats((prev) => [...prev, created]
+        .sort((a, b) => a.name.localeCompare(b.name)));
+      setCategoryId(String(created.id));
+      toast.success(`${t('Toifa qo‘shildi')}: ${created.name}`);
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const [adjustDelta, setAdjustDelta] = useState('');
   const [adjustReason, setAdjustReason] = useState('DELIVERY');
   const [stockBusy, setStockBusy] = useState(false);
@@ -234,11 +253,15 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
               <div className="field">
                 <label>{t('Toifa')}</label>
                 <select className="select" value={categoryId}
-                        onChange={(e) => setCategoryId(e.target.value)}>
+                        onChange={(e) => {
+                          if (e.target.value === '__new__') { createCategory(); return; }
+                          setCategoryId(e.target.value);
+                        }}>
                   <option value="">{t('Tanlanmagan')}</option>
-                  {categories.map((c) => (
+                  {cats.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
+                  <option value="__new__">➕ {t('Yangi toifa qo‘shish…')}</option>
                 </select>
               </div>
               {isNew && (

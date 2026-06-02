@@ -2,6 +2,7 @@ package uz.barakat.market.repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +16,9 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
      *  {@code size + 1} rows so {@code hasNext()} works without a COUNT
      *  query — ideal for "load more". */
     Slice<Sale> findByOrderByCreatedAtDescIdDesc(Pageable pageable);
+
+    /** Idempotency lookup for offline checkout replay (tenant-scoped by filter). */
+    Optional<Sale> findFirstByClientRef(String clientRef);
 
     /** Sales window — used by Reports and end-of-day. */
     List<Sale> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime from, LocalDateTime to);

@@ -58,11 +58,13 @@ public class AiToolService {
     private final SupplierService suppliers;
     private final DebtService debts;
     private final OrderService orders;
+    private final ForecastService forecast;
 
     public AiToolService(SaleRepository sales, AnalyticsService analytics,
                          ReportService reports, ProductRepository products,
                          CustomerService customers, SupplierService suppliers,
-                         DebtService debts, OrderService orders) {
+                         DebtService debts, OrderService orders,
+                         ForecastService forecast) {
         this.sales = sales;
         this.analytics = analytics;
         this.reports = reports;
@@ -71,6 +73,7 @@ public class AiToolService {
         this.suppliers = suppliers;
         this.debts = debts;
         this.orders = orders;
+        this.forecast = forecast;
     }
 
     /**
@@ -105,6 +108,9 @@ public class AiToolService {
             - expiringSoon {days}            -> muddati yaqinlashgan mahsulotlar (default 30 kun)
             BUYURTMALAR:
             - orders {}                      -> bugun keladigan / kechikkan / kelgusi buyurtmalar
+            AI BASHORAT / TAVSIYA:
+            - reorderSuggestions {}          -> nimani qayta buyurtma qilish kerak + tavsiya miqdor
+            - slowMovers {}                  -> sekin sotilayotgan mahsulotlar + chegirma tavsiyasi
             """;
     }
 
@@ -137,6 +143,8 @@ public class AiToolService {
                 case "lowStock"      -> lowStock();
                 case "expiringSoon"  -> expiringSoon(intArg(args, "days", 30));
                 case "orders"        -> ordersOverview();
+                case "reorderSuggestions" -> reorderSuggestions();
+                case "slowMovers"    -> slowMovers();
                 default -> "XATO: noma'lum asbob '" + name + "'";
             };
         } catch (Exception ex) {
@@ -290,9 +298,16 @@ public class AiToolService {
 
     private String debtsOverview() {
         var s = debts.summary();
+        // Customer debt = the ledger balance (same source as the Customers page
+        // and customerDebt), NOT the separate customer_debts table which is
+        // unused in practice and would report 0 while the ledger shows debt.
+        BigDecimal customerOwes = customers.list().stream()
+                .map(CustomerResponse::balance)
+                .filter(b -> b != null && b.signum() > 0)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         return String.format(Locale.ROOT,
                 "Hozirgi qarzlar holati: mijozlar bizga %s USD qarz, biz boshqalarga %s USD qarzmiz.",
-                money(s.customerDebtTotal()), money(s.myDebtTotal()));
+                money(customerOwes), money(s.myDebtTotal()));
     }
 
     // ------------------------------------------------------ finance / cash
@@ -401,6 +416,41 @@ public class AiToolService {
         String names = list.stream().limit(5).map(OrderResponse::name)
                 .reduce((a, b) -> a + ", " + b).orElse("");
         return list.size() + " ta (" + money(sum) + " USD): " + names;
+    }
+
+    // ----------------------------------------------------- AI suggestions
+
+    private String reorderSuggestions() {
+        var queue = forecast.reorderQueue();
+        if (queue.isEmpty()) {
+            return "Hozircha qayta buyurtma shart emas — barcha mahsulot yetarli.";
+        }
+        StringBuilder sb = new StringBuilder(
+                "Qayta buyurtma tavsiyasi (sotuv tezligiga ko'ra):\n");
+        queue.stream().limit(15).forEach(f -> {
+            String days = f.daysOfStock() == null ? "?" : String.valueOf(f.daysOfStock());
+            sb.append("  - ").append(f.name())
+              .append(": qoldiq ").append(f.currentQty())
+              .append(", ~").append(days).append(" kunga yetadi");
+            if (f.suggestedReorderQty() > 0) {
+                sb.append(", tavsiya ~").append(f.suggestedReorderQty()).append(" dona buyurtma");
+            }
+            sb.append('\n');
+        });
+        return sb.toString();
+    }
+
+    private String slowMovers() {
+        var slow = forecast.slowMovers();
+        if (slow.isEmpty()) {
+            return "Sekin sotilayotgan mahsulot yo'q — savdo yaxshi.";
+        }
+        StringBuilder sb = new StringBuilder("Sekin sotilayotgan mahsulotlar:\n");
+        slow.stream().limit(15).forEach(s -> sb.append("  - ").append(s.name())
+                .append(": qoldiq ").append(s.currentQty())
+                .append(", 30 kunda ").append((int) s.soldLast30Days()).append(" sotilgan")
+                .append(", chegirma tavsiyasi ").append(s.suggestedDiscountPercent()).append("%\n"));
+        return sb.toString();
     }
 
     // ------------------------------------------------------------- helpers
