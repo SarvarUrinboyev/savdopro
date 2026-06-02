@@ -7,6 +7,7 @@ import { ExportButton } from '../components/ExportButton.jsx';
 import { ImportModal } from '../components/ImportModal.jsx';
 import { ScanModal } from '../components/ScanModal.jsx';
 import { EmptyState, Loader, MetricCard } from '../components/ui.jsx';
+import { useAuth } from '../context/Auth.jsx';
 import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
 import { money, usd } from '../lib/format.js';
@@ -42,6 +43,10 @@ function ExpiryBadge({ date }) {
 export function Warehouse() {
   const t = useT();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // Goods transfer is owner/admin-only (same gate as the old sidebar link + the
+  // /transfers route). We surface it here, inside the warehouse.
+  const canTransfer = user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN';
   const { data, loading, error, reload } = useApi(
     () => Promise.all([ProductApi.list(), CategoryApi.list()]),
     [],
@@ -133,6 +138,11 @@ export function Warehouse() {
           <button className="btn btn-accent" onClick={() => setModal('scan')}>
             📷 {t('Skaner')}
           </button>
+          {canTransfer && (
+            <button className="btn btn-ghost" onClick={() => navigate('/transfers')}>
+              🔁 {t('Tovar transferi')}
+            </button>
+          )}
           <button className="btn btn-ghost" onClick={() => navigate('/stocktake')}>
             📋 {t('Inventarizatsiya')}
           </button>

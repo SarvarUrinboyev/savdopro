@@ -278,15 +278,9 @@ export function Sidebar({ shift, open }) {
             <span>{t("Do'konlar")}</span>
           </NavLink>
         )}
-        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && isOn('transfers') && (
-          <NavLink
-            to="/transfers"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-          >
-            <span className="ico" style={{ color: iconColor('/transfers') }}>{ICON['/transfers']}</span>
-            <span>{t("Tovar transferi")}</span>
-          </NavLink>
-        )}
+        {/* Tovar transferi intentionally not in the sidebar — reached from the
+            "Tovar transferi" button on the Ombor (warehouse) page. Route +
+            owner-role + module gate stay intact (App.jsx /transfers). */}
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
           <NavLink
             to="/billing"
