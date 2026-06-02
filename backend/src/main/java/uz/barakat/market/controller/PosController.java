@@ -1,5 +1,6 @@
 package uz.barakat.market.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,6 +13,7 @@ import uz.barakat.market.dto.PageSlice;
 import uz.barakat.market.dto.PosDtos.CheckoutRequest;
 import uz.barakat.market.dto.PosDtos.RefundRequest;
 import uz.barakat.market.dto.PosDtos.SaleResponse;
+import uz.barakat.market.auth.JwtAuthFilter;
 import uz.barakat.market.service.PosService;
 
 /**
@@ -35,8 +37,18 @@ public class PosController {
     }
 
     @PostMapping("/checkout")
-    public SaleResponse checkout(@Valid @RequestBody CheckoutRequest request) {
-        return service.checkout(request);
+    public SaleResponse checkout(@Valid @RequestBody CheckoutRequest request,
+                                 HttpServletRequest http) {
+        String cashier = (String) http.getAttribute(JwtAuthFilter.ATTR_USERNAME);
+        return service.checkout(request, cashier);
+    }
+
+    /** Per-cashier performance for [from, to] (yyyy-MM-dd). */
+    @GetMapping("/cashier-stats")
+    public java.util.List<uz.barakat.market.dto.CashierStat> cashierStats(
+            @RequestParam String from, @RequestParam String to) {
+        return service.cashierStats(
+                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to));
     }
 
     @GetMapping("/sales")

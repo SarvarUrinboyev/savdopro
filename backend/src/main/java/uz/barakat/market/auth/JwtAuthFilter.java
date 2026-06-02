@@ -37,6 +37,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     public static final String ATTR_ACCOUNT_ID = "savdopro.accountId";
     public static final String ATTR_ROLE = "savdopro.role";
     public static final String ATTR_MAX_SHOPS = "savdopro.maxShops";
+    /** The JWT's username — used to stamp the cashier on each POS sale. */
+    public static final String ATTR_USERNAME = "savdopro.username";
 
     private final JwtService jwt;
     private final AuthService auth;
@@ -105,6 +107,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 request.setAttribute(ATTR_USER_ID, userId);
                 request.setAttribute(ATTR_ACCOUNT_ID, accountId);
                 request.setAttribute(ATTR_ROLE, role);
+                request.setAttribute(ATTR_USERNAME, claims.get("username", String.class));
                 Object maxShopsClaim = claims.get("maxShops");
                 request.setAttribute(ATTR_MAX_SHOPS,
                         maxShopsClaim instanceof Number msNum ? msNum.intValue() : Integer.MAX_VALUE);

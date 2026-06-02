@@ -184,6 +184,8 @@ export const PosApi = {
   refund: (id, body) => api.post(`/pos/sales/${id}/refund`, body ?? { items: [] }),
   // Send/re-send the receipt to the sale's customer. Returns { channel }.
   sendReceipt: (id) => api.post(`/pos/sales/${id}/send-receipt`, {}),
+  // Per-cashier performance for [from, to] (yyyy-MM-dd).
+  cashierStats: (from, to) => api.get('/pos/cashier-stats' + qs({ from, to })),
 };
 
 export const ProductApi = {

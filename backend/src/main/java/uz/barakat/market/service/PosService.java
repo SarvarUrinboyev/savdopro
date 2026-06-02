@@ -95,6 +95,11 @@ public class PosService {
     // =============================================================== checkout
 
     public SaleResponse checkout(CheckoutRequest req) {
+        return checkout(req, null);
+    }
+
+    /** {@code cashier} = the logged-in user's username, stamped on the sale. */
+    public SaleResponse checkout(CheckoutRequest req, String cashier) {
         if (req == null || req.items() == null || req.items().isEmpty()) {
             throw new BadRequestException("Savatcha bo'sh");
         }
@@ -112,6 +117,7 @@ public class PosService {
 
         Sale sale = new Sale();
         sale.setPaymentMethod(method.name());
+        sale.setCashier(blankToNull(cashier));
         if (clientRef != null && !clientRef.isEmpty()) {
             sale.setClientRef(clientRef);
         }
@@ -274,6 +280,22 @@ public class PosService {
         Customer customer = customers.findById(sale.getCustomerId())
                 .orElseThrow(() -> NotFoundException.of("Mijoz", sale.getCustomerId()));
         return notifications.notify(customer, customerReceiptText(sale, customer)).name();
+    }
+
+    /** Per-cashier performance over [from, to] (inclusive): receipts, net, avg check. */
+    @Transactional(readOnly = true)
+    public java.util.List<uz.barakat.market.dto.CashierStat> cashierStats(
+            java.time.LocalDate from, java.time.LocalDate to) {
+        java.time.LocalDateTime f = from.atStartOfDay();
+        java.time.LocalDateTime t = to.plusDays(1).atStartOfDay();
+        return sales.cashierStats(f, t).stream().map(r -> {
+            String name = (r.getCashier() == null || r.getCashier().isBlank())
+                    ? "—" : r.getCashier();
+            BigDecimal net = r.getNet() == null ? BigDecimal.ZERO : r.getNet();
+            BigDecimal avg = r.getReceipts() == 0 ? BigDecimal.ZERO
+                    : net.divide(BigDecimal.valueOf(r.getReceipts()), 2, RoundingMode.HALF_UP);
+            return new uz.barakat.market.dto.CashierStat(name, r.getReceipts(), net, avg);
+        }).toList();
     }
 
     /** Concise, human-friendly receipt text for a customer message. */

@@ -59,6 +59,11 @@ public class Sale extends TenantScopedEntity {
     @Column(length = 500)
     private String note;
 
+    /** Username of the cashier who rang up this sale (from the JWT; null for
+     *  legacy/offline rows). Auto-added by ddl-auto=update on prod. */
+    @Column(length = 120)
+    private String cashier;
+
     /** Client-generated idempotency key for offline checkout replay (V27). */
     @Column(name = "client_ref", length = 64)
     private String clientRef;

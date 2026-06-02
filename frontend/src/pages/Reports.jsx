@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AiApi, ProductApi, ReportApi } from '../api/endpoints.js';
+import { AiApi, PosApi, ProductApi, ReportApi } from '../api/endpoints.js';
 import { ExportButton } from '../components/ExportButton.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, Spinner } from '../components/ui.jsx';
@@ -14,12 +14,60 @@ export function Reports() {
   return (
     <div className="grid" style={{ gap: 24 }}>
       <DailyReportSection t={t} />
+      <CashierStatsSection t={t} />
       <ReorderQueueSection t={t} />
       <SlowMoversSection t={t} />
       <ProfitByProductSection t={t} />
       <HourlySalesSection t={t} />
       <PriceTagsSection t={t} />
       <PdfReportSection t={t} />
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Cashier performance (Kassirlar samaradorligi) — last 30 days
+────────────────────────────────────────────────────────────── */
+function CashierStatsSection({ t }) {
+  const { data, loading, error, reload } = useApi(
+    () => PosApi.cashierStats(shiftIso(-29), todayIso()), []);
+  const rows = data || [];
+  const th = { padding: '6px 8px', textAlign: 'right' };
+  const td = { padding: '8px', textAlign: 'right' };
+  return (
+    <div className="card">
+      <div className="card-head">
+        <h2>👤 {t('Kassirlar samaradorligi')}</h2>
+        <span className="hint">{t('oxirgi 30 kun')}</span>
+      </div>
+      <div className="card-pad">
+        <Loader loading={loading} error={error} onRetry={reload}>
+          {rows.length === 0 ? (
+            <EmptyState icon="👤" text={t('Bu davrda sotuv yo‘q')} />
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ color: 'var(--text-faint)', fontSize: 12 }}>
+                  <th style={{ padding: '6px 8px', textAlign: 'left' }}>{t('Kassir')}</th>
+                  <th style={th}>{t('Cheklar')}</th>
+                  <th style={th}>{t('Savdo')}</th>
+                  <th style={th}>{t('O‘rtacha chek')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px' }}><strong>{r.cashier}</strong></td>
+                    <td style={td}>{r.receipts}</td>
+                    <td style={{ ...td, fontWeight: 600 }}>{usd(r.net)}</td>
+                    <td style={td}>{usd(r.avgReceipt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Loader>
+      </div>
     </div>
   );
 }

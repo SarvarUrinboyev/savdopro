@@ -32,4 +32,18 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
             + "FROM Sale s WHERE s.createdAt >= :from AND s.createdAt < :to")
     Object[] summaryBetween(@Param("from") LocalDateTime from,
                             @Param("to") LocalDateTime to);
+
+    /** Per-cashier performance for a window: receipts + net takings. */
+    @Query("SELECT s.cashier AS cashier, COUNT(s) AS receipts, "
+            + "COALESCE(SUM(s.totalUzs - s.refundedTotalUzs), 0) AS net "
+            + "FROM Sale s WHERE s.createdAt >= :from AND s.createdAt < :to "
+            + "GROUP BY s.cashier ORDER BY net DESC")
+    List<CashierStatRow> cashierStats(@Param("from") LocalDateTime from,
+                                      @Param("to") LocalDateTime to);
+
+    interface CashierStatRow {
+        String getCashier();
+        long getReceipts();
+        java.math.BigDecimal getNet();
+    }
 }
