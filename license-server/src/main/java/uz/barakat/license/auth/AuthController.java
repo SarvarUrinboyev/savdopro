@@ -49,9 +49,12 @@ public class AuthController {
     private final boolean googleLogin;
     private final boolean facebookLogin;
     private final boolean xLogin;
+    private final String signupTemplate;
 
     public AuthController(
             AuthService service, LoginRateLimiter rateLimiter,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.sms.signup-template:}") String signupTemplate,
             @org.springframework.beans.factory.annotation.Value(
                     "${savdopro.license.register.require-otp:false}") boolean otpRequired,
             @org.springframework.beans.factory.annotation.Value(
@@ -64,6 +67,7 @@ public class AuthController {
                     "${savdopro.license.oauth.x.enabled:false}") boolean xLogin) {
         this.service = service;
         this.rateLimiter = rateLimiter;
+        this.signupTemplate = signupTemplate;
         this.otpRequired = otpRequired;
         this.telegramBot = telegramBot;
         this.googleLogin = googleLogin;
@@ -91,7 +95,7 @@ public class AuthController {
                     "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
         }
         rateLimiter.recordFailure(ip); // throttle code requests per IP
-        service.requestSignupOtp(request.phone());
+        service.requestSignupOtp(request.phone(), signupTemplate);
     }
 
     @PostMapping("/login")

@@ -297,7 +297,7 @@ public class AuthService {
      * user (the account doesn't exist yet). Best-effort: a CooldownActive
      * surfaces as a friendly error; a bad phone is ignored silently.
      */
-    public void requestSignupOtp(String rawPhone) {
+    public void requestSignupOtp(String rawPhone, String template) {
         String phone = normalisePhone(rawPhone);
         if (phone == null) {
             throw new BadRequestException("Telefon raqami noto'g'ri");
@@ -308,8 +308,13 @@ public class AuthService {
                     "Iltimos, " + cd.secondsRemaining() + " soniyadan keyin qayta urinib ko'ring");
         }
         if (result instanceof OtpService.Result.Issued issued) {
-            sms.send(phone, "SavdoPRO ro'yxatdan o'tish tasdiqlash kodi: " + issued.code()
-                    + ". Kod 5 daqiqada amal qiladi.");
+            // The SMS text MUST match the operator's Eskiz-approved template
+            // exactly (Eskiz rejects unknown texts), so it's configurable:
+            // {code} is substituted with the one-time code.
+            String body = (template == null || template.isBlank()
+                    ? "SavdoPRO tasdiqlash kodi: {code}. Kod 5 daqiqa amal qiladi."
+                    : template).replace("{code}", issued.code());
+            sms.send(phone, body);
         }
     }
 
