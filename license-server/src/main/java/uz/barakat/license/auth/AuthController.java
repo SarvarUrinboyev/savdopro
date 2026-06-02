@@ -41,10 +41,57 @@ public class AuthController {
 
     private final AuthService service;
     private final LoginRateLimiter rateLimiter;
+    // Signup-screen feature flags (read once at startup). Phone verification is
+    // only enforced when SMS is actually wired; social logins show only when
+    // their provider is configured.
+    private final boolean otpRequired;
+    private final String telegramBot;
+    private final boolean googleLogin;
+    private final boolean facebookLogin;
+    private final boolean xLogin;
 
-    public AuthController(AuthService service, LoginRateLimiter rateLimiter) {
+    public AuthController(
+            AuthService service, LoginRateLimiter rateLimiter,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.register.require-otp:false}") boolean otpRequired,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.telegram-oauth.bot-username:}") String telegramBot,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.oauth.google.enabled:false}") boolean googleLogin,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.oauth.facebook.enabled:false}") boolean facebookLogin,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${savdopro.license.oauth.x.enabled:false}") boolean xLogin) {
         this.service = service;
         this.rateLimiter = rateLimiter;
+        this.otpRequired = otpRequired;
+        this.telegramBot = telegramBot;
+        this.googleLogin = googleLogin;
+        this.facebookLogin = facebookLogin;
+        this.xLogin = xLogin;
+    }
+
+    /** What the signup screen renders: enforced verification + enabled logins. */
+    @GetMapping("/signup/config")
+    public AuthDtos.SignupConfigResponse signupConfig() {
+        return new AuthDtos.SignupConfigResponse(
+                otpRequired,
+                telegramBot != null && !telegramBot.isBlank(),
+                (telegramBot == null || telegramBot.isBlank()) ? null : telegramBot,
+                googleLogin, facebookLogin, xLogin);
+    }
+
+    /** Signup step 1: SMS a verification code to the entered phone. */
+    @PostMapping("/signup/request-otp")
+    public void signupRequestOtp(@Valid @RequestBody AuthDtos.SignupOtpRequest request,
+                                 HttpServletRequest http) {
+        String ip = clientIp(http);
+        if (!rateLimiter.allow(ip)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
+        }
+        rateLimiter.recordFailure(ip); // throttle code requests per IP
+        service.requestSignupOtp(request.phone());
     }
 
     @PostMapping("/login")
@@ -77,8 +124,13 @@ public class AuthController {
                     "Juda ko'p urinish. Birozdan keyin qayta urinib ko'ring.");
         }
         // Count each signup toward the per-IP limit so a script can't mass-create
-        // trial accounts (until email/SMS verification lands in the next step).
+        // trial accounts.
         rateLimiter.recordFailure(ip);
+        // Phone verification: when enforced, the SMS code must check out before
+        // an account is created — this is what stops random/fake phone signups.
+        if (otpRequired) {
+            service.verifySignupOtp(request.phone(), request.code());
+        }
         return service.register(request, ip);
     }
 

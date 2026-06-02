@@ -26,10 +26,30 @@ public final class AuthDtos {
             @Size(min = 3, max = 40, message = "Login 3–40 belgidan iborat bo'lishi kerak")
             String username,
             @NotBlank(message = "Parol kiritilishi shart")
-            @Size(min = 6, message = "Parol kamida 6 belgi bo'lishi kerak")
+            @Size(min = 9, message = "Parol kamida 9 belgi bo'lishi kerak")
             String password,
             /** Optional contact phone stored on the account. */
-            String phone) {
+            String phone,
+            /** SMS one-time code — verified only when phone verification is enforced. */
+            String code) {
+    }
+
+    /** Signup step 1: request an SMS verification code for the given phone. */
+    public record SignupOtpRequest(
+            @NotBlank(message = "Telefon raqami kiritilishi shart") String phone) {
+    }
+
+    /** What the signup screen needs to know up front: which features are live. */
+    public record SignupConfigResponse(
+            /** True when phone verification (SMS OTP) is enforced on signup. */
+            boolean otpRequired,
+            /** True when "Login with Telegram" is configured. */
+            boolean telegramLogin,
+            /** Telegram bot username for the login widget (or null). */
+            String telegramBot,
+            boolean googleLogin,
+            boolean facebookLogin,
+            boolean xLogin) {
     }
 
     /** Forgot-password step 1: request a reset code by SMS to a registered phone. */

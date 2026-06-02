@@ -97,3 +97,19 @@ fiscal.api-key=<...>
 fiscal.terminal-id=<...>
 ```
 This is the single biggest legal prerequisite for selling to real Uzbek shops.
+
+## 10. Signup security — phone OTP + social logins
+- **Password**: registration now requires **≥ 9 characters** (enforced server-side,
+  with a strength meter in the UI). Live, no setup.
+- **Phone verification (SMS OTP)**: built + config-gated. To ENFORCE it:
+  1) configure Eskiz SMS on the LICENSE server (sms.eskiz.email/password — same
+     keys as §5), 2) set `savdopro.license.register.require-otp=true` and restart.
+  Then signup requires an SMS code; `/api/auth/signup/request-otp` sends it.
+- **Telegram login**: backend exists (loginViaTelegram). Set
+  `savdopro.license.telegram-oauth.bot-token` + `savdopro.license.telegram-oauth.bot-username`
+  to surface the Telegram button (widget wiring is the remaining FE step).
+- **Google / Facebook / X**: signup shows the icons; enable per provider with
+  `savdopro.license.oauth.{google,facebook,x}.enabled=true` once the OAuth app
+  (client id/secret + redirect) is registered and the redirect flow is wired.
+  Until then the buttons show "hali sozlanmagan".
+The signup screen reads `/api/auth/signup/config` and shows only what's enabled.

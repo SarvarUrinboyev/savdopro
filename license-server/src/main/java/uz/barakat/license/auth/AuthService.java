@@ -291,6 +291,36 @@ public class AuthService {
         }
     }
 
+    /**
+     * Signup step 1: SMS a verification code to the phone the new merchant
+     * entered. Unlike the reset flow this does NOT require a pre-existing
+     * user (the account doesn't exist yet). Best-effort: a CooldownActive
+     * surfaces as a friendly error; a bad phone is ignored silently.
+     */
+    public void requestSignupOtp(String rawPhone) {
+        String phone = normalisePhone(rawPhone);
+        if (phone == null) {
+            throw new BadRequestException("Telefon raqami noto'g'ri");
+        }
+        OtpService.Result result = otp.requestCode(phone);
+        if (result instanceof OtpService.Result.CooldownActive cd) {
+            throw new BadRequestException(
+                    "Iltimos, " + cd.secondsRemaining() + " soniyadan keyin qayta urinib ko'ring");
+        }
+        if (result instanceof OtpService.Result.Issued issued) {
+            sms.send(phone, "SavdoPRO ro'yxatdan o'tish tasdiqlash kodi: " + issued.code()
+                    + ". Kod 5 daqiqada amal qiladi.");
+        }
+    }
+
+    /** Signup step 2: throws when the SMS code is missing, wrong or expired. */
+    public void verifySignupOtp(String rawPhone, String code) {
+        String phone = normalisePhone(rawPhone);
+        if (phone == null || code == null || code.isBlank() || !otp.verify(phone, code)) {
+            throw new BadRequestException("Tasdiqlash kodi noto'g'ri yoki muddati o'tgan");
+        }
+    }
+
     /** Forgot-password: verify the code, set the new password, kill old sessions. */
     @Transactional
     public void resetPassword(String rawPhone, String code, String newPassword) {

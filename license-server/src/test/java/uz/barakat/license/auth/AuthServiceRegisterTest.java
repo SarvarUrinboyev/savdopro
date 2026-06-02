@@ -70,7 +70,7 @@ class AuthServiceRegisterTest {
 
         var resp = service.register(
                 new RegisterRequest("Yangi Do'kon", "Ali Valiyev",
-                        "YangiDokon", "parol123", "+998901112233"),
+                        "YangiDokon", "parol12345", "+998901112233", null),
                 "1.2.3.4");
 
         assertThat(resp.token()).isEqualTo("jwt-token");
@@ -99,7 +99,7 @@ class AuthServiceRegisterTest {
         when(users.existsByUsernameIgnoreCase("band")).thenReturn(true);
 
         assertThatThrownBy(() -> service.register(
-                new RegisterRequest("X", "Y", "Band", "parol123", null), "1.2.3.4"))
+                new RegisterRequest("X", "Y", "Band", "parol12345", null, null), "1.2.3.4"))
                 .isInstanceOf(BadRequestException.class);
 
         verify(accounts, never()).save(any());

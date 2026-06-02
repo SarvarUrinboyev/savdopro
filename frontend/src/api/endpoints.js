@@ -94,6 +94,10 @@ async function uploadFile(path, file) {
 export const AuthApi = {
   login: (body) => licenseApi.post('/api/auth/login', body),
   register: (body) => licenseApi.post('/api/auth/register', body),
+  // Signup screen: which verification/social-login features are live.
+  signupConfig: () => licenseApi.get('/api/auth/signup/config'),
+  // Signup step 1: SMS a phone-verification code.
+  signupRequestOtp: (phone) => licenseApi.post('/api/auth/signup/request-otp', { phone }),
   forgotPassword: (phone) => licenseApi.post('/api/auth/forgot-password', { phone }),
   resetPassword: (body) => licenseApi.post('/api/auth/reset-password', body),
   refresh: (body) => licenseApi.post('/api/auth/refresh', body),
