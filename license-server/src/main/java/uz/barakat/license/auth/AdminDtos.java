@@ -26,7 +26,9 @@ public final class AdminDtos {
             int userCount,
             LocalDateTime createdAt,
             /** Comma-separated module keys; null = all modules visible. */
-            String enabledModules) {
+            String enabledModules,
+            /** How the owner signed up: GOOGLE|TELEGRAM|FACEBOOK|X|PASSWORD. */
+            String signupProvider) {
     }
 
     /** Body of {@code PATCH /api/admin/accounts/{id}/modules}. */

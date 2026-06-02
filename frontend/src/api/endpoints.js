@@ -98,6 +98,15 @@ export const AuthApi = {
   signupConfig: () => licenseApi.get('/api/auth/signup/config'),
   // Signup step 1: SMS a phone-verification code.
   signupRequestOtp: (phone) => licenseApi.post('/api/auth/signup/request-otp', { phone }),
+  // Social login: exchange a Google access token (from the GIS account chooser)
+  // for a SavdoPRO session.
+  socialGoogle: (accessToken) => licenseApi.post('/api/auth/social/google', { accessToken }),
+  // Social login: a verified Telegram Login Widget payload → SavdoPRO session.
+  telegramLogin: (body) => licenseApi.post('/api/auth/telegram', body),
+  // Social login: a Facebook JS SDK access token → SavdoPRO session.
+  socialFacebook: (accessToken) => licenseApi.post('/api/auth/social/facebook', { accessToken }),
+  // Social login: X (Twitter) OAuth2 — the redirect code + PKCE verifier.
+  socialX: (code, codeVerifier) => licenseApi.post('/api/auth/social/x', { code, codeVerifier }),
   forgotPassword: (phone) => licenseApi.post('/api/auth/forgot-password', { phone }),
   resetPassword: (body) => licenseApi.post('/api/auth/reset-password', body),
   refresh: (body) => licenseApi.post('/api/auth/refresh', body),

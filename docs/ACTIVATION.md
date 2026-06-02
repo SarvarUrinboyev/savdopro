@@ -108,8 +108,37 @@ This is the single biggest legal prerequisite for selling to real Uzbek shops.
 - **Telegram login**: backend exists (loginViaTelegram). Set
   `savdopro.license.telegram-oauth.bot-token` + `savdopro.license.telegram-oauth.bot-username`
   to surface the Telegram button (widget wiring is the remaining FE step).
-- **Google / Facebook / X**: signup shows the icons; enable per provider with
-  `savdopro.license.oauth.{google,facebook,x}.enabled=true` once the OAuth app
-  (client id/secret + redirect) is registered and the redirect flow is wired.
-  Until then the buttons show "hali sozlanmagan".
+- **Social icons**: the signup screen now shows the REAL brand marks (inline-SVG
+  Google multicolor-G, Telegram, Facebook, X) — live, no setup. Clicking a not-yet-
+  configured provider shows a graceful "tez orada — login/parol bilan davom eting".
+- **Google account chooser** — ✅ **LIVE** (2026-06-02). Client id configured via
+  `SAVDOPRO_GOOGLE_CLIENT_ID` in the license systemd drop-in; clicking Google opens
+  the chooser and signs in / cold-creates a 3-day trial. If the popup ever says
+  "Access blocked / app not verified", the OAuth **consent screen** is in Testing →
+  PUBLISH it (email/profile are non-sensitive, no Google review) or add the user's
+  Gmail under Test users. To wire a NEW origin (e.g. a custom domain) repeat:
+  Google will only open its picker for an OAuth Client ID registered to THAT exact
+  origin — there is no way around it (Google security). Create one (free, ~5 min):
+  1. https://console.cloud.google.com → create/select a project.
+  2. APIs & Services → OAuth consent screen → External → app name "SavdoPRO",
+     support email = owner's → add scopes `openid`, `email`, `profile` → Save.
+     (While in "Testing", add the owner's Gmail under Test users.)
+  3. APIs & Services → Credentials → Create credentials → OAuth client ID →
+     Application type **Web application**.
+  4. **Authorized JavaScript origins**: `https://167-172-164-214.nip.io`
+     **Authorized redirect URIs**: `https://167-172-164-214.nip.io/oauth/google/callback`
+  5. Create → copy the **Client ID** + **Client secret** → hand to the dev.
+  Then set on the LICENSE server (systemd drop-in, NOT committed):
+  `savdopro.license.oauth.google.enabled=true`,
+  `savdopro.license.oauth.google.client-id=<id>`,
+  `savdopro.license.oauth.google.client-secret=<secret>`, restart license. The FE
+  (Google Identity Services account chooser → backend verify → auto-create trial
+  account) is wired in the same step the Client ID arrives, then deployed + tested.
+- **Telegram**: backend exists (loginViaTelegram) but only logs in an ALREADY-linked
+  account — belongs on the LOGIN page, not cold signup. Enable the widget with the
+  OAuth bot (`savdopro.license.telegram-oauth.bot-token/.bot-username`) + BotFather
+  `/setdomain 167-172-164-214.nip.io`.
+- **Facebook / X**: need their developer programs — a Facebook App with business
+  verification + App Review for the email permission, and an X Developer (paid)
+  OAuth 2.0 app. Longer onboarding; icons are ready, flows wire once apps exist.
 The signup screen reads `/api/auth/signup/config` and shows only what's enabled.

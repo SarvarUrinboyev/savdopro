@@ -7,6 +7,7 @@ import { useAuth } from './context/Auth.jsx';
 import { useApi } from './hooks/useApi.js';
 import { Login } from './pages/Login.jsx';
 import { Register } from './pages/Register.jsx';
+import { XCallback } from './pages/XCallback.jsx';
 import { ForgotPassword } from './pages/ForgotPassword.jsx';
 import { Landing } from './pages/Landing.jsx';
 import { ShiftOpen } from './pages/ShiftOpen.jsx';
@@ -94,6 +95,7 @@ export default function App() {
             Login via the catch-all, as before. */}
         {IS_WEB && <Route path="/" element={<Landing />} />}
         {IS_WEB && <Route path="/register" element={<Register />} />}
+        {IS_WEB && <Route path="/oauth/x/callback" element={<XCallback />} />}
         {IS_WEB && <Route path="/forgot-password" element={<ForgotPassword />} />}
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<Login />} />

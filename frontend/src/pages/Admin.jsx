@@ -11,6 +11,61 @@ import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
 import { formatDate } from '../lib/format.js';
 
+const PROVIDER_META = {
+  GOOGLE: { label: 'Google', bg: '#ffffff', border: true },
+  TELEGRAM: { label: 'Telegram', bg: 'linear-gradient(135deg,#2AABEE,#229ED9)' },
+  FACEBOOK: { label: 'Facebook', bg: '#1877F2' },
+  X: { label: 'X', bg: '#000000' },
+  PASSWORD: { label: 'Login / parol', bg: '#94a3b8' },
+};
+
+/** Tiny round badge marking how an account's owner signed up. */
+function ProviderIcon({ provider }) {
+  const key = PROVIDER_META[provider] ? provider : 'PASSWORD';
+  const meta = PROVIDER_META[key];
+  return (
+    <span
+      title={`${meta.label} orqali ro'yxatdan o'tgan`}
+      aria-label={meta.label}
+      style={{
+        width: 18, height: 18, borderRadius: '50%', background: meta.bg,
+        border: meta.border ? '1px solid #dadce0' : 'none', flex: '0 0 auto',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        verticalAlign: 'middle', marginRight: 6,
+      }}
+    >
+      {key === 'GOOGLE' && (
+        <svg viewBox="0 0 48 48" width="11" height="11" aria-hidden="true">
+          <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+          <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+          <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+          <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+        </svg>
+      )}
+      {key === 'TELEGRAM' && (
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="#fff" aria-hidden="true">
+          <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-2.1 2.04c-.23.23-.42.42-.72.31z"/>
+        </svg>
+      )}
+      {key === 'FACEBOOK' && (
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="#fff" aria-hidden="true">
+          <path d="M15.12 5.32H17V2.14A26.11 26.11 0 0 0 14.26 2c-2.72 0-4.58 1.66-4.58 4.7v2.6H6.61v3.56h3.07V22h3.68v-9.14h3.06l.46-3.56h-3.52V7.05c0-1.03.28-1.73 1.76-1.73z"/>
+        </svg>
+      )}
+      {key === 'X' && (
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="#fff" aria-hidden="true">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.656l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      )}
+      {key === 'PASSWORD' && (
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="#fff" aria-hidden="true">
+          <path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm3 8H9V6a3 3 0 0 1 6 0z"/>
+        </svg>
+      )}
+    </span>
+  );
+}
+
 /**
  * Super-admin only: list every paying account, create new ones, set
  * subscription expiry, block / unblock and reset user passwords. Other
@@ -119,6 +174,7 @@ export function Admin() {
                   {accounts.map((a) => (
                     <tr key={a.id}>
                       <td className="name-cell">
+                        <ProviderIcon provider={a.signupProvider} />
                         <Link
                           to={`/admin/accounts/${a.id}`}
                           className="admin-account-link"

@@ -108,6 +108,17 @@ export function AuthProvider({ children }) {
     return response.user;
   }, []);
 
+  // Apply a session returned by a social login (e.g. the Google account
+  // chooser). Same persist + state update as login/register, so the app shell
+  // appears immediately after "Sign in with Google".
+  const applySession = useCallback((response) => {
+    persistAuthPair(response);
+    setUser(response.user);
+    applyBrand(response.user?.brand);
+    setError(null);
+    return response.user;
+  }, []);
+
   const logout = useCallback(() => {
     // Best-effort revoke on the server so the refresh token can't be
     // reused. We don't block on the result — the local clear below
@@ -127,6 +138,7 @@ export function AuthProvider({ children }) {
     error,
     login,
     register,
+    applySession,
     logout,
     refresh: loadMe,
   };

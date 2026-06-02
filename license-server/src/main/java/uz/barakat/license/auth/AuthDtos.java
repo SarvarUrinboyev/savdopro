@@ -47,9 +47,43 @@ public final class AuthDtos {
             boolean telegramLogin,
             /** Telegram bot username for the login widget (or null). */
             String telegramBot,
+            /** Numeric Telegram bot id for the widget popup (or null). */
+            String telegramBotId,
             boolean googleLogin,
             boolean facebookLogin,
-            boolean xLogin) {
+            boolean xLogin,
+            /** Google OAuth client id for the GIS account chooser (or null). */
+            String googleClientId,
+            /** Facebook app id for the FB JS SDK (or null). */
+            String facebookAppId,
+            /** X OAuth2 client id for the authorize redirect (or null). */
+            String xClientId,
+            /** X OAuth2 redirect uri registered on the X app (or null). */
+            String xRedirectUri) {
+    }
+
+    /**
+     * Social login step: the browser's Google Identity Services account
+     * chooser returns an access token, which the server verifies against
+     * Google before minting a SavdoPRO session.
+     */
+    public record GoogleAuthRequest(
+            @NotBlank(message = "Google token kiritilishi shart") String accessToken) {
+    }
+
+    /** Facebook Login: the FB JS SDK returns an access token to verify. */
+    public record FacebookAuthRequest(
+            @NotBlank(message = "Facebook token kiritilishi shart") String accessToken) {
+    }
+
+    /**
+     * X (Twitter) OAuth2: the SPA sends back the authorization code from the
+     * redirect plus the PKCE code_verifier it generated, which the server
+     * exchanges for a session.
+     */
+    public record XAuthRequest(
+            @NotBlank(message = "X kodi kiritilishi shart") String code,
+            @NotBlank(message = "X tasdiq kodi kiritilishi shart") String codeVerifier) {
     }
 
     /** Forgot-password step 1: request a reset code by SMS to a registered phone. */

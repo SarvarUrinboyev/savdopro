@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ManagementApi, ReportApi } from '../api/endpoints.js';
 import { downloadAuthed } from '../lib/download.js';
 import { DateRangeFilter, rangeForPreset } from '../components/DateRangeFilter.jsx';
@@ -57,9 +58,13 @@ export function Management() {
   return (
     <>
       <PageHeader
-        title={t('Menejment')}
-        desc={t('Savdo hajmi ombordan avtomatik, xarajatlar va sof foyda')}
+        title={t('Moliya')}
+        desc={t('Tanlangan davr bo‘yicha: foyda, xarajat va pul qoldig‘i (hisobot + eksport)')}
       >
+        <Link to="/dashboard" className="btn btn-ghost"
+              title={t('Bugungi jonli holat — kassa, savdo, buyurtmalar')}>
+          ⚡ {t('Bugun')}
+        </Link>
         <CurrencyToggle value={displayCurrency} onChange={setDisplayCurrency} />
         <button
           className="btn btn-ghost"
@@ -92,29 +97,20 @@ export function Management() {
       <Loader loading={loading} error={error} onRetry={reload}>
         {data && (
           <>
-            <div className="section-label">📈 {t('Savdo — ombordan avtomatik')}</div>
+            {/* Headline KPIs only — the full breakdown (COGS, salaries, taxes,
+                other) lives once in the "Foyda hisoboti" waterfall below, so we
+                no longer repeat those figures as cards here. */}
+            <div className="section-label">📊 {t('Asosiy ko‘rsatkichlar')}</div>
             <div className="metrics-4 section">
               <MetricCard tone="blue" icon="🛒" label={t('Savdo hajmi')}
                           value={show(data.salesRevenue)} currencyCode={displayCurrency} />
-              <MetricCard tone="amber" icon="🏷️" label={t('Tovar tannarxi')}
-                          value={show(data.costOfGoods)} currencyCode={displayCurrency} />
               <MetricCard tone="green" icon="📈" label={t('Yalpi foyda')}
                           value={show(data.grossProfit)} currencyCode={displayCurrency} />
-              <MetricCard tone="blue" icon="📦" label={t('Sotilgan dona')}
-                          value={data.unitsSold} currency={false} />
-            </div>
-
-            <div className="section-label">💼 {t('Xarajatlar va sof foyda')}</div>
-            <div className="metrics-4 section">
-              <MetricCard tone="orange" icon="👷" label={t('Ishchi oyliklari')}
-                          value={show(data.salaryTotal)} currencyCode={displayCurrency} />
-              <MetricCard tone="red" icon="🏛️" label={t('Soliqlar')}
-                          value={show(data.taxTotal)} currencyCode={displayCurrency} />
-              <MetricCard tone="amber" icon="🧾" label={t('Boshqa xarajatlar')}
-                          value={show(data.otherTotal)} currencyCode={displayCurrency} />
               <MetricCard tone={Number(data.netProfit) >= 0 ? 'green' : 'red'} icon="💰"
                           label={t('Sof foyda')} value={show(data.netProfit)}
                           currencyCode={displayCurrency} />
+              <MetricCard tone="blue" icon="📦" label={t('Sotilgan dona')}
+                          value={data.unitsSold} currency={false} />
             </div>
 
             <div className="grid grid-2">

@@ -199,7 +199,7 @@ const NAV_ITEMS = [
   { key: 'pos',           to: '/pos',           label: 'Kassa (POS)' },
   { key: 'pos-history',   to: '/pos/history',   label: 'Sotuvlar tarixi' },
   { key: 'promos',        to: '/promos',        label: 'Aksiyalar' },
-  { key: 'management',    to: '/management',    label: 'Menejment' },
+  { key: 'management',    to: '/management',    label: 'Moliya' },
   { key: 'home-expenses', to: '/home-expenses', label: "Do'kon xarajatlari" },
   { key: 'payments',      to: '/payments',      label: "To'lov" },
   { key: 'orders',        to: '/orders',        label: 'Buyurtmalar' },

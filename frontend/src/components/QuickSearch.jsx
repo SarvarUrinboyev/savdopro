@@ -22,7 +22,7 @@ import { useKeyboard } from '../hooks/useKeyboard.js';
 
 const PAGES = [
   { label: 'Boshqaruv', path: '/dashboard' },
-  { label: 'Menejment', path: '/management' },
+  { label: 'Moliya', path: '/management' },
   { label: "Do'kon xarajatlari", path: '/home-expenses' },
   { label: "To'lov", path: '/payments' },
   { label: 'Buyurtmalar', path: '/orders' },

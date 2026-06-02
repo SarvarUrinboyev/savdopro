@@ -56,6 +56,23 @@ public class TelegramOAuthVerifier {
     }
 
     /**
+     * The numeric bot id — the part before ':' in the bot token. The browser's
+     * Telegram Login Widget needs it (as {@code bot_id}) to open the popup. The
+     * bot id is public (it appears in the widget's iframe URL), so surfacing it
+     * to the signup screen leaks nothing. Returns null when unconfigured.
+     */
+    public Long botId() {
+        if (!isConfigured()) return null;
+        int colon = botToken.indexOf(':');
+        if (colon <= 0) return null;
+        try {
+            return Long.parseLong(botToken.substring(0, colon).trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    /**
      * Validate the payload and return the verified Telegram user id.
      * Throws {@link BadRequestException} on any failure — the caller
      * surfaces a generic "Telegram orqali kirish bekor qilindi" message

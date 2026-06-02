@@ -17,7 +17,7 @@ const PAGE_TITLES = {
   '/dashboard': 'Boshqaruv',
   '/pos': 'Kassa (POS)',
   '/pos/history': 'Sotuvlar tarixi',
-  '/management': 'Menejment',
+  '/management': 'Moliya',
   '/home-expenses': "Do'kon xarajatlari",
   '/payments': "To'lov",
   '/orders': 'Buyurtmalar',

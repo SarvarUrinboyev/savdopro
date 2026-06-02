@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   BalanceApi, DashboardApi, ExchangeRateApi, ManagementApi, PaymentApi,
 } from '../api/endpoints.js';
@@ -74,6 +75,15 @@ function Content({ data, rate, onEditBalance }) {
   const t = useT();
   return (
     <>
+      <div className="section flex-between" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, color: 'var(--text-faint)', fontSize: 13 }}>
+          ⚡ {t('Bugungi jonli holat — kassa, savdo va buyurtmalar')}
+        </span>
+        <Link to="/management" className="btn btn-ghost btn-sm"
+              title={t('Davr bo‘yicha foyda, xarajat va eksport')}>
+          📊 {t('Moliya hisoboti (davr)')} →
+        </Link>
+      </div>
       <OnboardingChecklist />
       <RateBanner rate={rate} />
       <AnomalyBanner />

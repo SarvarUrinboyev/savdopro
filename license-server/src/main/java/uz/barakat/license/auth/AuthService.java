@@ -109,6 +109,154 @@ public class AuthService {
                 jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(owner, saved));
     }
 
+    /**
+     * Sign in (or cold sign-up) via a verified Google identity. Google
+     * accounts are keyed by their email used as the username — an email
+     * always contains '@', which normal hand-picked logins never do, so the
+     * two namespaces can't collide and one Google account maps to exactly
+     * one SavdoPRO account. First-time Google users get a fresh 3-day trial
+     * account + owner (no usable password — they always come back via
+     * Google). Returns a session exactly like {@link #login}.
+     *
+     * <p>The Google token is verified upstream in the controller
+     * ({@link GoogleOAuthVerifier}); this method trusts the email it is given.
+     */
+    @Transactional
+    public LoginResponse loginViaGoogle(String email, String googleSub,
+                                        String displayName, String clientIp) {
+        String normEmail = email == null ? "" : email.trim().toLowerCase();
+        if (normEmail.isBlank() || normEmail.indexOf('@') <= 0) {
+            throw new BadRequestException("Google hisobida email topilmadi");
+        }
+        // Returning Google user → log straight in.
+        var existing = users.findByUsernameIgnoreCase(normEmail);
+        if (existing.isPresent()) {
+            AppUser user = existing.get();
+            Account account = requireUsableAccount(user.getAccountId());
+            user.setLastLoginAt(LocalDateTime.now());
+            users.save(user);
+            RefreshTokenService.Issued refresh =
+                    refreshTokens.issue(user.getId(), account.getId(), clientIp);
+            return new LoginResponse(jwt.issue(user), refresh.plaintext(),
+                    jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(user, account));
+        }
+        // First time → create a trial account + its owner (auto-login).
+        String shopName = (displayName != null && !displayName.isBlank())
+                ? displayName.trim()
+                : normEmail.substring(0, normEmail.indexOf('@'));
+        Account account = new Account();
+        account.setName(shopName);
+        account.setContactPhone(null);
+        account.setSubscriptionExpires(LocalDate.now().plusDays(TRIAL_DAYS));
+        account.setBlocked(false);
+        account.setPlan(SubscriptionPlan.TRIAL);
+        Account saved = accounts.save(account);
+
+        AppUser owner = new AppUser();
+        owner.setUsername(normEmail);
+        // Unusable random password — Google is the only way into this account
+        // until the owner sets one via password reset.
+        owner.setPasswordHash(encoder.encode(java.util.UUID.randomUUID().toString()));
+        owner.setFullName((displayName != null && !displayName.isBlank())
+                ? displayName.trim() : normEmail);
+        owner.setRole(UserRole.ACCOUNT_OWNER);
+        owner.setAccountId(saved.getId());
+        try {
+            users.save(owner);
+        } catch (DataIntegrityViolationException ex) {
+            // Raced with a parallel Google login for the same email — the first
+            // one won; just log into whatever now exists rather than 500.
+            AppUser raced = users.findByUsernameIgnoreCase(normEmail)
+                    .orElseThrow(() -> new BadRequestException("Google orqali kirib bo'lmadi"));
+            Account racedAcc = requireUsableAccount(raced.getAccountId());
+            RefreshTokenService.Issued rr =
+                    refreshTokens.issue(raced.getId(), racedAcc.getId(), clientIp);
+            return new LoginResponse(jwt.issue(raced), rr.plaintext(),
+                    jwt.accessTtlSeconds(), rr.expiresAt(), toMe(raced, racedAcc));
+        }
+
+        // Tell the super-admin a new merchant just signed up (best-effort).
+        alerter.notifyNewSignup(saved.getName(), null, owner.getUsername(), TRIAL_DAYS);
+
+        RefreshTokenService.Issued refresh =
+                refreshTokens.issue(owner.getId(), saved.getId(), clientIp);
+        return new LoginResponse(jwt.issue(owner), refresh.plaintext(),
+                jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(owner, saved));
+    }
+
+    /**
+     * Facebook login: verified upstream by {@link FacebookOAuthVerifier}. Keyed
+     * by the verified email when Facebook returns one (App Review granted the
+     * email permission), else by the synthetic {@code fb_<id>} username.
+     */
+    @Transactional
+    public LoginResponse loginViaFacebook(String id, String email, String name, String clientIp) {
+        String key = (email != null && !email.isBlank())
+                ? email.trim().toLowerCase() : "fb_" + id;
+        return socialSession(key, name, clientIp);
+    }
+
+    /**
+     * X (Twitter) login: verified upstream by {@link XOAuthVerifier}. X does not
+     * expose email, so accounts are keyed by the synthetic {@code x_<id>}.
+     */
+    @Transactional
+    public LoginResponse loginViaX(String id, String name, String clientIp) {
+        return socialSession("x_" + id, name, clientIp);
+    }
+
+    /**
+     * Shared cold-signup for the email-less social providers (Facebook / X):
+     * log in the user owning {@code usernameKey}, or create a fresh 3-day trial
+     * account + owner. The key is synthetic ({@code fb_<id>}/{@code x_<id>}) or a
+     * verified email — none of which collide with hand-picked logins.
+     */
+    private LoginResponse socialSession(String usernameKey, String displayName, String clientIp) {
+        var existing = users.findByUsernameIgnoreCase(usernameKey);
+        if (existing.isPresent()) {
+            AppUser user = existing.get();
+            Account account = requireUsableAccount(user.getAccountId());
+            user.setLastLoginAt(LocalDateTime.now());
+            users.save(user);
+            RefreshTokenService.Issued refresh =
+                    refreshTokens.issue(user.getId(), account.getId(), clientIp);
+            return new LoginResponse(jwt.issue(user), refresh.plaintext(),
+                    jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(user, account));
+        }
+        String name = (displayName == null || displayName.isBlank())
+                ? usernameKey : displayName.trim();
+        Account account = new Account();
+        account.setName(name);
+        account.setContactPhone(null);
+        account.setSubscriptionExpires(LocalDate.now().plusDays(TRIAL_DAYS));
+        account.setBlocked(false);
+        account.setPlan(SubscriptionPlan.TRIAL);
+        Account saved = accounts.save(account);
+
+        AppUser owner = new AppUser();
+        owner.setUsername(usernameKey);
+        owner.setPasswordHash(encoder.encode(java.util.UUID.randomUUID().toString()));
+        owner.setFullName(name);
+        owner.setRole(UserRole.ACCOUNT_OWNER);
+        owner.setAccountId(saved.getId());
+        try {
+            users.save(owner);
+        } catch (DataIntegrityViolationException ex) {
+            AppUser raced = users.findByUsernameIgnoreCase(usernameKey)
+                    .orElseThrow(() -> new BadRequestException("Ijtimoiy tarmoq orqali kirib bo'lmadi"));
+            Account racedAcc = requireUsableAccount(raced.getAccountId());
+            RefreshTokenService.Issued rr =
+                    refreshTokens.issue(raced.getId(), racedAcc.getId(), clientIp);
+            return new LoginResponse(jwt.issue(raced), rr.plaintext(),
+                    jwt.accessTtlSeconds(), rr.expiresAt(), toMe(raced, racedAcc));
+        }
+        alerter.notifyNewSignup(saved.getName(), null, owner.getUsername(), TRIAL_DAYS);
+        RefreshTokenService.Issued refresh =
+                refreshTokens.issue(owner.getId(), saved.getId(), clientIp);
+        return new LoginResponse(jwt.issue(owner), refresh.plaintext(),
+                jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(owner, saved));
+    }
+
     public LoginResponse login(LoginRequest request, String clientIp) {
         AppUser user = users.findByUsernameIgnoreCase(request.username().trim())
                 .orElseThrow(() -> new BadRequestException("Login yoki parol noto'g'ri"));
@@ -211,6 +359,73 @@ public class AuthService {
                 jwt.accessTtlSeconds(),
                 refresh.expiresAt(),
                 toMe(user, account));
+    }
+
+    /**
+     * Telegram login for the PUBLIC signup screen: like
+     * {@link #loginViaTelegram} but cold-signs-up a brand-new Telegram user
+     * instead of rejecting them. Returning users (telegram_id already known)
+     * log straight in; first-timers get a fresh 3-day trial account + owner,
+     * keyed by the unique {@code telegram_id} column (Telegram gives no email).
+     * The username is the synthetic {@code tg_<id>} so it can never collide
+     * with a hand-picked login or a Google email-as-username.
+     */
+    @Transactional
+    public LoginResponse loginOrRegisterViaTelegram(
+            uz.barakat.license.auth.AuthDtos.TelegramAuthRequest request,
+            String clientIp) {
+        long telegramId = telegramVerifier.verifyAndExtractId(request.asFieldMap());
+        var existing = users.findByTelegramId(telegramId);
+        if (existing.isPresent()) {
+            AppUser user = existing.get();
+            Account account = requireUsableAccount(user.getAccountId());
+            user.setLastLoginAt(LocalDateTime.now());
+            users.save(user);
+            RefreshTokenService.Issued refresh =
+                    refreshTokens.issue(user.getId(), account.getId(), clientIp);
+            return new LoginResponse(jwt.issue(user), refresh.plaintext(),
+                    jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(user, account));
+        }
+        // First time → trial account + owner (auto-login).
+        String fn = request.firstName() == null ? "" : request.firstName().trim();
+        String ln = request.lastName() == null ? "" : request.lastName().trim();
+        String fullName = (fn + " " + ln).trim();
+        if (fullName.isBlank()) {
+            fullName = (request.username() != null && !request.username().isBlank())
+                    ? request.username().trim() : "Telegram foydalanuvchi";
+        }
+        Account account = new Account();
+        account.setName(fullName);
+        account.setContactPhone(null);
+        account.setSubscriptionExpires(LocalDate.now().plusDays(TRIAL_DAYS));
+        account.setBlocked(false);
+        account.setPlan(SubscriptionPlan.TRIAL);
+        Account saved = accounts.save(account);
+
+        AppUser owner = new AppUser();
+        owner.setUsername("tg_" + telegramId);
+        owner.setPasswordHash(encoder.encode(java.util.UUID.randomUUID().toString()));
+        owner.setFullName(fullName);
+        owner.setRole(UserRole.ACCOUNT_OWNER);
+        owner.setAccountId(saved.getId());
+        owner.setTelegramId(telegramId);
+        try {
+            users.save(owner);
+        } catch (DataIntegrityViolationException ex) {
+            // Raced with a parallel Telegram login → use whatever now exists.
+            AppUser raced = users.findByTelegramId(telegramId)
+                    .orElseThrow(() -> new BadRequestException("Telegram orqali kirib bo'lmadi"));
+            Account racedAcc = requireUsableAccount(raced.getAccountId());
+            RefreshTokenService.Issued rr =
+                    refreshTokens.issue(raced.getId(), racedAcc.getId(), clientIp);
+            return new LoginResponse(jwt.issue(raced), rr.plaintext(),
+                    jwt.accessTtlSeconds(), rr.expiresAt(), toMe(raced, racedAcc));
+        }
+        alerter.notifyNewSignup(saved.getName(), null, owner.getUsername(), TRIAL_DAYS);
+        RefreshTokenService.Issued refresh =
+                refreshTokens.issue(owner.getId(), saved.getId(), clientIp);
+        return new LoginResponse(jwt.issue(owner), refresh.plaintext(),
+                jwt.accessTtlSeconds(), refresh.expiresAt(), toMe(owner, saved));
     }
 
     /**

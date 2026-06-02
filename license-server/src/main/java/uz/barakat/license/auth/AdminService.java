@@ -56,10 +56,17 @@ public class AdminService {
         // fan out to one COUNT(*) per account in the row mapper. The
         // map lookup below is O(1).
         java.util.Map<Long, Long> counts = users.countsByAccountId();
+        // One pass to find each account's owner, so the row mapper can label the
+        // signup channel without an N+1 per-account lookup.
+        java.util.Map<Long, AppUser> owners = users.findAll().stream()
+                .filter(u -> u.getRole() == UserRole.ACCOUNT_OWNER)
+                .collect(java.util.stream.Collectors.toMap(
+                        AppUser::getAccountId, u -> u, (x, y) -> x));
         return accounts.findAll().stream()
                 .sorted(Comparator.comparing(Account::getCreatedAt).reversed())
                 .map(a -> toAccountResponseWithCount(a,
-                        counts.getOrDefault(a.getId(), 0L).intValue()))
+                        counts.getOrDefault(a.getId(), 0L).intValue(),
+                        signupProvider(owners.get(a.getId()))))
                 .toList();
     }
 
@@ -234,11 +241,15 @@ public class AdminService {
      * benefit from a fresh count.
      */
     private AdminAccountResponse toAccountResponse(Account a) {
-        return toAccountResponseWithCount(a,
-                users.findByAccountIdOrderByUsernameAsc(a.getId()).size());
+        List<AppUser> us = users.findByAccountIdOrderByUsernameAsc(a.getId());
+        AppUser owner = us.stream()
+                .filter(u -> u.getRole() == UserRole.ACCOUNT_OWNER)
+                .findFirst().orElse(null);
+        return toAccountResponseWithCount(a, us.size(), signupProvider(owner));
     }
 
-    private static AdminAccountResponse toAccountResponseWithCount(Account a, int userCount) {
+    private static AdminAccountResponse toAccountResponseWithCount(
+            Account a, int userCount, String signupProvider) {
         int days = a.getSubscriptionExpires() == null
                 ? Integer.MAX_VALUE
                 : (int) (a.getSubscriptionExpires().toEpochDay() - LocalDate.now().toEpochDay());
@@ -248,7 +259,24 @@ public class AdminService {
                 a.getId(), a.getName(), a.getContactPhone(), a.getContactNote(),
                 a.getSubscriptionExpires(), Math.max(0, days),
                 a.isBlocked(), expired, a.getPlan().name(), userCount, a.getCreatedAt(),
-                a.getEnabledModules());
+                a.getEnabledModules(), signupProvider);
+    }
+
+    /**
+     * Best-effort signup channel for the account owner, derived from how the
+     * owner row was keyed at signup (we don't store an explicit column): a linked
+     * telegram_id or a {@code tg_/fb_/x_} username → that provider; an email-style
+     * username → Google; anything else → a normal password signup.
+     */
+    private static String signupProvider(AppUser owner) {
+        if (owner == null) return "PASSWORD";
+        if (owner.getTelegramId() != null) return "TELEGRAM";
+        String u = owner.getUsername() == null ? "" : owner.getUsername().toLowerCase();
+        if (u.startsWith("tg_")) return "TELEGRAM";
+        if (u.startsWith("fb_")) return "FACEBOOK";
+        if (u.startsWith("x_")) return "X";
+        if (u.contains("@")) return "GOOGLE";
+        return "PASSWORD";
     }
 
     /**
