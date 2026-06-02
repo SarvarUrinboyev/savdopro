@@ -199,7 +199,8 @@ const NAV_ITEMS = [
   { key: 'pos',           to: '/pos',           label: 'Kassa (POS)' },
   { key: 'pos-history',   to: '/pos/history',   label: 'Sotuvlar tarixi' },
   { key: 'promos',        to: '/promos',        label: 'Aksiyalar' },
-  { key: 'management',    to: '/management',    label: 'Moliya' },
+  // Moliya intentionally not in the sidebar — reached via the "Moliya hisoboti"
+  // link on the Boshqaruv (dashboard) page. Route + permission gate stay intact.
   { key: 'home-expenses', to: '/home-expenses', label: "Do'kon xarajatlari" },
   { key: 'payments',      to: '/payments',      label: "To'lov" },
   { key: 'orders',        to: '/orders',        label: 'Buyurtmalar' },
