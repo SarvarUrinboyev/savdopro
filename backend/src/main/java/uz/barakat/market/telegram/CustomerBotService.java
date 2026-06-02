@@ -21,6 +21,7 @@ import uz.barakat.market.repository.CustomerRepository;
 import uz.barakat.market.repository.CustomerTransactionRepository;
 import uz.barakat.market.service.ExchangeRateService;
 import uz.barakat.market.service.MoneyFormat;
+import uz.barakat.market.service.ReportPdfRenderer;
 
 /**
  * Customer self-service Telegram bot. Customers send their phone number
@@ -40,6 +41,7 @@ public class CustomerBotService {
     private final CustomerRepository customers;
     private final CustomerTransactionRepository transactions;
     private final ExchangeRateService exchangeRate;
+    private final ReportPdfRenderer pdf;
 
     private volatile boolean running;
     private Thread poller;
@@ -48,12 +50,14 @@ public class CustomerBotService {
     public CustomerBotService(CustomerBotProperties properties, TelegramBotApi api,
                               CustomerRepository customers,
                               CustomerTransactionRepository transactions,
-                              ExchangeRateService exchangeRate) {
+                              ExchangeRateService exchangeRate,
+                              ReportPdfRenderer pdf) {
         this.properties = properties;
         this.api = api;
         this.customers = customers;
         this.transactions = transactions;
         this.exchangeRate = exchangeRate;
+        this.pdf = pdf;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -183,19 +187,81 @@ public class CustomerBotService {
             api.sendMessage(chatId, welcomeText(), contactKeyboard());
             return;
         }
-        LocalDate from = switch (data) {
+        Customer customer = found.get();
+        // Download a PDF ledger for the chosen period.
+        if (data.startsWith("PDF_")) {
+            sendLedgerPdf(chatId, customer, periodFrom(data), periodLabel(data));
+            return;
+        }
+        // Otherwise show the period's goods on screen.
+        api.sendMessage(chatId,
+                goodsBlock(customer.getId(), periodFrom(data),
+                        periodLabel(data) + " tovarlaringiz", 30, true),
+                rangeKeyboard());
+    }
+
+    /** Period start for a RANGE / PDF callback (null = all time). */
+    private static LocalDate periodFrom(String data) {
+        return switch (data.replace("PDF_", "RANGE_")) {
             case "RANGE_30" -> LocalDate.now().minusDays(30);
             case "RANGE_MONTH" -> LocalDate.now().withDayOfMonth(1);
+            case "RANGE_90" -> LocalDate.now().minusDays(90);
             default -> null;
         };
-        String label = switch (data) {
+    }
+
+    private static String periodLabel(String data) {
+        return switch (data.replace("PDF_", "RANGE_")) {
             case "RANGE_30" -> "Oxirgi 30 kun";
             case "RANGE_MONTH" -> "Bu oy";
+            case "RANGE_90" -> "Oxirgi 3 oy";
             default -> "Barcha";
         };
-        api.sendMessage(chatId,
-                goodsBlock(found.get().getId(), from, label + " tovarlaringiz", 30, true),
-                rangeKeyboard());
+    }
+
+    /**
+     * Builds + sends a PDF ledger (purchases + payments + running balance) for
+     * the period, so the customer can download/keep their own statement.
+     */
+    private void sendLedgerPdf(long chatId, Customer customer, LocalDate from, String label) {
+        try {
+            List<CustomerTransaction> all = transactions
+                    .findByCustomerIdOrderByDateDescIdDesc(customer.getId());
+            BigDecimal opening = BigDecimal.ZERO;
+            for (CustomerTransaction tx : all) {
+                if (from != null && tx.getDate().isBefore(from)) {
+                    opening = applyTx(opening, tx);
+                }
+            }
+            List<CustomerTransaction> period = all.stream()
+                    .filter(tx -> from == null || !tx.getDate().isBefore(from))
+                    .sorted(java.util.Comparator.comparing(CustomerTransaction::getDate)
+                            .thenComparing(CustomerTransaction::getId))
+                    .toList();
+            BigDecimal running = opening;
+            List<ReportPdfRenderer.LedgerRow> rows = new java.util.ArrayList<>();
+            for (CustomerTransaction tx : period) {
+                running = applyTx(running, tx);
+                rows.add(new ReportPdfRenderer.LedgerRow(
+                        tx.getDate(),
+                        tx.getType() == CustomerTxType.GOODS ? "Tovar" : "To'lov",
+                        tx.getDescription() == null ? "—" : tx.getDescription(),
+                        tx.getAmount(), running));
+            }
+            byte[] bytes = pdf.renderCustomerLedger(
+                    customer.getName(), customer.getPhone(), opening, rows, running);
+            api.sendDocument(chatId, bytes, "hisobot-" + LocalDate.now() + ".pdf",
+                    label + " — " + customer.getName());
+        } catch (Exception ex) {
+            log.warn("Customer ledger PDF failed for chat {}: {}", chatId, ex.toString());
+            api.sendMessage(chatId, "Hisobotni tayyorlashda xatolik. Keyinroq urinib ko'ring.");
+        }
+    }
+
+    private static BigDecimal applyTx(BigDecimal balance, CustomerTransaction tx) {
+        return tx.getType() == CustomerTxType.GOODS
+                ? balance.add(tx.getAmount())
+                : balance.subtract(tx.getAmount());
     }
 
     private void linkAndShow(long chatId, String phone) {
@@ -337,9 +403,12 @@ public class CustomerBotService {
 
     private static Object rangeKeyboard() {
         return Map.of("inline_keyboard", List.of(
-                List.of(Map.of("text", "📅 Oxirgi 30 kun", "callback_data", "RANGE_30"),
+                List.of(Map.of("text", "📅 30 kun", "callback_data", "RANGE_30"),
                         Map.of("text", "📅 Bu oy", "callback_data", "RANGE_MONTH")),
-                List.of(Map.of("text", "📋 Barcha tovarlar", "callback_data", "RANGE_ALL"))));
+                List.of(Map.of("text", "📅 3 oy", "callback_data", "RANGE_90"),
+                        Map.of("text", "📋 Hammasi", "callback_data", "RANGE_ALL")),
+                List.of(Map.of("text", "📄 PDF: 30 kun", "callback_data", "PDF_30"),
+                        Map.of("text", "📄 PDF: hammasi", "callback_data", "PDF_ALL"))));
     }
 
     private static void sleepQuietly() {

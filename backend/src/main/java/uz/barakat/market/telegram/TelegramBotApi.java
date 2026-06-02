@@ -106,4 +106,52 @@ public class TelegramBotApi {
             log.warn("Telegram {} error: {}", method, ex.toString());
         }
     }
+
+    /** Uploads a document (e.g. a PDF report) to a chat via multipart/form-data. */
+    public void sendDocument(long chatId, byte[] bytes, String fileName, String caption) {
+        String boundary = "----savdopro-cust-" + System.nanoTime();
+        try {
+            var baos = new java.io.ByteArrayOutputStream();
+            writePart(baos, boundary, "chat_id", String.valueOf(chatId));
+            if (caption != null && !caption.isBlank()) {
+                writePart(baos, boundary, "caption", caption);
+            }
+            writeFilePart(baos, boundary, "document", fileName, "application/pdf", bytes);
+            baos.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(API + properties.token() + "/sendDocument"))
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                    .POST(HttpRequest.BodyPublishers.ofByteArray(baos.toByteArray()))
+                    .build();
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() / 100 != 2) {
+                log.warn("Telegram sendDocument failed: HTTP {} - {}",
+                        resp.statusCode(), resp.body());
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ex) {
+            log.warn("Telegram sendDocument error: {}", ex.toString());
+        }
+    }
+
+    private static void writePart(java.io.ByteArrayOutputStream out, String boundary,
+                                  String name, String value) throws java.io.IOException {
+        out.write(("--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n"
+                + value + "\r\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static void writeFilePart(java.io.ByteArrayOutputStream out, String boundary,
+                                      String name, String fileName, String contentType,
+                                      byte[] bytes) throws java.io.IOException {
+        out.write(("--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"" + name + "\"; "
+                + "filename=\"" + fileName + "\"\r\n"
+                + "Content-Type: " + contentType + "\r\n\r\n")
+                .getBytes(StandardCharsets.UTF_8));
+        out.write(bytes);
+        out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+    }
 }
