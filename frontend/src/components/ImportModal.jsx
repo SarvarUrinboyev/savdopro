@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ProductApi } from '../api/endpoints.js';
+import { downloadAuthed } from '../lib/download.js';
 import { useT } from '../context/Settings.jsx';
 import { Modal } from './Modal.jsx';
 import { useToast } from './Toast.jsx';
@@ -9,6 +10,7 @@ export function ImportModal({ onClose, onDone }) {
   const [file, setFile] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [tplBusy, setTplBusy] = useState(false);
   const toast = useToast();
   const t = useT();
 
@@ -52,13 +54,23 @@ export function ImportModal({ onClose, onDone }) {
         {t('Excel (.xlsx) yoki CSV fayl yuklang. Ustunlar:')}{' '}
         <b>{t('Nomi, IMEI 1, IMEI 2, Kelish narxi, Sotilish narxi, Miqdor, Toifa')}</b>.
       </p>
-      <a
+      <button
+        type="button"
         className="btn btn-ghost btn-sm"
-        href={ProductApi.templateUrl}
         style={{ marginBottom: 14 }}
+        disabled={tplBusy}
+        onClick={async () => {
+          setTplBusy(true);
+          try {
+            await downloadAuthed(ProductApi.templateUrl, 'namuna-shablon.xlsx');
+          } catch (err) {
+            toast.error(err.message);
+          }
+          setTplBusy(false);
+        }}
       >
-        ⬇ {t('Namuna shablonni yuklab olish')}
-      </a>
+        ⬇ {tplBusy ? t('Yuklanmoqda...') : t('Namuna shablonni yuklab olish')}
+      </button>
       <div className="field" style={{ marginTop: 14 }}>
         <label>{t('Fayl')}</label>
         <input

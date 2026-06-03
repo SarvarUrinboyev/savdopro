@@ -7,6 +7,7 @@ import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
 import { shiftIso, todayIso, usd } from '../lib/format.js';
 import { generatePriceTagsPdf } from '../lib/priceTagsPdf.js';
+import { downloadAuthed } from '../lib/download.js';
 import { PosHistory } from './PosHistory.jsx';
 
 export function Reports() {
@@ -563,14 +564,25 @@ function DayMetricCard({ tone, icon, label, value, count }) {
 function PdfReportSection({ t }) {
   const [from, setFrom] = useState(shiftIso(-30));
   const [to, setTo] = useState(todayIso());
+  const toast = useToast();
 
-  const openSalesPdf = () => {
+  // Authenticated blob download — a plain window.open / <a href> drops the
+  // Bearer token and the backend answers 401.
+  const openSalesPdf = async () => {
     if (!from || !to) return;
-    window.open(ReportApi.salesPdfUrl({ from, to }), '_blank', 'noreferrer');
+    try {
+      await downloadAuthed(ReportApi.salesPdfUrl({ from, to }), `savdo-${from}_${to}.pdf`);
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
-  const openInventoryPdf = () => {
-    window.open(ReportApi.inventoryPdfUrl(), '_blank', 'noreferrer');
+  const openInventoryPdf = async () => {
+    try {
+      await downloadAuthed(ReportApi.inventoryPdfUrl(), 'ombor-hisoboti.pdf');
+    } catch (err) {
+      toast.error(err.message);
+    }
   };
 
   return (

@@ -161,10 +161,24 @@ function SoldGoodsExportCard({ range }) {
   const t = useT();
   const toast = useToast();
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [expBusy, setExpBusy] = useState(null);
 
   const params = { from: range.from, to: range.to };
-  const csvUrl = ManagementApi.soldGoodsExportUrl({ ...params, format: 'csv' });
-  const xlsxUrl = ManagementApi.soldGoodsExportUrl({ ...params, format: 'xlsx' });
+
+  // Authenticated blob download — a plain <a href> drops the Bearer token and
+  // the backend answers 401.
+  const downloadExport = async (format) => {
+    setExpBusy(format);
+    try {
+      await downloadAuthed(
+        ManagementApi.soldGoodsExportUrl({ ...params, format }),
+        `sotilgan-tovarlar-${range.from}_${range.to}.${format}`,
+      );
+    } catch (err) {
+      toast.error(err.message);
+    }
+    setExpBusy(null);
+  };
 
   const downloadPdf = async () => {
     setPdfBusy(true);
@@ -190,8 +204,14 @@ function SoldGoodsExportCard({ range }) {
         </div>
       </div>
       <div className="flex gap-8" style={{ flexWrap: 'wrap' }}>
-        <a className="btn btn-ghost btn-sm" href={csvUrl}>⬇ CSV</a>
-        <a className="btn btn-ghost btn-sm" href={xlsxUrl}>⬇ Excel</a>
+        <button className="btn btn-ghost btn-sm" onClick={() => downloadExport('csv')}
+                disabled={expBusy === 'csv'}>
+          {expBusy === 'csv' ? t('Tayyorlanmoqda...') : '⬇ CSV'}
+        </button>
+        <button className="btn btn-ghost btn-sm" onClick={() => downloadExport('xlsx')}
+                disabled={expBusy === 'xlsx'}>
+          {expBusy === 'xlsx' ? t('Tayyorlanmoqda...') : '⬇ Excel'}
+        </button>
         <button className="btn btn-ghost btn-sm" onClick={downloadPdf} disabled={pdfBusy}>
           {pdfBusy ? t('Tayyorlanmoqda...') : '⬇ PDF'}
         </button>
