@@ -25,6 +25,18 @@ const REASON_LABEL = {
   WRITEOFF: "Brak / yo'qotish",
 };
 
+// An IMEI is a 15-digit number — strip anything that isn't a digit and cap at
+// 15 so the field can never hold letters or an over-long value.
+const imeiClean = (v) => (v || '').replace(/\D/g, '').slice(0, 15);
+
+// A category whose name hints at phones flips the "is a phone" switch on, so the
+// operator doesn't have to remember to reveal the IMEI fields.
+const PHONE_HINTS = ['telefon', 'smartfon', 'smartphone', 'phone', 'iphone',
+  'samsung', 'xiaomi', 'redmi', 'oppo', 'vivo', 'tecno', 'infinix', 'realme',
+  'honor', 'nokia', 'pixel', 'huawei'];
+const looksLikePhone = (s) =>
+  PHONE_HINTS.some((h) => (s || '').toLowerCase().includes(h));
+
 export function ProductEditor() {
   const { id } = useParams();
   const isNew = !id;
@@ -66,6 +78,9 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
   const [barcode, setBarcode] = useState(product?.barcode ?? '');
   const [imei1, setImei1] = useState(product?.imei1 ?? '');
   const [imei2, setImei2] = useState(product?.imei2 ?? '');
+  // IMEI only matters for phones — hidden by default, pre-enabled when editing a
+  // product that already carries one.
+  const [isPhone, setIsPhone] = useState(Boolean(product?.imei1 || product?.imei2));
   const [purchasePrice, setPurchasePrice] = useState(product?.purchasePrice ?? '');
   const [salePrice, setSalePrice] = useState(product?.salePrice ?? '');
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
@@ -110,6 +125,16 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
       toast.error(t('Mahsulot nomi kiritilishi shart'));
       return;
     }
+    if (isPhone) {
+      if (imei1 && imei1.length !== 15) {
+        toast.error(t("IMEI 1 to'liq 15 raqamdan iborat bo'lishi kerak"));
+        return;
+      }
+      if (imei2 && imei2.length !== 15) {
+        toast.error(t("IMEI 2 to'liq 15 raqamdan iborat bo'lishi kerak"));
+        return;
+      }
+    }
     const buyN = Number(purchasePrice) || 0;
     const sellN = Number(salePrice) || 0;
     if (sellN <= 0) {
@@ -123,8 +148,8 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
     const body = {
       name: name.trim(),
       barcode: barcode.trim() || null,
-      imei1: imei1.trim() || null,
-      imei2: imei2.trim() || null,
+      imei1: isPhone ? (imei1.trim() || null) : null,
+      imei2: isPhone ? (imei2.trim() || null) : null,
       purchasePrice: Number(purchasePrice) || 0,
       salePrice: Number(salePrice) || 0,
       categoryId: categoryId ? Number(categoryId) : null,
@@ -236,26 +261,35 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
                        onChange={(e) => setBarcode(e.target.value)}
                        placeholder={t("Skanerdan yoki qo'lda — masalan 4780000000017")} />
               </div>
-              <div className="form-row">
-                <div className="field">
-                  <label>{t('IMEI 1')}</label>
-                  <input className="input" value={imei1}
-                         onChange={(e) => setImei1(e.target.value)}
-                         placeholder={t('masalan 353915110000001')} />
-                </div>
-                <div className="field">
-                  <label>{t('IMEI 2')}</label>
-                  <input className="input" value={imei2}
-                         onChange={(e) => setImei2(e.target.value)}
-                         placeholder={t('ikkinchi SIM (ixtiyoriy)')} />
+              <div className="field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8,
+                                cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={isPhone}
+                         onChange={(e) => setIsPhone(e.target.checked)}
+                         style={{ width: 16, height: 16, accentColor: 'var(--green)' }} />
+                  📱 {t('Telefon (IMEI raqami bor)')}
+                </label>
+                <div className="field-hint">
+                  {t('Faqat smartfon/telefon uchun yoqing — IMEI maydonlari chiqadi. Boshqa tovarlar uchun shart emas.')}
                 </div>
               </div>
+              {isPhone && (
+                <div className="form-row">
+                  <ImeiField label={t('IMEI 1')} value={imei1} onChange={setImei1}
+                             placeholder={t('15 raqam, masalan 353915110000001')} t={t} />
+                  <ImeiField label={t('IMEI 2 (ixtiyoriy)')} value={imei2} onChange={setImei2}
+                             placeholder={t('ikkinchi SIM')} t={t} />
+                </div>
+              )}
               <div className="field">
                 <label>{t('Toifa')}</label>
                 <select className="select" value={categoryId}
                         onChange={(e) => {
-                          if (e.target.value === '__new__') { createCategory(); return; }
-                          setCategoryId(e.target.value);
+                          const v = e.target.value;
+                          if (v === '__new__') { createCategory(); return; }
+                          setCategoryId(v);
+                          const cat = cats.find((c) => String(c.id) === String(v));
+                          if (cat && looksLikePhone(cat.name)) setIsPhone(true);
                         }}>
                   <option value="">{t('Tanlanmagan')}</option>
                   {cats.map((c) => (
@@ -424,5 +458,24 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
         />
       )}
     </>
+  );
+}
+
+/** A single IMEI input: digits only, capped at 15, with a live 0/15 counter. */
+function ImeiField({ label, value, onChange, placeholder, t }) {
+  const len = value.length;
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <input className="input mono" inputMode="numeric" maxLength={15}
+             value={value} onChange={(e) => onChange(imeiClean(e.target.value))}
+             placeholder={placeholder} />
+      {len > 0 && (
+        <div className="field-hint"
+             style={{ color: len === 15 ? '#16a34a' : '#f59e0b', fontWeight: 600 }}>
+          {len === 15 ? `✓ ${t("15 ta raqam — to'g'ri")}` : `${len}/15 ${t('raqam')}`}
+        </div>
+      )}
+    </div>
   );
 }
