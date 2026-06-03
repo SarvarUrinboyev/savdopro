@@ -12,5 +12,8 @@ public record ShiftResponse(
         String openedBy,
         ShiftStatus status,
         Long durationMinutes,
-        BigDecimal startingCash) {
+        BigDecimal startingCash,
+        BigDecimal expectedCash,
+        BigDecimal countedCash,
+        BigDecimal cashDifference) {
 }

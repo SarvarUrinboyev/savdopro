@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import org.hibernate.annotations.Filter;
 import lombok.Getter;
@@ -31,4 +32,13 @@ public class Shift extends TenantScopedEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.OPEN;
+
+    /** Books' expected cash at close (morning balance − cash paid out); null
+     *  until the shift is closed. Auto-added by ddl-auto=update on prod. */
+    @Column(name = "expected_cash", precision = 15, scale = 2)
+    private BigDecimal expectedCash;
+
+    /** Cash physically counted in the till at close; null when not counted. */
+    @Column(name = "counted_cash", precision = 15, scale = 2)
+    private BigDecimal countedCash;
 }

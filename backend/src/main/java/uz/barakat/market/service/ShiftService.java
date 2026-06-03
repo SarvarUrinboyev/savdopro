@@ -1,14 +1,17 @@
 package uz.barakat.market.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Shift;
 import uz.barakat.market.domain.ShiftStatus;
 import uz.barakat.market.dto.BalanceRequest;
 import uz.barakat.market.dto.EndOfDayReport;
+import uz.barakat.market.dto.ShiftCloseRequest;
 import uz.barakat.market.dto.ShiftOpenRequest;
 import uz.barakat.market.dto.ShiftResponse;
 import org.slf4j.Logger;
@@ -69,14 +72,23 @@ public class ShiftService {
      * PDF for the day so the owner has a printable receipt sitting in
      * their chat — no need to switch back to the desktop.
      */
-    public EndOfDayReport close() {
+    public EndOfDayReport close(ShiftCloseRequest request) {
+        LocalDate today = LocalDate.now();
+        // Build the report first so we can snapshot the books' expected cash
+        // onto the shift row before flipping it closed.
+        EndOfDayReport text = reportService.sendToTelegram(today);
+        BigDecimal counted = request == null ? null : request.countedCash();
         shifts.findFirstByStatusOrderByOpenedAtDesc(ShiftStatus.OPEN).ifPresent(shift -> {
             shift.setClosedAt(LocalDateTime.now());
             shift.setStatus(ShiftStatus.CLOSED);
+            // Freeze expected (from the books) and counted (physical) cash on the
+            // shift so it stays a self-contained reconciliation record even if
+            // today's expenses are edited afterwards.
+            shift.setExpectedCash(text.estimatedCash());
+            shift.setCountedCash(counted);
             shifts.save(shift);
+            alertCashShortfall(shift);
         });
-        LocalDate today = LocalDate.now();
-        EndOfDayReport text = reportService.sendToTelegram(today);
         // Attach the PDF separately so the text summary still posts even
         // if PDF rendering or upload trips on a corner case.
         try {
@@ -88,6 +100,39 @@ public class ShiftService {
             log.warn("End-of-shift PDF delivery failed for {}: {}", today, ex.toString());
         }
         return text;
+    }
+
+    /**
+     * Best-effort owner alert when the counted cash falls short of what the
+     * books expect — a till discrepancy worth the owner's eyes. Async and
+     * guarded exactly like the below-cost alert, so a Telegram hiccup never
+     * blocks the close. A no-op when nothing was counted, the count meets or
+     * beats expectations, or the owner bot isn't configured.
+     */
+    private void alertCashShortfall(Shift shift) {
+        BigDecimal expected = shift.getExpectedCash();
+        BigDecimal counted = shift.getCountedCash();
+        if (counted == null || expected == null || !telegram.isConfigured()) {
+            return;
+        }
+        BigDecimal shortfall = expected.subtract(counted);
+        if (shortfall.signum() <= 0) {
+            return; // exact or over the books — no loss to flag
+        }
+        try {
+            String who = (shift.getOpenedBy() == null || shift.getOpenedBy().isBlank())
+                    ? "—" : shift.getOpenedBy();
+            String msg = "⚠️ KASSADA KAMOMAD — Smena #" + shift.getId() + "\n\n"
+                    + "Kutilgan naqd: " + MoneyFormat.usd(expected) + "\n"
+                    + "Sanab chiqilgan: " + MoneyFormat.usd(counted) + "\n"
+                    + "Kamomad: " + MoneyFormat.usd(shortfall) + "\n"
+                    + "Smenani ochgan: " + who + "\n\n"
+                    + "Kassani va kassirlarni tekshiring.";
+            CompletableFuture.runAsync(() -> telegram.sendMessage(msg));
+        } catch (Exception ex) {
+            log.warn("Cash-shortfall alert failed for shift {}: {}",
+                    shift.getId(), ex.toString());
+        }
     }
 
     @Transactional(readOnly = true)

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uz.barakat.market.dto.EndOfDayReport;
+import uz.barakat.market.dto.ShiftCloseRequest;
 import uz.barakat.market.dto.ShiftOpenRequest;
 import uz.barakat.market.dto.ShiftResponse;
 import uz.barakat.market.service.ShiftService;
@@ -46,10 +47,11 @@ public class ShiftController {
         return service.open(request);
     }
 
-    /** Closes the shift, builds the report and sends it to Telegram. */
+    /** Closes the shift, reconciles the counted cash, builds the report and
+     *  sends it to Telegram. The cash count body is optional. */
     @PostMapping("/close")
-    public EndOfDayReport close() {
-        return service.close();
+    public EndOfDayReport close(@RequestBody(required = false) @Valid ShiftCloseRequest request) {
+        return service.close(request);
     }
 
     @DeleteMapping("/history")

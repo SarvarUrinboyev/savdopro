@@ -97,8 +97,14 @@ public final class Mappers {
         Long minutes = s.getClosedAt() == null
                 ? null
                 : ChronoUnit.MINUTES.between(s.getOpenedAt(), s.getClosedAt());
+        // Difference = counted − expected: positive is an overage, negative a
+        // shortfall (kamomad). Null until a shift is closed with a cash count.
+        BigDecimal difference = (s.getCountedCash() == null || s.getExpectedCash() == null)
+                ? null
+                : s.getCountedCash().subtract(s.getExpectedCash());
         return new ShiftResponse(s.getId(), s.getOpenedAt(), s.getClosedAt(), s.getOpenedBy(),
-                s.getStatus(), minutes, startingCash);
+                s.getStatus(), minutes, startingCash,
+                s.getExpectedCash(), s.getCountedCash(), difference);
     }
 
     public static TerminalResponse terminal(LocalDate date, BigDecimal humo, BigDecimal uzcard) {

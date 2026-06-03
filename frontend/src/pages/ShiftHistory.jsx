@@ -5,7 +5,7 @@ import { ConfirmDialog } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, PageHeader } from '../components/ui.jsx';
 import { useApi } from '../hooks/useApi.js';
-import { formatDateTime, formatDuration } from '../lib/format.js';
+import { formatDateTime, formatDuration, usd } from '../lib/format.js';
 
 export function ShiftHistory() {
   const { data, loading, error, reload } = useApi(() => ShiftApi.history(), []);
@@ -55,6 +55,9 @@ export function ShiftHistory() {
                     <th>{t('Yopildi')}</th>
                     <th>{t('Davomiyligi')}</th>
                     <th>{t('Kim ochdi')}</th>
+                    <th>{t('Kutilgan')}</th>
+                    <th>{t('Sanaldi')}</th>
+                    <th>{t('Farq')}</th>
                     <th>{t('Holat')}</th>
                   </tr>
                 </thead>
@@ -67,6 +70,32 @@ export function ShiftHistory() {
                       </td>
                       <td>{formatDuration(s.durationMinutes)}</td>
                       <td>{s.openedBy || <span className="faint">—</span>}</td>
+                      <td className="nowrap mono">
+                        {s.expectedCash == null ? <span className="faint">—</span> : usd(s.expectedCash)}
+                      </td>
+                      <td className="nowrap mono">
+                        {s.countedCash == null ? <span className="faint">—</span> : usd(s.countedCash)}
+                      </td>
+                      <td className="nowrap">
+                        {s.cashDifference == null ? (
+                          <span className="faint">—</span>
+                        ) : (
+                          <span
+                            className="mono"
+                            style={{
+                              fontWeight: 700,
+                              color:
+                                s.cashDifference < 0
+                                  ? 'var(--red)'
+                                  : s.cashDifference > 0
+                                    ? 'var(--green)'
+                                    : undefined,
+                            }}
+                          >
+                            {usd(s.cashDifference)}
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {s.status === 'OPEN' ? (
                           <span className="badge badge-naqd">{t('Ochiq')}</span>

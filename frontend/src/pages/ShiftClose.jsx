@@ -10,6 +10,7 @@ import { formatDate, money, usd } from '../lib/format.js';
 export function ShiftClose({ onClosed }) {
   const { data: report, loading, error, reload } = useApi(() => ReportApi.endOfDay(), []);
   const [busy, setBusy] = useState(false);
+  const [counted, setCounted] = useState('');
   const toast = useToast();
   const t = useT();
 
@@ -25,9 +26,15 @@ export function ShiftClose({ onClosed }) {
   };
 
   const closeShift = async () => {
+    const trimmed = counted.trim();
+    const countedCash = trimmed === '' ? null : Number(trimmed);
+    if (countedCash !== null && (Number.isNaN(countedCash) || countedCash < 0)) {
+      toast.error(t("Sanab chiqilgan naqdni to'g'ri kiriting"));
+      return;
+    }
     setBusy(true);
     try {
-      await ShiftApi.close();
+      await ShiftApi.close({ countedCash });
       toast.success(t('Smena yopildi va hisobot yuborildi'));
       window.print();
       onClosed();
@@ -45,6 +52,8 @@ export function ShiftClose({ onClosed }) {
           <ReportView
             report={report}
             busy={busy}
+            counted={counted}
+            setCounted={setCounted}
             onSend={sendTelegram}
             onPrint={() => window.print()}
             onClose={closeShift}
@@ -69,9 +78,13 @@ function Row({ label, value, strong, tone }) {
   );
 }
 
-function ReportView({ report, busy, onSend, onPrint, onClose }) {
+function ReportView({ report, busy, counted, setCounted, onSend, onPrint, onClose }) {
   const t = useT();
   const s = report.sales;
+  const expected = Number(report.estimatedCash || 0);
+  const countedNum = Number(counted);
+  const hasCount = counted.trim() !== '' && !Number.isNaN(countedNum);
+  const diff = countedNum - expected;
   return (
     <div className="grid grid-2">
       <div>
@@ -129,7 +142,28 @@ function ReportView({ report, busy, onSend, onPrint, onClose }) {
             <Row label={t('Ertalabgi balans')} value={report.startingCash} />
             <Row label={t('Chiqdi (naqd)')} value={report.cashOut} tone="red" />
             <hr style={{ border: 0, borderTop: '1px solid var(--border)', margin: '4px 0' }} />
-            <Row label={t('Taxminiy qoldiq')} value={report.estimatedCash} strong tone="green" />
+            <Row label={t('Taxminiy qoldiq (kutilgan)')} value={report.estimatedCash} strong tone="green" />
+
+            <div className="field" style={{ textAlign: 'left', marginTop: 12, marginBottom: 0 }}>
+              <label>{t('Sanab chiqilgan naqd')}</label>
+              <input
+                className="input"
+                type="number"
+                inputMode="numeric"
+                value={counted}
+                onChange={(e) => setCounted(e.target.value)}
+                placeholder={t('Kassadagi naqdni sanang...')}
+              />
+              <div className="field-hint">{t('Smena oxirida kassada qolgan haqiqiy naqd pul.')}</div>
+            </div>
+            {hasCount && (
+              <Row
+                label={diff < 0 ? t('Kamomad') : diff > 0 ? t('Ortiqcha') : t('Mos keladi ✓')}
+                value={diff}
+                strong
+                tone={diff < 0 ? 'red' : 'green'}
+              />
+            )}
           </div>
         </div>
 
