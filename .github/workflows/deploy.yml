@@ -47,6 +47,17 @@ jobs:
         run: |
           npm ci
           npm run build
+          # Guard against a partial build (e.g. an obfuscator/plugin dropping
+          # lazy chunks): a missing page chunk 404s at runtime and takes the
+          # page down. Assert every key chunk exists + a sane total, else FAIL
+          # the deploy loudly instead of shipping a broken UI (incident 2026-06-04).
+          ASSETS=../backend/src/main/resources/static/assets
+          n=$(ls "$ASSETS"/*.js | wc -l); echo "frontend js chunks: $n"
+          for p in Dashboard ProductEditor Payments Reports Customers Warehouse Orders Debt; do
+            ls "$ASSETS" | grep -qE "^${p}-" || { echo "::error::frontend build missing the $p chunk — refusing to deploy"; exit 1; }
+          done
+          [ "$n" -ge 25 ] || { echo "::error::frontend build produced only $n chunks (expected >=25) — refusing to deploy"; exit 1; }
+          echo "frontend build complete ✓"
 
       # 2) Backend jar (bundles the freshly built frontend) + license jar
       - name: Build backend jar
