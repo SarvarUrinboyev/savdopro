@@ -36,9 +36,11 @@ public class SpaController {
     @GetMapping(
             value = {
                 // Single-segment SPA routes: /login /dashboard /reports …
-                "/{path:^(?!api|error|assets|favicon\\.ico|icon\\.svg|index\\.html).*$}",
+                // `ws` is excluded so /ws (and /ws-sockjs) reach the WebSocket
+                // handler instead of being shadowed by index.html.
+                "/{path:^(?!api|error|assets|ws|favicon\\.ico|icon\\.svg|index\\.html).*$}",
                 // Multi-segment SPA routes: /warehouse/details/123 …
-                "/{path:^(?!api|error|assets).*$}/**"
+                "/{path:^(?!api|error|assets|ws).*$}/**"
             },
             produces = MediaType.TEXT_HTML_VALUE)
     @ResponseBody
