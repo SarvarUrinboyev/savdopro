@@ -2,6 +2,8 @@ package uz.barakat.market.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,12 +45,13 @@ public class PosController {
         return service.checkout(request, cashier);
     }
 
-    /** Per-cashier performance for [from, to] (yyyy-MM-dd). */
+    /** Per-cashier performance for [from, to] (yyyy-MM-dd). Spring parses the
+     *  dates, so a malformed value returns 400 instead of 500. */
     @GetMapping("/cashier-stats")
     public java.util.List<uz.barakat.market.dto.CashierStat> cashierStats(
-            @RequestParam String from, @RequestParam String to) {
-        return service.cashierStats(
-                java.time.LocalDate.parse(from), java.time.LocalDate.parse(to));
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.cashierStats(from, to);
     }
 
     @GetMapping("/sales")

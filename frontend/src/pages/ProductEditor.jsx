@@ -76,8 +76,8 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
 
   const [name, setName] = useState(product?.name ?? '');
   const [barcode, setBarcode] = useState(product?.barcode ?? '');
-  const [imei1, setImei1] = useState(product?.imei1 ?? '');
-  const [imei2, setImei2] = useState(product?.imei2 ?? '');
+  const [imei1, setImei1] = useState(imeiClean(product?.imei1 ?? ''));
+  const [imei2, setImei2] = useState(imeiClean(product?.imei2 ?? ''));
   // IMEI only matters for phones — hidden by default, pre-enabled when editing a
   // product that already carries one.
   const [isPhone, setIsPhone] = useState(Boolean(product?.imei1 || product?.imei2));
@@ -126,11 +126,15 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
       return;
     }
     if (isPhone) {
-      if (imei1 && imei1.length !== 15) {
+      // Only enforce the 15-digit rule on a value the operator actually typed —
+      // a legacy/imported IMEI of another length must not block an unrelated edit.
+      const origI1 = imeiClean(product?.imei1 ?? '');
+      const origI2 = imeiClean(product?.imei2 ?? '');
+      if (imei1 && imei1 !== origI1 && imei1.length !== 15) {
         toast.error(t("IMEI 1 to'liq 15 raqamdan iborat bo'lishi kerak"));
         return;
       }
-      if (imei2 && imei2.length !== 15) {
+      if (imei2 && imei2 !== origI2 && imei2.length !== 15) {
         toast.error(t("IMEI 2 to'liq 15 raqamdan iborat bo'lishi kerak"));
         return;
       }
