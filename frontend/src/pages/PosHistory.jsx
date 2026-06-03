@@ -14,7 +14,7 @@ import { money } from '../lib/format.js';
  * / TO'LIQ QAYTARILGAN). Clicking a row opens the receipt detail with
  * per-line refund controls.
  */
-export function PosHistory() {
+export function PosHistory({ embedded = false }) {
   const t = useT();
   const PAGE_SIZE = 50;
   const [items, setItems] = useState([]);
@@ -67,106 +67,132 @@ export function PosHistory() {
   const reload = () => fetchPage(0, false);
   const loadMore = () => fetchPage(page + 1, true);
 
+  const exportBtn = (
+    <ExportButton
+      filename={`sotuvlar-${new Date().toISOString().slice(0, 10)}`}
+      rows={rows.map((s) => ({
+        [t('Sotuv')]: `#${s.id}`,
+        [t('Vaqt')]: s.createdAt,
+        [t('Mijoz')]: s.customerName || '',
+        [t('Tovar dona')]: s.items.length,
+        [t('Subtotal')]: Number(s.subtotalUzs),
+        [t('Chegirma')]: Number(s.subtotalUzs) - Number(s.totalUzs),
+        [t("To'lov turi")]: s.paymentMethod,
+        [t('Jami UZS')]: Number(s.totalUzs),
+        [t('Qaytarilgan')]: Number(s.refundedTotalUzs),
+        [t('Holat')]: s.fullyRefunded ? 'TO_LIQ QAYTARILGAN'
+          : (s.refundedTotalUzs > 0 ? 'QISMAN' : 'FAOL'),
+      }))}
+    />
+  );
+
+  const body = (
+    <Loader loading={loading} error={error} onRetry={reload}>
+      {rows.length === 0 ? (
+        <EmptyState icon="🛒" text={t("Hali sotuv yo'q")} />
+      ) : (
+        <div className="table-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{t('Vaqt')}</th>
+                <th>{t('Mijoz')}</th>
+                <th className="num">{t('Tovar')}</th>
+                <th>{t("To'lov turi")}</th>
+                <th className="num">{t('Jami')}</th>
+                <th className="num">{t('Qaytarilgan')}</th>
+                <th>{t('Holat')}</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr key={s.id} className="hover-row">
+                  <td className="mono"><strong>#{s.id}</strong></td>
+                  <td className="faint mono" style={{ whiteSpace: 'nowrap' }}>
+                    {formatTs(s.createdAt)}
+                  </td>
+                  <td>{s.customerName || <span className="faint">—</span>}</td>
+                  <td className="num mono">{s.items.length}</td>
+                  <td><span className="badge">{s.paymentMethod}</span></td>
+                  <td className="num mono"><strong>{money(s.totalUzs)}</strong></td>
+                  <td className="num mono faint">
+                    {Number(s.refundedTotalUzs) > 0 ? money(s.refundedTotalUzs) : '—'}
+                  </td>
+                  <td>
+                    {s.fullyRefunded
+                      ? <span className="badge badge-qarzga">{t('Qaytarilgan')}</span>
+                      : Number(s.refundedTotalUzs) > 0
+                        ? <span className="badge badge-aralash">{t('Qisman')}</span>
+                        : <span className="badge badge-naqd">{t('Faol')}</span>}
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    {s.customerId && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        disabled={sendingId === s.id}
+                        title={t('Chekni mijozga yuborish (Telegram/SMS)')}
+                        onClick={() => sendReceipt(s)}
+                      >
+                        {sendingId === s.id ? '⏳' : '📨'}
+                      </button>
+                    )}
+                    <button className="btn btn-ghost btn-sm" onClick={() => setOpen({ sale: s })}>
+                      {t('Batafsil')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {hasMore && rows.length > 0 && (
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? t('Yuklanmoqda...') : `⬇️ ${t("Ko'proq yuklash")}`}
+          </button>
+        </div>
+      )}
+    </Loader>
+  );
+
+  const modal = open && (
+    <SaleDetailModal
+      sale={open.sale}
+      onClose={() => setOpen(null)}
+      onChanged={() => { setOpen(null); reload(); }}
+    />
+  );
+
+  // Embedded into the Hisobotlar page as a card section; standalone (reached
+  // from the Kassa page) keeps its own page header.
+  if (embedded) {
+    return (
+      <div className="card">
+        <div className="card-head">
+          <h2>🧾 {t('Sotuvlar tarixi')}</h2>
+          <span className="hint">{rows.length}{hasMore ? '+' : ''} {t('ta sotuv')}</span>
+        </div>
+        <div className="card-pad">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            {exportBtn}
+          </div>
+          {body}
+        </div>
+        {modal}
+      </div>
+    );
+  }
+
   return (
     <>
       <PageHeader title={t('Sotuvlar tarixi')} desc={`${rows.length}${hasMore ? '+' : ''} ${t('ta sotuv')}`}>
-        <ExportButton
-          filename={`sotuvlar-${new Date().toISOString().slice(0, 10)}`}
-          rows={rows.map((s) => ({
-            [t('Sotuv')]: `#${s.id}`,
-            [t('Vaqt')]: s.createdAt,
-            [t('Mijoz')]: s.customerName || '',
-            [t('Tovar dona')]: s.items.length,
-            [t('Subtotal')]: Number(s.subtotalUzs),
-            [t('Chegirma')]: Number(s.subtotalUzs) - Number(s.totalUzs),
-            [t("To'lov turi")]: s.paymentMethod,
-            [t('Jami UZS')]: Number(s.totalUzs),
-            [t('Qaytarilgan')]: Number(s.refundedTotalUzs),
-            [t('Holat')]: s.fullyRefunded ? 'TO_LIQ QAYTARILGAN'
-              : (s.refundedTotalUzs > 0 ? 'QISMAN' : 'FAOL'),
-          }))}
-        />
+        {exportBtn}
       </PageHeader>
-
-      <div className="card section">
-        <Loader loading={loading} error={error} onRetry={reload}>
-          {rows.length === 0 ? (
-            <EmptyState icon="🛒" text={t("Hali sotuv yo'q")} />
-          ) : (
-            <div className="table-wrap">
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>{t('Vaqt')}</th>
-                    <th>{t('Mijoz')}</th>
-                    <th className="num">{t('Tovar')}</th>
-                    <th>{t("To'lov turi")}</th>
-                    <th className="num">{t('Jami')}</th>
-                    <th className="num">{t('Qaytarilgan')}</th>
-                    <th>{t('Holat')}</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((s) => (
-                    <tr key={s.id} className="hover-row">
-                      <td className="mono"><strong>#{s.id}</strong></td>
-                      <td className="faint mono" style={{ whiteSpace: 'nowrap' }}>
-                        {formatTs(s.createdAt)}
-                      </td>
-                      <td>{s.customerName || <span className="faint">—</span>}</td>
-                      <td className="num mono">{s.items.length}</td>
-                      <td><span className="badge">{s.paymentMethod}</span></td>
-                      <td className="num mono"><strong>{money(s.totalUzs)}</strong></td>
-                      <td className="num mono faint">
-                        {Number(s.refundedTotalUzs) > 0 ? money(s.refundedTotalUzs) : '—'}
-                      </td>
-                      <td>
-                        {s.fullyRefunded
-                          ? <span className="badge badge-qarzga">{t('Qaytarilgan')}</span>
-                          : Number(s.refundedTotalUzs) > 0
-                            ? <span className="badge badge-aralash">{t('Qisman')}</span>
-                            : <span className="badge badge-naqd">{t('Faol')}</span>}
-                      </td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        {s.customerId && (
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            disabled={sendingId === s.id}
-                            title={t('Chekni mijozga yuborish (Telegram/SMS)')}
-                            onClick={() => sendReceipt(s)}
-                          >
-                            {sendingId === s.id ? '⏳' : '📨'}
-                          </button>
-                        )}
-                        <button className="btn btn-ghost btn-sm" onClick={() => setOpen({ sale: s })}>
-                          {t('Batafsil')}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {hasMore && rows.length > 0 && (
-            <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? t('Yuklanmoqda...') : `⬇️ ${t("Ko'proq yuklash")}`}
-              </button>
-            </div>
-          )}
-        </Loader>
-      </div>
-
-      {open && (
-        <SaleDetailModal
-          sale={open.sale}
-          onClose={() => setOpen(null)}
-          onChanged={() => { setOpen(null); reload(); }}
-        />
-      )}
+      <div className="card section">{body}</div>
+      {modal}
     </>
   );
 }

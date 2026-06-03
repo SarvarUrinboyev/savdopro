@@ -183,7 +183,7 @@ const iconColor = (to) => ICON_COLOR[to] || 'currentColor';
 const NAV_ITEMS = [
   { key: 'dashboard',     to: '/dashboard',     label: 'Boshqaruv' },
   { key: 'pos',           to: '/pos',           label: 'Kassa (POS)' },
-  { key: 'pos-history',   to: '/pos/history',   label: 'Sotuvlar tarixi' },
+  // Sotuvlar tarixi reached from the Kassa page + embedded in the Hisobotlar page.
   { key: 'promos',        to: '/promos',        label: 'Aksiyalar' },
   // Moliya intentionally not in the sidebar — reached via the "Moliya hisoboti"
   // link on the Boshqaruv (dashboard) page. Route + permission gate stay intact.

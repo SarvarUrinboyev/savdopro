@@ -7,6 +7,7 @@ import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
 import { shiftIso, todayIso, usd } from '../lib/format.js';
 import { generatePriceTagsPdf } from '../lib/priceTagsPdf.js';
+import { PosHistory } from './PosHistory.jsx';
 
 export function Reports() {
   const t = useT();
@@ -14,6 +15,7 @@ export function Reports() {
   return (
     <div className="grid" style={{ gap: 24 }}>
       <DailyReportSection t={t} />
+      <PosHistory embedded />
       <CashierStatsSection t={t} />
       <ReorderQueueSection t={t} />
       <SlowMoversSection t={t} />
