@@ -24,8 +24,6 @@ export const ALL_MODULES = [
   { key: 'suppliers',     path: '/suppliers',     label: 'Yetkazib beruvchilar' },
   { key: 'debt',          path: '/debt',          label: 'Qarz' },
   { key: 'calculator',    path: '/calculator',    label: 'Kalkulyator' },
-  { key: 'shift-history', path: '/shift-history', label: 'Smena tarixi' },
-  { key: 'shift-close',   path: '/shift-close',   label: 'Smena yopish' },
   { key: 'reports',       path: '/reports',       label: 'Hisobotlar' },
   { key: 'shops',         path: '/shops',         label: "Do'konlar" },
   { key: 'transfers',     path: '/transfers',     label: "Tovar transferi" },

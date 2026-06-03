@@ -23,8 +23,6 @@ const MODULE_PERMS = {
   customers: ['CUSTOMERS:READ', 'CUSTOMERS:WRITE'],
   suppliers: ['SUPPLIERS:READ', 'SUPPLIERS:WRITE'],
   debt: ['DEBTS:READ', 'DEBTS:WRITE'],
-  'shift-history': ['SHIFTS:READ'],
-  'shift-close': ['SHIFTS:READ', 'SHIFTS:WRITE', 'SHIFTS:ADMIN'],
   reports: ['REPORTS:READ', 'REPORTS:WRITE'],
   shops: ['SHOPS:READ', 'SHOPS:WRITE'],
   transfers: ['TRANSFERS:READ', 'TRANSFERS:WRITE'],

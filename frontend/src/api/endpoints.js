@@ -209,14 +209,6 @@ export const CategoryApi = {
   remove: (id) => api.del(`/categories/${id}`),
 };
 
-export const ShiftApi = {
-  history: () => api.get('/shifts'),
-  current: () => api.get('/shifts/current'),
-  open: (body) => api.post('/shifts/open', body),
-  close: (body) => api.post('/shifts/close', body),
-  clearHistory: () => api.del('/shifts/history'),
-};
-
 export const TerminalApi = {
   today: () => api.get('/terminal/today'),
   history: () => api.get('/terminal/history'),

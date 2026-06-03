@@ -31,8 +31,6 @@ const PAGES = [
   { label: 'Yetkazib beruvchilar', path: '/suppliers' },
   { label: 'Qarz', path: '/debt' },
   { label: 'Kalkulyator', path: '/calculator' },
-  { label: 'Smena tarixi', path: '/shift-history' },
-  { label: 'Smena yopish', path: '/shift-close' },
   { label: 'Hisobotlar', path: '/reports' },
   { label: "Do'konlar", path: '/shops' },
   { label: 'Tovar transferi', path: '/transfers' },

@@ -11,51 +11,7 @@ import { useKeyboard } from '../hooks/useKeyboard.js';
 import { useSettings } from '../context/Settings.jsx';
 import { useShop } from '../context/Shop.jsx';
 import { LANGUAGES } from '../i18n/i18n.js';
-import { formatDate, formatTime, todayIso } from '../lib/format.js';
-
-/** Header shift status pill — click to open a small "ochish / yopish" menu. */
-function ShiftPill({ shift, t }) {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const go = (path) => { setOpen(false); navigate(path); };
-  return (
-    <div style={{ position: 'relative' }}>
-      <button
-        type="button"
-        className={`shift-pill ${shift ? 'open' : 'closed'}`}
-        onClick={() => setOpen((v) => !v)}
-        title={t('Smena')}
-        style={{ cursor: 'pointer', border: 'none', font: 'inherit' }}
-      >
-        <span className="dot" />
-        {shift
-          ? `${t('Smena ochiq')} · ${formatTime(shift.openedAt)}`
-          : t('Smena yopiq')}
-      </button>
-      {open && (
-        <>
-          <div onClick={() => setOpen(false)}
-               style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
-          <div style={{
-            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 61,
-            background: 'var(--surface)', border: '1px solid var(--border-strong)',
-            borderRadius: 12, boxShadow: '0 14px 34px -12px rgba(0,0,0,.55)',
-            padding: 6, minWidth: 200, display: 'flex', flexDirection: 'column', gap: 2,
-          }}>
-            <button className="btn btn-ghost" style={{ justifyContent: 'flex-start' }}
-                    onClick={() => go('/shift-open')}>
-              🔓 {t('Smena ochish')}
-            </button>
-            <button className="btn btn-ghost" style={{ justifyContent: 'flex-start' }}
-                    onClick={() => go('/shift-close')}>
-              🔒 {t('Smena yopish')}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+import { formatDate, todayIso } from '../lib/format.js';
 
 const PAGE_TITLES = {
   '/dashboard': 'Boshqaruv',
@@ -70,8 +26,6 @@ const PAGE_TITLES = {
   '/suppliers': 'Yetkazib beruvchilar',
   '/debt': 'Qarz',
   '/calculator': 'Kalkulyator',
-  '/shift-history': 'Smena tarixi',
-  '/shift-close': 'Smena yopish',
   '/admin': 'Super-admin',
   '/shops': "Do'konlar",
   '/reports': 'Hisobotlar',
@@ -92,7 +46,7 @@ function resolveTitle(pathname) {
 }
 
 /** App shell: fixed sidebar, sticky topbar and the routed page. */
-export function Layout({ shift }) {
+export function Layout() {
   const { pathname } = useLocation();
   const { theme, toggleTheme, lang, setLang, t } = useSettings();
   const { isConsolidated, shops } = useShop();
@@ -108,7 +62,6 @@ export function Layout({ shift }) {
     F3: () => navigate('/warehouse'),       // warehouse
     F4: () => navigate('/customers'),       // customers
     F5: () => navigate('/payments'),        // payments
-    F9: () => navigate('/shift-close'),     // close shift
     F10: () => navigate('/reports'),        // reports
   }), [navigate]));
 
@@ -116,7 +69,7 @@ export function Layout({ shift }) {
     <div className="app-shell">
       <QuickSearch />
       <AiChatWidget />
-      <Sidebar shift={shift} open={navOpen} />
+      <Sidebar open={navOpen} />
       {navOpen && (
         <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       )}
@@ -163,7 +116,6 @@ export function Layout({ shift }) {
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
             <span className="date">📅 {formatDate(todayIso())}</span>
-            <ShiftPill shift={shift} t={t} />
           </div>
         </header>
         <SubscriptionBanner />

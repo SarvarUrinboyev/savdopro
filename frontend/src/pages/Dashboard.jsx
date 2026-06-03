@@ -120,7 +120,7 @@ function Content({ data, rate, onEditBalance }) {
       <div className="grid grid-2">
         <div className="card">
           <div className="card-head">
-            <h2>{t('Smenaning xarajatlari')}</h2>
+            <h2>{t('Bugungi xarajatlar')}</h2>
             <span className="hint">{t('Eng katta xarajatlar')}</span>
           </div>
           <div className="card-pad">

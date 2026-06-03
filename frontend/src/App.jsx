@@ -1,16 +1,13 @@
 import { lazy } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { ShiftApi } from './api/endpoints.js';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout.jsx';
 import { Spinner } from './components/ui.jsx';
 import { useAuth } from './context/Auth.jsx';
-import { useApi } from './hooks/useApi.js';
 import { Login } from './pages/Login.jsx';
 import { Register } from './pages/Register.jsx';
 import { XCallback } from './pages/XCallback.jsx';
 import { ForgotPassword } from './pages/ForgotPassword.jsx';
 import { Landing } from './pages/Landing.jsx';
-import { ShiftOpen } from './pages/ShiftOpen.jsx';
 import { Help } from './pages/Help.jsx';
 import { Stocktake } from './pages/Stocktake.jsx';
 import { IS_WEB } from './config.js';
@@ -39,8 +36,6 @@ const Payments = lazyPage(() => import('./pages/Payments.jsx'), 'Payments');
 const Pos = lazyPage(() => import('./pages/Pos.jsx'), 'Pos');
 const PosHistory = lazyPage(() => import('./pages/PosHistory.jsx'), 'PosHistory');
 const Promos = lazyPage(() => import('./pages/Promos.jsx'), 'Promos');
-const ShiftClose = lazyPage(() => import('./pages/ShiftClose.jsx'), 'ShiftClose');
-const ShiftHistory = lazyPage(() => import('./pages/ShiftHistory.jsx'), 'ShiftHistory');
 const ProductEditor = lazyPage(() => import('./pages/ProductEditor.jsx'), 'ProductEditor');
 const SupplierDetail = lazyPage(() => import('./pages/SupplierDetail.jsx'), 'SupplierDetail');
 const Suppliers = lazyPage(() => import('./pages/Suppliers.jsx'), 'Suppliers');
@@ -69,9 +64,8 @@ function Access({ module, roles, children }) {
 const g = (element, opts) => <Access {...opts}>{element}</Access>;
 
 /**
- * Top level: until a shift is open the app shows the "open shift" gate
- * (desktop POS only); once open — or always, on the web portal — it renders
- * the dashboard and its pages.
+ * Top level: shows the login routes until authenticated, then the app shell
+ * (dashboard and its pages).
  */
 export default function App() {
   const auth = useAuth();
@@ -107,51 +101,9 @@ export default function App() {
 }
 
 function Authenticated() {
-  const auth = useAuth();
-  const navigate = useNavigate();
-  const { data: shift, loading, error, reload } = useApi(() => ShiftApi.current(), []);
-
-  if (loading) {
-    return (
-      <div className="center-screen">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    // Auth-related failures: bounce back to login. The api client has
-    // already cleared the JWT, so logging out completes the reset and
-    // App.jsx will render <Login /> on the next render.
-    const isAuth = /\b(401|403)\b/.test(String(error))
-      || /sessiya|akkaunt/i.test(String(error));
-    if (isAuth) {
-      auth.logout();
-      return null;
-    }
-    return (
-      <div className="center-screen">
-        <div className="empty">
-          <div className="e-ico">⚠️</div>
-          <div className="e-text">{error}</div>
-          <button className="btn btn-primary mt-16" onClick={reload}>
-            Qayta urinish
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // The POS "open a shift" gate is a cashier / in-store concept. The hosted
-  // web merchant portal skips it so an owner reviewing dashboards and reports
-  // isn't forced to open a till first.
-  if (!shift && !IS_WEB) {
-    return <ShiftOpen onOpened={reload} />;
-  }
-
   return (
     <Routes>
-      <Route element={<Layout shift={shift} />}>
+      <Route element={<Layout />}>
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="management" element={g(<Management />, { module: 'management' })} />
@@ -169,9 +121,6 @@ function Authenticated() {
         <Route path="suppliers/:id" element={g(<SupplierDetail />, { module: 'suppliers' })} />
         <Route path="debt" element={g(<Debt />, { module: 'debt' })} />
         <Route path="calculator" element={g(<Calculator />, { module: 'calculator' })} />
-        <Route path="shift-history" element={g(<ShiftHistory />, { module: 'shift-history' })} />
-        <Route path="shift-close" element={g(<ShiftClose onClosed={reload} />, { module: 'shift-close' })} />
-        <Route path="shift-open" element={<ShiftOpen onOpened={() => { reload(); navigate('/dashboard'); }} />} />
         <Route path="help" element={<Help />} />
         <Route path="admin" element={g(<Admin />, { roles: ['SUPER_ADMIN'] })} />
         <Route path="admin/accounts/:id" element={g(<AccountDetail />, { roles: ['SUPER_ADMIN'] })} />

@@ -87,18 +87,6 @@ const ICON = {
       <line x1="16" y1="16" x2="16" y2="16" />
     </svg>
   ),
-  '/shift-history': (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
-         strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-  '/shift-close': (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
-         strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h2m6-4l3-3m0 0l-3-3m3 3H9" />
-    </svg>
-  ),
   '/admin': (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
          strokeLinecap="round" strokeLinejoin="round">
@@ -184,8 +172,6 @@ const ICON_COLOR = {
   '/suppliers':     '#0891b2',
   '/debt':          '#ef4444',
   '/calculator':    '#64748b',
-  '/shift-history': '#7c3aed',
-  '/shift-close':   '#dc2626',
   '/reports':       '#f59e0b',
   '/help':          '#10b981',
 };
@@ -209,15 +195,12 @@ const NAV_ITEMS = [
   // Yetkazib beruvchilar reached from the Mijozlar page header button (/suppliers route stays).
   { key: 'debt',          to: '/debt',          label: 'Qarz' },
   { key: 'calculator',    to: '/calculator',    label: 'Kalkulyator' },
-  { key: 'shift-history', to: '/shift-history', label: 'Smena tarixi' },
-  // Smena yopish moved to the header shift-pill dropdown (ochish / yopish).
   { key: 'reports',       to: '/reports',       label: 'Hisobotlar' },
 ];
 
-export function Sidebar({ shift, open }) {
+export function Sidebar({ open }) {
   const t = useT();
   const { user, logout } = useAuth();
-  const shiftOpen = Boolean(shift);
   const initials = (user?.fullName || user?.username || '?')
     .split(/\s+/).filter(Boolean).slice(0, 2)
     .map((s) => s[0].toUpperCase()).join('') || '?';
@@ -315,10 +298,11 @@ export function Sidebar({ shift, open }) {
             <div className="op-role" title={user?.accountName || ''}>
               {user?.fullName || user?.username || t('Operator')}
             </div>
-            <div className={`op-status ${shiftOpen ? 'on' : 'off'}`}>
-              <span className="op-dot" />
-              {shiftOpen ? t('Ochiq') : t('Yopiq')}
-            </div>
+            {user?.accountName && (
+              <div style={{ fontSize: 11, color: 'var(--text-faint)', marginTop: 2 }}>
+                {user.accountName}
+              </div>
+            )}
           </div>
           <button
             className="op-logout"
