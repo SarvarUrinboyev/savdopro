@@ -6,10 +6,13 @@ import obfuscator from 'vite-plugin-javascript-obfuscator';
 // resources, so the Spring Boot JAR serves the UI and the API together.
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build';
-  // Obfuscation is on for production builds. It can be turned off for a single
-  // build with VITE_OBFUSCATE=0 (e.g. to debug a minified prod issue) without
-  // touching this file.
-  const obfuscate = isBuild && process.env.VITE_OBFUSCATE !== '0';
+  // Obfuscation is OPT-IN (set VITE_OBFUSCATE=1). It is OFF by default because
+  // the obfuscator corrupts Vite/Rollup code-splitting: it intermittently drops
+  // or merges lazy page chunks, so dynamic imports 404 at runtime — this took
+  // prod down on 2026-06-04. Reliability first. The shipped bundle is still
+  // protected: esbuild mangles names + drops console, no source maps, private
+  // repo. Re-enable obfuscation only with a code-split-safe tool/config.
+  const obfuscate = isBuild && process.env.VITE_OBFUSCATE === '1';
 
   return {
     plugins: [
