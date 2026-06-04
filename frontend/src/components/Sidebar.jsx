@@ -181,6 +181,11 @@ const iconColor = (to) => ICON_COLOR[to] || 'currentColor';
 // The Sidebar filters out items whose key is not in the current user's
 // allow-list (server-issued via /me; null = "all visible").
 const NAV_ITEMS = [
+  // Top three, by owner request: To'lov, Ombor, Mijozlar.
+  { key: 'payments',      to: '/payments',      label: "To'lov" },
+  { key: 'warehouse',     to: '/warehouse',     label: 'Ombor' },
+  { key: 'customers',     to: '/customers',     label: 'Mijozlar' },
+  // Yetkazib beruvchilar reached from the Mijozlar page header button (/suppliers route stays).
   { key: 'dashboard',     to: '/dashboard',     label: 'Boshqaruv' },
   { key: 'pos',           to: '/pos',           label: 'Kassa (POS)' },
   // Sotuvlar tarixi reached from the Kassa page + embedded in the Hisobotlar page.
@@ -188,11 +193,7 @@ const NAV_ITEMS = [
   // Moliya intentionally not in the sidebar — reached via the "Moliya hisoboti"
   // link on the Boshqaruv (dashboard) page. Route + permission gate stay intact.
   { key: 'home-expenses', to: '/home-expenses', label: "Do'kon xarajatlari" },
-  { key: 'payments',      to: '/payments',      label: "To'lov" },
   { key: 'orders',        to: '/orders',        label: 'Buyurtmalar' },
-  { key: 'warehouse',     to: '/warehouse',     label: 'Ombor' },
-  { key: 'customers',     to: '/customers',     label: 'Mijozlar' },
-  // Yetkazib beruvchilar reached from the Mijozlar page header button (/suppliers route stays).
   { key: 'debt',          to: '/debt',          label: 'Qarz' },
   { key: 'calculator',    to: '/calculator',    label: 'Kalkulyator' },
   { key: 'reports',       to: '/reports',       label: 'Hisobotlar' },
