@@ -54,3 +54,6 @@ build_*.txt
 # Mobile server H2 runtime DB (regenerated at runtime)
 mobile/server/data/
 *.lock.db
+
+# --- Local working docs (not part of the product) ---
+savdopro_audit_prompt_v2.md
