@@ -199,6 +199,11 @@ export const ProductApi = {
   stocktake: (body) => api.post('/products/stocktake', body),
   lowStock: () => api.get('/products/low-stock'),
   scan: (body) => api.post('/products/scan', body),
+  // Global barcode lookup (Open Food Facts / UPC Item DB) — a read-only
+  // suggestion for an unknown code. The scan modal calls it only as a fallback,
+  // when the national catalogue has nothing. Returns
+  // { found, name, suggestedCategory, source }.
+  barcodeLookup: (code) => api.get('/products/barcode-lookup' + qs({ code })),
   importFile: (file) => uploadFile('/products/import', file),
   templateUrl: '/api/products/import/template',
 };

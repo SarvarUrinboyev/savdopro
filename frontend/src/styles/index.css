@@ -543,6 +543,7 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 @keyframes slidein { from { transform: translateX(20px); opacity: 0; } }
 .toast.success { border-left-color: var(--accent); }
 .toast.error   { border-left-color: var(--red); }
+.toast.warn    { border-left-color: var(--amber); }
 .toast.info    { border-left-color: var(--blue); }
 
 /* ------------------------------------------------------- states / misc */

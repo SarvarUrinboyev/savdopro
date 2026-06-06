@@ -11,6 +11,7 @@ import { useVoiceInput } from '../hooks/useVoiceInput.js';
 import {
   cacheProducts, enqueueCheckout, failedCount, flushQueue, pendingCount,
 } from '../lib/offlineDb.js';
+import { normalizeBarcode } from '../lib/barcode.js';
 import { money } from '../lib/format.js';
 
 const PAYMENT_METHODS = [
@@ -133,8 +134,13 @@ export function Pos() {
     e.preventDefault();
     const q = search.trim();
     if (!q) return;
-    // Exact barcode match wins over text search.
-    const exact = products?.find((p) => p.barcode === q);
+    // Exact barcode match wins over text search. Normalise both sides so a GS1
+    // DataMatrix marking code (with its per-unit serial) still matches the
+    // product stored under its plain GTIN.
+    const norm = normalizeBarcode(q);
+    const exact = products?.find(
+      (p) => p.barcode && normalizeBarcode(p.barcode) === norm,
+    );
     if (exact) {
       addToCart(exact);
       setSearch('');

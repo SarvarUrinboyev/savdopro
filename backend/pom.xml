@@ -139,6 +139,16 @@
             <version>5.3.0</version>
         </dependency>
 
+        <!-- Caffeine: backs the 1-hour in-memory cache for the global barcode
+             lookup (warehouse scan fallback), so repeated scans of the same code
+             don't re-hit Open Food Facts / UPC Item DB. CaffeineCacheManager is
+             already on the classpath via spring-context-support (starter-mail);
+             this adds the cache engine itself. Version managed by the Boot BOM. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- PDF generation (LibrePDF / OpenPDF вЂ” LGPL fork of iText 4,
              actively maintained, no AGPL commercial-license trap). Used by
              ReportPdfRenderer for sales / inventory / customer-ledger PDFs. -->

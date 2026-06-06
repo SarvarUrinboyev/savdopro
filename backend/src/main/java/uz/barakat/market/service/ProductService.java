@@ -25,6 +25,7 @@ import uz.barakat.market.repository.CategoryRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.StockMovementRepository;
 import uz.barakat.market.telegram.TelegramService;
+import uz.barakat.market.util.BarcodeNormalizer;
 
 /** Warehouse / inventory: products, stock movements and bulk import. */
 @Service
@@ -87,6 +88,13 @@ public class ProductService {
     public ProductResponse create(ProductRequest request) {
         Product product = new Product();
         applyFields(product, request);
+        // Scanner intake: when no category was picked but the catalogue suggested
+        // one by name, create/link it on the fly. Create path only — an update
+        // must never grow the category list as a side effect.
+        if (product.getCategoryId() == null && request.categoryName() != null
+                && !request.categoryName().isBlank()) {
+            product.setCategoryId(categoryService.resolveOrCreate(request.categoryName()));
+        }
         requireNoDuplicate(product, null);
         int initial = request.quantity() != null ? request.quantity() : 0;
         product.setQuantity(initial);
@@ -216,24 +224,38 @@ public class ProductService {
     }
 
     /**
-     * Scans a barcode: an existing product gets +1 stock (a DELIVERY
-     * movement is logged); an unknown barcode is reported back so the UI
-     * can offer to create a new product.
+     * Resolves a scanned barcode against the warehouse — the database half of a
+     * scan. It does NOT change stock. The raw code is reduced to its canonical
+     * GTIN form (so a GS1 marking code's per-unit serial doesn't make every scan
+     * look new):
+     *
+     * <ul>
+     *   <li>known product  -> {@code found = true} with the product, so the UI
+     *       can ask how many units arrived ("Kirim") and call {@link #adjustStock};
+     *   <li>unknown barcode -> {@code found = false} with the canonical code; the
+     *       browser then queries the national catalogue itself to pre-fill the
+     *       new-product form (the hosted backend can't reach Uzbek gov endpoints).
+     * </ul>
      */
-    public ScanResponse scan(String barcode) {
-        String code = barcode == null ? "" : barcode.strip();
-        if (code.isEmpty()) {
+    @Transactional(readOnly = true)
+    public ScanResponse resolveScan(String barcode) {
+        String canonical = BarcodeNormalizer.normalize(barcode);
+        if (canonical.isEmpty()) {
             throw new BadRequestException("Shtrix kod bo'sh");
         }
-        Product product = products.findFirstByBarcode(code).orElse(null);
+        Product product = products.findFirstByBarcode(canonical).orElse(null);
         if (product == null) {
-            return new ScanResponse(false, code, null);
+            // Back-compat: rows saved before normalisation may hold the raw code.
+            String raw = barcode == null ? "" : barcode.strip();
+            if (!raw.isEmpty() && !raw.equals(canonical)) {
+                product = products.findFirstByBarcode(raw).orElse(null);
+            }
         }
-        product.setQuantity(product.getQuantity() + 1);
-        products.save(product);
-        logMovement(product, 1, product.getQuantity(), StockReason.DELIVERY, "Skaner orqali");
-        return new ScanResponse(true, code,
-                Mappers.product(product, categoryName(product.getCategoryId())));
+        if (product != null) {
+            return new ScanResponse(true, canonical,
+                    Mappers.product(product, categoryName(product.getCategoryId())));
+        }
+        return new ScanResponse(false, canonical, null);
     }
 
     /** Bulk import of products from a CSV or XLSX file. */
@@ -251,7 +273,7 @@ public class ProductService {
             }
             Product product = new Product();
             product.setName(row.name());
-            product.setBarcode(row.barcode());
+            product.setBarcode(blankToNull(BarcodeNormalizer.normalize(row.barcode())));
             product.setImei1(row.imei1());
             product.setImei2(row.imei2());
             product.setPurchasePrice(row.purchasePrice());
@@ -278,7 +300,9 @@ public class ProductService {
             throw new BadRequestException("Tanlangan toifa topilmadi");
         }
         product.setName(request.name().strip());
-        product.setBarcode(blankToNull(request.barcode()));
+        // Canonicalise the barcode on write (every entry path: editor, import,
+        // scan) so a later scan's normalised GTIN always matches what's stored.
+        product.setBarcode(blankToNull(BarcodeNormalizer.normalize(request.barcode())));
         product.setImei1(blankToNull(request.imei1()));
         product.setImei2(blankToNull(request.imei2()));
         product.setPurchasePrice(request.purchasePrice());

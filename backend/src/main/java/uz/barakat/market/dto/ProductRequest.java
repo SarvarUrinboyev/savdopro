@@ -3,6 +3,7 @@ package uz.barakat.market.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -22,6 +23,12 @@ public record ProductRequest(
         @PositiveOrZero(message = "Narx manfiy bo'la olmaydi") BigDecimal salePrice,
         @PositiveOrZero(message = "Soni manfiy bo'la olmaydi") Integer quantity,
         Long categoryId,
+        /**
+         * Optional category name used only when {@code categoryId} is null —
+         * e.g. the scanner pre-fills the catalogue's group and the category is
+         * created on the fly. Mirrors the bulk importer's resolve-or-create.
+         */
+        @Size(max = 120, message = "Toifa nomi juda uzun") String categoryName,
         String description,
         @PositiveOrZero(message = "Chegara manfiy bo'la olmaydi") Integer lowStockThreshold,
         String mxikCode,

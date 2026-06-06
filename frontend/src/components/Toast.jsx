@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useState } from 'react';
 
 const ToastContext = createContext(null);
 
-/** Provides transient success / error / info notifications. */
+/** Provides transient success / error / warning / info notifications. */
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
@@ -17,6 +17,7 @@ export function ToastProvider({ children }) {
   const toast = {
     success: (m) => push(m, 'success'),
     error: (m) => push(m, 'error'),
+    warn: (m) => push(m, 'warn'),
     info: (m) => push(m, 'info'),
   };
 
