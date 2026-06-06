@@ -43,6 +43,10 @@ services:
       db:
         condition: service_healthy
     environment:
+      # Activate the prod profile. A no-op today (the license server has no
+      # application-prod.properties or @Profile("prod") beans yet), but it makes
+      # the deploy intent explicit and auto-applies any future prod-only settings.
+      SPRING_PROFILES_ACTIVE: prod
       # Spring Boot picks these up from application.properties via ${VAR:default}.
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-license}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-license}
