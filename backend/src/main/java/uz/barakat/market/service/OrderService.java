@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.market.service.webhook.WebhookEvents;
 import uz.barakat.market.domain.Currency;
 import uz.barakat.market.domain.Order;
 import uz.barakat.market.dto.ExpenseRequest;
@@ -24,10 +26,13 @@ public class OrderService {
 
     private final OrderRepository orders;
     private final ExpenseService expenseService;
+    private final ApplicationEventPublisher events;
 
-    public OrderService(OrderRepository orders, ExpenseService expenseService) {
+    public OrderService(OrderRepository orders, ExpenseService expenseService,
+                        ApplicationEventPublisher events) {
         this.orders = orders;
         this.expenseService = expenseService;
+        this.events = events;
     }
 
     /** Open orders grouped into today / overdue / upcoming. */
@@ -59,7 +64,9 @@ public class OrderService {
     public OrderResponse create(OrderRequest request) {
         Order order = new Order();
         apply(order, request);
-        return Mappers.order(orders.save(order), LocalDate.now());
+        Order saved = orders.save(order);
+        events.publishEvent(new WebhookEvents.OrderChanged(saved.getId(), "created"));
+        return Mappers.order(saved, LocalDate.now());
     }
 
     public OrderResponse update(Long id, OrderRequest request) {
@@ -88,7 +95,9 @@ public class OrderService {
                 Currency.USD, "Buyurtmadan: " + order.getName()));
         order.setCompleted(true);
         order.setCompletedAt(LocalDateTime.now());
-        return Mappers.order(orders.save(order), LocalDate.now());
+        Order saved = orders.save(order);
+        events.publishEvent(new WebhookEvents.OrderChanged(saved.getId(), "status_changed"));
+        return Mappers.order(saved, LocalDate.now());
     }
 
     private void apply(Order order, OrderRequest request) {

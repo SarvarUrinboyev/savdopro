@@ -170,6 +170,19 @@ export const AiApi = {
   acknowledgeAnomaly: (id) => api.post(`/ai/anomalies/${id}/acknowledge`, {}),
 };
 
+// External integrations: API keys + outbound webhooks (owner only).
+export const IntegrationsApi = {
+  meta: () => api.get('/integrations/meta'),
+  listKeys: () => api.get('/integrations/api-keys'),
+  createKey: (body) => api.post('/integrations/api-keys', body),
+  revokeKey: (id) => api.del(`/integrations/api-keys/${id}`),
+  listWebhooks: () => api.get('/integrations/webhooks'),
+  createWebhook: (body) => api.post('/integrations/webhooks', body),
+  deleteWebhook: (id) => api.del(`/integrations/webhooks/${id}`),
+  testWebhook: (id) => api.post(`/integrations/webhooks/${id}/test`, {}),
+  deliveries: () => api.get('/integrations/webhooks/deliveries'),
+};
+
 export const PromoApi = {
   list: () => api.get('/promos'),
   active: () => api.get('/promos/active'),

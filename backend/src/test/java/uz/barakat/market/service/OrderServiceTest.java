@@ -29,6 +29,7 @@ import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import uz.barakat.market.domain.Currency;
 import uz.barakat.market.domain.Order;
 import uz.barakat.market.domain.PaymentType;
@@ -51,6 +52,7 @@ class OrderServiceTest {
 
     @Mock private OrderRepository orders;
     @Mock private ExpenseService expenseService;
+    @Mock private ApplicationEventPublisher events;
     @InjectMocks private OrderService service;
 
     private MockedStatic<LocalDate> dateMock;

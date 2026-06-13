@@ -108,6 +108,8 @@ public class ProductService {
         if (initial > 0) {
             logMovement(product, initial, initial, StockReason.INITIAL, "Boshlang'ich qoldiq");
         }
+        events.publishEvent(new uz.barakat.market.service.webhook.WebhookEvents.ProductChanged(
+                product.getId(), "created"));
         return Mappers.product(product, categoryName(product.getCategoryId()));
     }
 
@@ -117,6 +119,8 @@ public class ProductService {
         applyFields(product, request);
         requireNoDuplicate(product, id);
         products.save(product);
+        events.publishEvent(new uz.barakat.market.service.webhook.WebhookEvents.ProductChanged(
+                product.getId(), "updated"));
         return Mappers.product(product, categoryName(product.getCategoryId()));
     }
 

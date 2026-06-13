@@ -100,6 +100,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String callerKey(HttpServletRequest req) {
+        // External Open-API callers get their own per-key bucket.
+        Object apiKeyId = req.getAttribute(ApiKeyAuthFilter.ATTR_API_KEY_ID);
+        if (apiKeyId != null) {
+            return "k:" + apiKeyId;
+        }
         Object user = req.getAttribute(JwtAuthFilter.ATTR_USERNAME);
         if (user instanceof String s && !s.isBlank()) {
             return "u:" + s;

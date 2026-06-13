@@ -293,6 +293,21 @@ export function Sidebar({ open }) {
             <span>{t('Buxgalteriya')}</span>
           </NavLink>
         )}
+        {/* External integrations (Open API + webhooks) — owner only. */}
+        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
+          <NavLink
+            to="/integrations"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="ico">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 7V3M15 7V3M9 21v-4M15 21v-4M7 7h10v4a5 5 0 01-10 0V7z" />
+              </svg>
+            </span>
+            <span>{t('Integratsiyalar')}</span>
+          </NavLink>
+        )}
         {NAV_ITEMS.filter((item) => isOn(item.key)).map((item) => (
           <NavLink
             key={item.to}

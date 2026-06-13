@@ -59,6 +59,20 @@ public class TenantFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain)
             throws ServletException, IOException {
+        // External Open API: the API key already resolved the tenant (no X-Shop-Id).
+        // Scope to the key's shop and skip all header-based logic. This is also the
+        // tenant-isolation guarantee for /api/v1 — the key can only ever see its shop.
+        Object apiKeyShopId = request.getAttribute(ApiKeyAuthFilter.ATTR_API_KEY_SHOP_ID);
+        if (apiKeyShopId instanceof Long shopId) {
+            try {
+                TenantContext.setShopId(shopId);
+                chain.doFilter(request, response);
+            } finally {
+                TenantContext.clear();
+            }
+            return;
+        }
+
         String raw = request.getHeader("X-Shop-Id");
         String trimmed = raw == null ? null : raw.trim();
         Long accountId = (Long) request.getAttribute(JwtAuthFilter.ATTR_ACCOUNT_ID);

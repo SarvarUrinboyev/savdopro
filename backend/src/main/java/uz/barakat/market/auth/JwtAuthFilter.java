@@ -58,6 +58,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
+            // An API-key bearer token (sk_live_…) is handled by ApiKeyAuthFilter,
+            // which runs first and may already have set the authentication. Skip
+            // it here — never try to parse it as a JWT (that would clear the
+            // context and wipe the API-key auth).
+            if (token.startsWith(ApiKeyService.TOKEN_PREFIX)) {
+                chain.doFilter(request, response);
+                return;
+            }
             try {
                 Claims claims = jwt.parse(token);
                 String subject = claims.getSubject();

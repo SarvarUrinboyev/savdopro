@@ -30,7 +30,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter)
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
+                                           ApiKeyAuthFilter apiKeyFilter)
             throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -122,6 +123,21 @@ public class SecurityConfig {
                         .requestMatchers("/api/ai/**").access(perm("REPORTS", "READ"))
                         .requestMatchers(HttpMethod.GET, "/api/report/**", "/api/dashboard/**", "/api/exchange-rate/**").access(perm("REPORTS", "READ"))
                         .requestMatchers("/api/report/**", "/api/exchange-rate/**").access(perm("REPORTS", "WRITE"))
+                        // Integration management (API keys + webhook subscriptions) is an
+                        // owner action — gate on SHOPS:WRITE (cashiers lack it). Must precede
+                        // the /api/** catch-all.
+                        .requestMatchers("/api/integrations/**").access(perm("SHOPS", "WRITE"))
+                        // External Open API (/api/v1/**) — authenticated by API key
+                        // (ApiKeyAuthFilter sets SCOPE_* authorities); per-resource scope.
+                        // JWT users carry no SCOPE_ authority, API keys carry no perms, so
+                        // the two auth worlds can't cross over.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/products/**").access(scope("catalog:read"))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/sales/**").access(scope("sales:read"))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/customers/**").access(scope("customers:read"))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").access(scope("orders:read"))
+                        .requestMatchers(HttpMethod.GET, "/api/v1/accounting/**").access(scope("accounting:read"))
+                        // /api/v1/me + /api/v1/ping — any valid key.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/**").authenticated()
                         // Everything else under /api requires a valid JWT.
                         .requestMatchers("/api/**").authenticated()
                         // Anything else (SPA deep-links) is served as-is.
@@ -140,8 +156,28 @@ public class SecurityConfig {
                             res.getWriter().write(
                                     "{\"message\":\"Bu amal uchun ruxsatingiz yo'q\",\"code\":\"FORBIDDEN\"}");
                         }))
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                // API-key auth runs BEFORE the JWT filter; it acts only on sk_live_
+                // tokens / X-Api-Key and leaves JWT bearer tokens untouched.
+                .addFilterBefore(apiKeyFilter, JwtAuthFilter.class);
         return http.build();
+    }
+
+    /**
+     * Builds an {@link AuthorizationManager} that grants access only when the
+     * caller carries the given OAuth-style scope as a {@code SCOPE_<scope>}
+     * authority. API keys carry these (set by {@link ApiKeyAuthFilter}); JWT
+     * users never do — keeping the external Open API and the first-party app on
+     * separate authorization rails.
+     */
+    private static AuthorizationManager<RequestAuthorizationContext> scope(String scope) {
+        String authority = "SCOPE_" + scope;
+        return (authentication, context) -> {
+            var a = authentication.get();
+            boolean ok = a != null && a.isAuthenticated()
+                    && a.getAuthorities().stream().anyMatch(g -> authority.equals(g.getAuthority()));
+            return new AuthorizationDecision(ok);
+        };
     }
 
     /**
