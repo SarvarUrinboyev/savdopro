@@ -4,19 +4,23 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import uz.barakat.market.domain.CustomerTxType;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.dto.CustomerResponse;
 import uz.barakat.market.dto.DebtorResponse;
 import uz.barakat.market.dto.OrderResponse;
 import uz.barakat.market.dto.OrdersByStatus;
 import uz.barakat.market.dto.SupplierResponse;
+import uz.barakat.market.repository.CustomerTransactionRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.SaleRepository;
 
@@ -59,12 +63,14 @@ public class AiToolService {
     private final DebtService debts;
     private final OrderService orders;
     private final ForecastService forecast;
+    private final CustomerTransactionRepository customerTx;
 
     public AiToolService(SaleRepository sales, AnalyticsService analytics,
                          ReportService reports, ProductRepository products,
                          CustomerService customers, SupplierService suppliers,
                          DebtService debts, OrderService orders,
-                         ForecastService forecast) {
+                         ForecastService forecast,
+                         CustomerTransactionRepository customerTx) {
         this.sales = sales;
         this.analytics = analytics;
         this.reports = reports;
@@ -74,6 +80,7 @@ public class AiToolService {
         this.debts = debts;
         this.orders = orders;
         this.forecast = forecast;
+        this.customerTx = customerTx;
     }
 
     /**
@@ -111,6 +118,10 @@ public class AiToolService {
             AI BASHORAT / TAVSIYA:
             - reorderSuggestions {}          -> nimani qayta buyurtma qilish kerak + tavsiya miqdor
             - slowMovers {}                  -> sekin sotilayotgan mahsulotlar + chegirma tavsiyasi
+            MOLIYA DIREKTORI (CFO) TAHLILLARI:
+            - profitDiagnosis {date}         -> foyda nega o'zgardi: sotuv/tannarx/xarajat farqi (oldingi kun bilan)
+            - priceRaiseCandidates {limit}   -> narxni oshirish mumkin bo'lgan tovarlar (ko'p sotiladigan + past marja)
+            - overdueDebtors {days}          -> qarzni kechiktirayotgan mijozlar (oxirgi to'lovdan beri o'tgan kun)
             """;
     }
 
@@ -145,6 +156,9 @@ public class AiToolService {
                 case "orders"        -> ordersOverview();
                 case "reorderSuggestions" -> reorderSuggestions();
                 case "slowMovers"    -> slowMovers();
+                case "profitDiagnosis" -> profitDiagnosis(date(args, "date"));
+                case "priceRaiseCandidates" -> priceRaiseCandidates(intArg(args, "limit", 5));
+                case "overdueDebtors" -> overdueDebtors(intArg(args, "days", 0));
                 default -> "XATO: noma'lum asbob '" + name + "'";
             };
         } catch (Exception ex) {
@@ -451,6 +465,134 @@ public class AiToolService {
                 .append(", 30 kunda ").append((int) s.soldLast30Days()).append(" sotilgan")
                 .append(", chegirma tavsiyasi ").append(s.suggestedDiscountPercent()).append("%\n"));
         return sb.toString();
+    }
+
+    // ------------------------------------------------------- CFO analyses
+
+    /** Why did net profit change vs the previous day — decomposed into drivers. */
+    private String profitDiagnosis(LocalDate date) {
+        LocalDate prev = date.minusDays(1);
+        var t = reports.forDate(date);
+        var y = reports.forDate(prev);
+        BigDecimal revT = t.sales() == null ? BigDecimal.ZERO : nzBd(t.sales().net());
+        BigDecimal revY = y.sales() == null ? BigDecimal.ZERO : nzBd(y.sales().net());
+        BigDecimal cogsT = t.sales() == null ? BigDecimal.ZERO : nzBd(t.sales().cogs());
+        BigDecimal cogsY = y.sales() == null ? BigDecimal.ZERO : nzBd(y.sales().cogs());
+        BigDecimal grossT = t.sales() == null ? BigDecimal.ZERO : nzBd(t.sales().profit());
+        BigDecimal grossY = y.sales() == null ? BigDecimal.ZERO : nzBd(y.sales().profit());
+        BigDecimal expT = nzBd(t.marketTotal()).add(nzBd(t.homeTotal()));
+        BigDecimal expY = nzBd(y.marketTotal()).add(nzBd(y.homeTotal()));
+        BigDecimal netT = grossT.subtract(expT);
+        BigDecimal netY = grossY.subtract(expY);
+        BigDecimal dNet = netT.subtract(netY);
+        BigDecimal dRev = revT.subtract(revY);
+        BigDecimal dCogs = cogsT.subtract(cogsY);
+        BigDecimal dExp = expT.subtract(expY);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format(Locale.ROOT, "Foyda tahlili %s (oldingi kun %s bilan):\n", date, prev));
+        sb.append(String.format(Locale.ROOT, "  Sotuv (tushum): %s -> %s (%s%s)\n",
+                money(revY), money(revT), sign(dRev), money(dRev.abs())));
+        sb.append(String.format(Locale.ROOT, "  Tovar tannarxi: %s -> %s (%s%s)\n",
+                money(cogsY), money(cogsT), sign(dCogs), money(dCogs.abs())));
+        sb.append(String.format(Locale.ROOT, "  Yalpi foyda: %s -> %s\n", money(grossY), money(grossT)));
+        sb.append(String.format(Locale.ROOT, "  Xarajat: %s -> %s (%s%s)\n",
+                money(expY), money(expT), sign(dExp), money(dExp.abs())));
+        sb.append(String.format(Locale.ROOT, "  SOF FOYDA: %s -> %s (%s%s)\n",
+                money(netY), money(netT), sign(dNet), money(dNet.abs())));
+        sb.append("Asosiy sabab: ").append(profitDriver(dRev, dCogs, dExp, dNet));
+        return sb.toString();
+    }
+
+    /** Names the single factor that hurt net profit the most. */
+    private static String profitDriver(BigDecimal dRev, BigDecimal dCogs,
+                                       BigDecimal dExp, BigDecimal dNet) {
+        if (dNet.signum() >= 0) {
+            return "sof foyda kamaymadi (oshdi yoki o'zgarmadi).";
+        }
+        BigDecimal revC = dRev;             // higher revenue helps
+        BigDecimal cogsC = dCogs.negate();  // higher cost hurts
+        BigDecimal expC = dExp.negate();    // higher expense hurts
+        String worst = "sotuv"; BigDecimal worstVal = revC;
+        if (cogsC.compareTo(worstVal) < 0) { worst = "tannarx"; worstVal = cogsC; }
+        if (expC.compareTo(worstVal) < 0) { worst = "xarajat"; worstVal = expC; }
+        return switch (worst) {
+            case "tannarx" -> "tovar tannarxi oshdi / marja pasaydi (" + money(worstVal.abs()) + " USD).";
+            case "xarajat" -> "xarajatlar oshdi (" + money(worstVal.abs()) + " USD).";
+            default -> "sotuv tushumi kamaydi (" + money(dRev.abs()) + " USD).";
+        };
+    }
+
+    /** Fast-moving but thin-margin products — good candidates to raise price. */
+    private String priceRaiseCandidates(int limit) {
+        int lim = Math.min(Math.max(limit, 1), 15);
+        LocalDate today = LocalDate.now();
+        var rows = analytics.profitByProduct(today.minusDays(30), today);
+        if (rows.isEmpty()) return "Oxirgi 30 kunda sotuv yo'q — narx tavsiyasi berib bo'lmaydi.";
+        var cands = rows.stream()
+                .filter(r -> r.soldQty() > 0 && r.marginPercent() != null
+                        && r.marginPercent().compareTo(BigDecimal.valueOf(25)) < 0)
+                .sorted(Comparator.comparingInt(AnalyticsService.ProductProfitRow::soldQty).reversed())
+                .limit(lim).toList();
+        if (cands.isEmpty()) {
+            return "Narx oshirishga aniq nomzod yo'q — ko'p sotiladigan tovarlarning marjasi yaxshi.";
+        }
+        Map<Long, Product> byId = new HashMap<>();
+        for (Product p : products.findAllByOrderByNameAsc()) byId.put(p.getId(), p);
+        StringBuilder sb = new StringBuilder(
+                "Narxni oshirish mumkin (ko'p sotiladi, marja past). +10% taklif:\n");
+        cands.forEach(r -> {
+            Product p = byId.get(r.productId());
+            BigDecimal price = p == null ? BigDecimal.ZERO : nzBd(p.getSalePrice());
+            BigDecimal suggested = price.multiply(new BigDecimal("1.10")).setScale(2, RoundingMode.HALF_UP);
+            sb.append("  - ").append(r.name())
+              .append(": 30 kunda ").append(r.soldQty()).append(" dona, marja ")
+              .append(r.marginPercent()).append("%, narx ").append(money(price))
+              .append(" -> ~").append(money(suggested)).append(" USD\n");
+        });
+        return sb.toString();
+    }
+
+    /** Debtors ranked by how long since their last payment. */
+    private String overdueDebtors(int minDays) {
+        var debtors = customers.list().stream()
+                .filter(c -> c.balance() != null && c.balance().signum() > 0)
+                .toList();
+        if (debtors.isEmpty()) return "Qarzdor mijoz yo'q — hamma to'lagan.";
+        Map<Long, LocalDate> lastPay = new HashMap<>();
+        for (var row : customerTx.lastDateByType(CustomerTxType.PAYMENT)) {
+            if (row.getCustomerId() != null && row.getLastDate() != null) {
+                lastPay.put(row.getCustomerId(), row.getLastDate());
+            }
+        }
+        LocalDate today = LocalDate.now();
+        record Late(CustomerResponse c, long days, LocalDate lastPay) { }
+        int floor = Math.max(0, minDays);
+        var ranked = debtors.stream().map(c -> {
+            LocalDate lp = lastPay.get(c.id());
+            LocalDate basis = lp != null ? lp
+                    : (c.createdAt() != null ? c.createdAt().toLocalDate() : today);
+            long dl = Math.max(0, ChronoUnit.DAYS.between(basis, today));
+            return new Late(c, dl, lp);
+        }).filter(r -> r.days() >= floor)
+          .sorted(Comparator.comparingLong(Late::days).reversed())
+          .toList();
+        if (ranked.isEmpty()) {
+            return String.format("%d kundan ko'p kechiktirgan qarzdor yo'q.", floor);
+        }
+        StringBuilder sb = new StringBuilder(
+                "Qarzni eng ko'p kechiktirgan mijozlar (oxirgi to'lovdan beri):\n");
+        ranked.stream().limit(10).forEach(r -> sb.append("  - ").append(r.c().name())
+                .append(": ").append(money(r.c().balance())).append(" USD qarz, ")
+                .append(r.lastPay() == null ? "hech to'lamagan" : r.days() + " kun oldin to'lagan")
+                .append(r.c().phone() != null && !r.c().phone().isBlank()
+                        ? " (tel: " + r.c().phone() + ")" : "")
+                .append("\n"));
+        return sb.toString();
+    }
+
+    private static String sign(BigDecimal v) {
+        return v.signum() < 0 ? "-" : "+";
     }
 
     // ------------------------------------------------------------- helpers

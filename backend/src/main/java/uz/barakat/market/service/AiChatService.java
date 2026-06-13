@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.SaleRepository;
+import uz.barakat.market.service.CfoActionService.CfoAction;
 import uz.barakat.market.service.ai.AiProvider;
 import uz.barakat.market.service.ai.GeminiProvider;
 import uz.barakat.market.service.ai.OpenAiCompatProvider;
@@ -85,6 +86,7 @@ public class AiChatService {
     private final SaleRepository sales;
     private final ProductRepository products;
     private final AiToolService tools;
+    private final CfoActionService cfoActions;
     private final List<AiProvider> chain;
 
     public AiChatService(
@@ -93,6 +95,7 @@ public class AiChatService {
             SaleRepository sales,
             ProductRepository products,
             AiToolService tools,
+            CfoActionService cfoActions,
             // chain order — change to reorder failover priority
             @Value("${ai.providers:gemini,nvidia-deepseek,nvidia-kimi,openrouter}") String chainOrder,
             // Per-provider keys + models. All optional; unset = skipped.
@@ -109,6 +112,7 @@ public class AiChatService {
         this.sales = sales;
         this.products = products;
         this.tools = tools;
+        this.cfoActions = cfoActions;
         this.chain = buildChain(
                 chainOrder,
                 geminiKey, geminiModel,
@@ -161,7 +165,8 @@ public class AiChatService {
 
     public record ChatRequest(String question, List<Turn> history) { }
 
-    public record ChatResponse(String answer, String snapshot, String provider) { }
+    public record ChatResponse(String answer, List<CfoAction> actions,
+                               String snapshot, String provider) { }
 
     public ChatResponse ask(ChatRequest req) {
         String question = (req == null || req.question() == null) ? "" : req.question();
@@ -174,7 +179,15 @@ public class AiChatService {
                 + "\nQO'SHIMCHA ma'lumot kerak bo'lsa, FAQAT bitta qatorda shunday yoz:\n"
                 + "TOOL <nom> {\"arg\":\"qiymat\"}\n"
                 + "Boshqa hech narsa yozma. Ma'lumot yetarli bo'lsa — to'g'ridan-to'g'ri "
-                + "yakuniy javobni yoz (TOOL'siz). Sanalar YYYY-MM-DD ko'rinishida.";
+                + "yakuniy javobni yoz (TOOL'siz). Sanalar YYYY-MM-DD ko'rinishida."
+                + "\n\nAMALLAR (action): agar foydalanuvchiga aniq amal foydali bo'lsa, "
+                + "yakuniy javob OXIRIDA har birini alohida qatorda shunday yoz "
+                + "(ilova ularni tugmaga aylantiradi, sen O'ZING bajarma):\n"
+                + "ACTION ORDER | <mahsulot nomi> | <miqdor>\n"
+                + "ACTION DISCOUNT | <mahsulot nomi> | <foiz>\n"
+                + "ACTION PRICE | <mahsulot nomi> | <foiz>\n"
+                + "ACTION NOTIFY | <mijoz nomi> |\n"
+                + "Faqat asboblardan kelgan HAQIQIY nom yoz. Amal kerak bo'lmasa, ACTION yozma.";
 
         StringBuilder ctx = new StringBuilder();
         if (!snapshot.isEmpty()) {
@@ -207,7 +220,10 @@ public class AiChatService {
 
             ToolCall tc = parseToolCall(r.text());
             if (tc == null) {
-                return new ChatResponse(r.text().trim(), snapshot, r.provider());
+                // Final answer — pull out any ACTION lines into structured,
+                // id-resolved suggestions and strip them from the shown text.
+                CfoActionService.Extracted ex = cfoActions.extract(r.text().trim());
+                return new ChatResponse(ex.text(), ex.actions(), snapshot, r.provider());
             }
 
             // Execute the requested tool (tenant-scoped, read-only) and feed
@@ -226,7 +242,7 @@ public class AiChatService {
                 : "Barcha AI providerlar javob bermadi: " + errs;
         return new ChatResponse(
                 diag + (snapshot.isEmpty() ? "" : "\n\nKalit ma'lumot:\n" + snapshot),
-                snapshot, lastProvider);
+                List.of(), snapshot, lastProvider);
     }
 
     // --------------------------------------------------------------- llm + tools

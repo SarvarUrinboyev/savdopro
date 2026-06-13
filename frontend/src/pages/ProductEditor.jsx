@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CategoryApi, ProductApi } from '../api/endpoints.js';
+import { CategoryApi, ExchangeRateApi, ProductApi } from '../api/endpoints.js';
 import { ConfirmDialog } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
-import { Loader } from '../components/ui.jsx';
+import { CurrencyToggle, Loader } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
 import { useApi } from '../hooks/useApi.js';
-import { formatDateTime } from '../lib/format.js';
+import { useStickyState } from '../hooks/useStickyState.js';
+import { formatDateTime, money, usd } from '../lib/format.js';
 
 const REASONS = [
   { value: 'DELIVERY', label: 'Yangi yetkazib berish' },
@@ -45,6 +46,9 @@ export function ProductEditor() {
       isNew ? Promise.resolve(null) : ProductApi.get(id),
       CategoryApi.list(),
       isNew ? Promise.resolve([]) : ProductApi.movements(id),
+      // CBU USD->UZS rate: lets the operator type prices in so'm. Optional —
+      // offline the form simply stays USD-only.
+      ExchangeRateApi.get().catch(() => null),
     ]),
     [id],
   );
@@ -62,6 +66,7 @@ export function ProductEditor() {
           product={data[0]}
           categories={data[1]}
           movements={data[2]}
+          rate={data[3]}
           reloadAll={reload}
         />
       )}
@@ -69,7 +74,7 @@ export function ProductEditor() {
   );
 }
 
-function Editor({ isNew, product, categories, movements, reloadAll }) {
+function Editor({ isNew, product, categories, movements, rate, reloadAll }) {
   const t = useT();
   const navigate = useNavigate();
   const toast = useToast();
@@ -81,8 +86,50 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
   // IMEI only matters for phones — hidden by default, pre-enabled when editing a
   // product that already carries one.
   const [isPhone, setIsPhone] = useState(Boolean(product?.imei1 || product?.imei2));
-  const [purchasePrice, setPurchasePrice] = useState(product?.purchasePrice ?? '');
-  const [salePrice, setSalePrice] = useState(product?.salePrice ?? '');
+
+  // ----- price entry currency (USD / so'm) -----
+  // Prices are STORED in USD (reports, margins and the POS all assume it);
+  // the toggle only changes what the operator types. So'm input is converted
+  // at the CBU rate on save. Without a rate (offline) the form is USD-only.
+  const usdRate = rate?.available && Number(rate.rate) > 0 ? Number(rate.rate) : null;
+  const [priceCurrency, setPriceCurrency] = useStickyState('barakat.cur.product', 'USD');
+  const curr = usdRate ? priceCurrency : 'USD';
+  const uzsToUsd = (n) => Math.round((n / usdRate) * 100) / 100;
+  // Stored USD -> what the input should show in the sticky currency.
+  const initPrice = (v) => {
+    if (v == null || v === '') return '';
+    return (usdRate && priceCurrency === 'UZS')
+      ? String(Math.round(Number(v) * usdRate))
+      : String(v);
+  };
+  const [purchasePrice, setPurchasePrice] = useState(() => initPrice(product?.purchasePrice));
+  const [salePrice, setSalePrice] = useState(() => initPrice(product?.salePrice));
+
+  const switchCurrency = (next) => {
+    if (next === curr) return;
+    if (!usdRate) {
+      toast.error(t("Dollar kursi yuklanmadi — narxni hozircha USDda kiriting"));
+      return;
+    }
+    // Keep what the operator already typed: convert it to the new currency.
+    const conv = (v) => {
+      const n = Number(v);
+      if (v === '' || v == null || !Number.isFinite(n)) return '';
+      return next === 'UZS' ? String(Math.round(n * usdRate)) : String(uzsToUsd(n));
+    };
+    setPurchasePrice(conv);
+    setSalePrice(conv);
+    setPriceCurrency(next);
+  };
+
+  /** "≈ $1.24" under a so'm input (and vice versa) so the stored value is visible. */
+  const equiv = (v) => {
+    const n = Number(v);
+    if (!usdRate || !Number.isFinite(n) || n <= 0) return null;
+    return curr === 'UZS'
+      ? `≈ ${usd(uzsToUsd(n))}`
+      : `≈ ${money(Math.round(n * usdRate))} so'm`;
+  };
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [threshold, setThreshold] = useState(product?.lowStockThreshold ?? 0);
@@ -141,11 +188,19 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
     }
     const buyN = Number(purchasePrice) || 0;
     const sellN = Number(salePrice) || 0;
-    if (sellN <= 0) {
+    // Validate what will actually be STORED, not just what was typed: a tiny
+    // so'm price (under ~half a US cent) rounds to $0.00 and would ring up free.
+    const buyUsd = curr === 'UZS' ? uzsToUsd(buyN) : buyN;
+    const sellUsd = curr === 'UZS' ? uzsToUsd(sellN) : sellN;
+    if (sellN <= 0 || sellUsd <= 0) {
       toast.error(t("Sotilish narxi 0 dan katta bo'lishi kerak"));
       return;
     }
-    if (buyN > 0 && sellN < buyN) {
+    if (buyN > 0 && buyUsd <= 0) {
+      toast.error(t("Kelish narxi juda kichik — USDga aylantirilganda $0 bo'lib qoladi"));
+      return;
+    }
+    if (buyUsd > 0 && sellUsd < buyUsd) {
       // Allow but warn — sometimes sold under cost (sale clearance).
       toast.info(t("Diqqat: sotilish narxi kelish narxidan past"));
     }
@@ -154,8 +209,8 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
       barcode: barcode.trim() || null,
       imei1: isPhone ? (imei1.trim() || null) : null,
       imei2: isPhone ? (imei2.trim() || null) : null,
-      purchasePrice: Number(purchasePrice) || 0,
-      salePrice: Number(salePrice) || 0,
+      purchasePrice: buyUsd,
+      salePrice: sellUsd,
       categoryId: categoryId ? Number(categoryId) : null,
       description: description.trim() || null,
       lowStockThreshold: Number(threshold) || 0,
@@ -247,16 +302,32 @@ function Editor({ isNew, product, categories, movements, reloadAll }) {
                 <input className="input" value={name}
                        onChange={(e) => setName(e.target.value)} />
               </div>
+              <div className="field">
+                <label>{t('Narx valyutasi')}</label>
+                <CurrencyToggle value={curr} onChange={switchCurrency} />
+                <div className="field-hint">
+                  {usdRate
+                    ? <>1 USD = {money(Math.round(usdRate))} so'm ({t('Markaziy bank')})
+                        {curr === 'UZS' && <> · {t("so'mda kiritilgan narx kurs bo'yicha USDga aylantirib saqlanadi")}</>}</>
+                    : t('Dollar kursi yuklanmadi — narxlar hozircha faqat USDda kiritiladi')}
+                </div>
+              </div>
               <div className="form-row">
                 <div className="field">
-                  <label>{t('Kelish narxi (USD) *')}</label>
+                  <label>{curr === 'UZS' ? t("Kelish narxi (so'm) *") : t('Kelish narxi (USD) *')}</label>
                   <input className="input" type="number" value={purchasePrice}
                          onChange={(e) => setPurchasePrice(e.target.value)} placeholder="0" />
+                  {equiv(purchasePrice) && (
+                    <div className="field-hint" style={{ fontWeight: 600 }}>{equiv(purchasePrice)}</div>
+                  )}
                 </div>
                 <div className="field">
-                  <label>{t('Sotilish narxi (USD) *')}</label>
+                  <label>{curr === 'UZS' ? t("Sotilish narxi (so'm) *") : t('Sotilish narxi (USD) *')}</label>
                   <input className="input" type="number" value={salePrice}
                          onChange={(e) => setSalePrice(e.target.value)} placeholder="0" />
+                  {equiv(salePrice) && (
+                    <div className="field-hint" style={{ fontWeight: 600 }}>{equiv(salePrice)}</div>
+                  )}
                 </div>
               </div>
               <div className="field">

@@ -4,6 +4,7 @@ import {
   BalanceApi, DashboardApi, ExchangeRateApi, ManagementApi, PaymentApi,
 } from '../api/endpoints.js';
 import { AnomalyBanner } from '../components/AnomalyBanner.jsx';
+import { AnomalyHistory } from '../components/AnomalyHistory.jsx';
 import { CashboxForecastCard } from '../components/CashboxForecastCard.jsx';
 import { OnboardingChecklist } from '../components/OnboardingChecklist.jsx';
 import { LiveSalesFeed } from '../components/LiveSalesFeed.jsx';
@@ -153,6 +154,8 @@ function Content({ data, rate, onEditBalance }) {
           </div>
         </div>
       </div>
+
+      <AnomalyHistory />
     </>
   );
 }

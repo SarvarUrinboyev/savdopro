@@ -1,11 +1,14 @@
 package uz.barakat.market.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,16 +43,19 @@ public class ProductService {
     private final CategoryService categoryService;
     private final ProductImporter importer;
     private final TelegramService telegram;
+    private final ApplicationEventPublisher events;
 
     public ProductService(ProductRepository products, CategoryRepository categories,
                           StockMovementRepository movements, CategoryService categoryService,
-                          ProductImporter importer, TelegramService telegram) {
+                          ProductImporter importer, TelegramService telegram,
+                          ApplicationEventPublisher events) {
         this.products = products;
         this.categories = categories;
         this.movements = movements;
         this.categoryService = categoryService;
         this.importer = importer;
         this.telegram = telegram;
+        this.events = events;
     }
 
     /** Filtered list: free-text search (name/SKU), category and stock status. */
@@ -159,6 +165,50 @@ public class ProductService {
         // already-low product would re-spam the owner.
         maybeAlertLowStock(product, before);
         return Mappers.product(product, categoryName(product.getCategoryId()));
+    }
+
+    /**
+     * Receives goods into stock with weighted-average costing. Bumps quantity,
+     * recomputes {@code product.purchasePrice} as the new WAC, and logs a
+     * DELIVERY movement valued at the RECEIPT cost — so the ledger books
+     * inventory + accounts-payable at what we actually owe the supplier, while
+     * future sale COGS uses the maintained weighted average. Returns the new WAC.
+     */
+    public BigDecimal receiveStock(Long productId, int qty, BigDecimal unitCostUsd, String note) {
+        if (qty <= 0) {
+            throw new BadRequestException("Qabul miqdori 0 dan katta bo'lishi kerak");
+        }
+        BigDecimal cost = unitCostUsd == null ? BigDecimal.ZERO : unitCostUsd;
+        if (cost.signum() < 0) {
+            throw new BadRequestException("Kelish narxi manfiy bo'la olmaydi");
+        }
+        Product product = find(productId);
+        int oldQty = Math.max(0, product.getQuantity());
+        BigDecimal oldCost = product.getPurchasePrice() == null
+                ? BigDecimal.ZERO : product.getPurchasePrice();
+        int newQty = product.getQuantity() + qty;
+        BigDecimal newCost = oldQty == 0
+                ? cost
+                : oldCost.multiply(BigDecimal.valueOf(oldQty))
+                        .add(cost.multiply(BigDecimal.valueOf(qty)))
+                        .divide(BigDecimal.valueOf(oldQty + qty), 2, RoundingMode.HALF_UP);
+        product.setQuantity(newQty);
+        product.setPurchasePrice(newCost);
+        products.save(product);
+
+        // DELIVERY movement valued at the RECEIPT cost (not the new WAC) so the
+        // ledger's inventory + A/P reflect the actual supplier liability.
+        StockMovement movement = new StockMovement();
+        movement.setProductId(product.getId());
+        movement.setDelta(qty);
+        movement.setResultingQuantity(newQty);
+        movement.setReason(StockReason.DELIVERY);
+        movement.setNote(note);
+        movement.setUnitSalePrice(product.getSalePrice());
+        movement.setUnitCostPrice(cost);
+        movements.save(movement);
+        events.publishEvent(new LedgerEvents.StockMovementRecorded(movement.getId()));
+        return newCost;
     }
 
     /**
@@ -331,6 +381,10 @@ public class ProductService {
         movement.setUnitSalePrice(product.getSalePrice());
         movement.setUnitCostPrice(product.getPurchasePrice());
         movements.save(movement);
+        // Post the inventory side to the ledger after this tx commits (best-effort).
+        // SALE / RETURN movements are created in PosService, not here, so this
+        // only ever fires for intake / correction / write-off.
+        events.publishEvent(new LedgerEvents.StockMovementRecorded(movement.getId()));
     }
 
     private Map<Long, String> categoryNames() {

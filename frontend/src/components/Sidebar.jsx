@@ -147,6 +147,14 @@ const ICON = {
       <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
     </svg>
   ),
+  '/accounting': (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"
+         strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      <path d="M9 7h7M9 11h5" />
+    </svg>
+  ),
 };
 
 /**
@@ -173,6 +181,7 @@ const ICON_COLOR = {
   '/debt':          '#ef4444',
   '/calculator':    '#64748b',
   '/reports':       '#f59e0b',
+  '/accounting':    '#7c3aed',
   '/help':          '#10b981',
 };
 const iconColor = (to) => ICON_COLOR[to] || 'currentColor';
@@ -272,6 +281,16 @@ export function Sidebar({ open }) {
           >
             <span className="ico" style={{ color: iconColor('/billing') }}>{ICON['/billing']}</span>
             <span>{t("Tarif va to'lov")}</span>
+          </NavLink>
+        )}
+        {/* Buxgalteriya (Bosh kitob) — owner/finance only; one entry, six tabs. */}
+        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
+          <NavLink
+            to="/accounting"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="ico" style={{ color: iconColor('/accounting') }}>{ICON['/accounting']}</span>
+            <span>{t('Buxgalteriya')}</span>
           </NavLink>
         )}
         {NAV_ITEMS.filter((item) => isOn(item.key)).map((item) => (

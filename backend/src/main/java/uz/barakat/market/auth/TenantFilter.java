@@ -1,5 +1,6 @@
 package uz.barakat.market.auth;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,9 +47,11 @@ public class TenantFilter extends OncePerRequestFilter {
     private static final Long EMPTY_TENANT_SENTINEL = -1L;
 
     private final ShopRepository shops;
+    private final MeterRegistry metrics;
 
-    public TenantFilter(ShopRepository shops) {
+    public TenantFilter(ShopRepository shops, MeterRegistry metrics) {
         this.shops = shops;
+        this.metrics = metrics;
     }
 
     @Override
@@ -77,6 +80,7 @@ public class TenantFilter extends OncePerRequestFilter {
                     // them see sibling shops in the same account. Reject hard.
                     log.warn("SHOP_USER attempted X-Shop-Id=ALL accountId={} path={} remote={} — denied",
                             accountId, path, remote);
+                    metrics.counter("security.tenant.violation", "reason", "consolidated_denied").increment();
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.getWriter().write(
@@ -121,6 +125,7 @@ public class TenantFilter extends OncePerRequestFilter {
                         // be able to scope queries to a shop it does not own.
                         log.warn("X-Shop-Id={} not owned by accountId={} path={} remote={} — denied",
                                 shopId, accountId, path, remote);
+                        metrics.counter("security.tenant.violation", "reason", "cross_tenant").increment();
                         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                         response.setContentType("application/json");
                         response.getWriter().write(

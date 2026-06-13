@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.domain.StockMovement;
@@ -48,6 +49,7 @@ class ProductServiceTest {
     @Mock private CategoryService categoryService;
     @Mock private ProductImporter importer;
     @Mock private TelegramService telegram;
+    @Mock private ApplicationEventPublisher events;
     @InjectMocks private ProductService service;
 
     /** A minimal valid create payload — uncategorised, with the given opening stock. */

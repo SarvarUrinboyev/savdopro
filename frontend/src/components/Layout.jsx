@@ -51,6 +51,7 @@ export function Layout() {
   const { theme, toggleTheme, lang, setLang, t } = useSettings();
   const { isConsolidated, shops } = useShop();
   const title = resolveTitle(pathname);
+  const isPosKiosk = pathname === '/pos';
   // Mobile off-canvas nav. Closes automatically whenever the route changes.
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => { setNavOpen(false); }, [pathname]);
@@ -60,20 +61,23 @@ export function Layout() {
   useKeyboard(useMemo(() => ({
     F2: () => navigate('/warehouse/new'),   // new product
     F3: () => navigate('/warehouse'),       // warehouse
-    F4: () => navigate('/customers'),       // customers
+    // On the Kassa screen F4 belongs to the register (To'lov) — don't
+    // yank the cashier away to the customers page mid-sale.
+    F4: () => { if (!pathname.startsWith('/pos')) navigate('/customers'); },
     F5: () => navigate('/payments'),        // payments
     F10: () => navigate('/reports'),        // reports
-  }), [navigate]));
+  }), [navigate, pathname]));
 
   return (
-    <div className="app-shell">
-      <QuickSearch />
-      <AiChatWidget />
-      <Sidebar open={navOpen} />
-      {navOpen && (
+    <div className={`app-shell ${isPosKiosk ? 'app-shell-pos-kiosk' : ''}`}>
+      {!isPosKiosk && <QuickSearch />}
+      {!isPosKiosk && <AiChatWidget />}
+      {!isPosKiosk && <Sidebar open={navOpen} />}
+      {!isPosKiosk && navOpen && (
         <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       )}
-      <div className="main">
+      <div className={`main ${isPosKiosk ? 'main-pos-kiosk' : ''}`}>
+        {!isPosKiosk && (
         <header className="topbar">
           <button
             type="button"
@@ -118,8 +122,9 @@ export function Layout() {
             <span className="date">📅 {formatDate(todayIso())}</span>
           </div>
         </header>
-        <SubscriptionBanner />
-        {isConsolidated && (
+        )}
+        {!isPosKiosk && <SubscriptionBanner />}
+        {!isPosKiosk && isConsolidated && (
           <div className="consolidated-banner">
             <span className="cb-ico">🌐</span>
             <span>
@@ -129,7 +134,7 @@ export function Layout() {
             </span>
           </div>
         )}
-        <main className="content">
+        <main className={`content ${isPosKiosk ? 'content-pos-kiosk' : ''}`}>
           <ErrorBoundary key={pathname}>
             <Suspense fallback={<div className="center-screen"><Spinner /></div>}>
               <Outlet />

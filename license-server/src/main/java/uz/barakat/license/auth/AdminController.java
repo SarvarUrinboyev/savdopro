@@ -118,6 +118,13 @@ public class AdminController {
         return service.setBlocked(id, request.blocked());
     }
 
+    /** Require (or stop requiring) 2FA for this account's users — soft nudge. */
+    @PatchMapping("/accounts/{id}/require-mfa")
+    public AdminAccountResponse setRequireMfa(@PathVariable Long id,
+                                              @RequestBody AdminDtos.RequireMfaRequest request) {
+        return service.setRequireMfa(id, request != null && request.requireMfa());
+    }
+
     /** Manually grant / extend a subscription (set the plan for N months, no
      *  charge) — comp an account or extend a trial from the admin panel. */
     @PostMapping("/accounts/{id}/grant")

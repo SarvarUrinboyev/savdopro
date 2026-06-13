@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import uz.barakat.market.auth.TenantContext;
 import uz.barakat.market.domain.Customer;
 import uz.barakat.market.domain.CustomerTransaction;
 import uz.barakat.market.domain.CustomerTxType;
@@ -307,6 +308,30 @@ public class OnlinePaymentService {
 
     public Optional<OnlinePayment> findClick(String clickTransId) {
         return payments.findByProviderAndProviderTxnId(CLICK, clickTransId);
+    }
+
+    // ========================================================= reconciliation
+
+    /**
+     * Repairs a paid-but-not-credited online payment: writes the missing
+     * ledger PAYMENT row so the customer's debt finally reflects the money
+     * received. Shop-guarded (online_payments is not tenant-filtered) and
+     * idempotent — a no-op unless the txn is PERFORMED with no ledger link.
+     * Returns true if a credit was written.
+     */
+    public boolean creditUnreconciled(Long onlinePaymentId) {
+        OnlinePayment op = payments.findById(onlinePaymentId)
+                .orElseThrow(() -> NotFoundException.of("Onlayn to'lov", onlinePaymentId));
+        Long shop = TenantContext.currentShopId();
+        if (shop != null && !shop.equals(op.getShopId())) {
+            throw NotFoundException.of("Onlayn to'lov", onlinePaymentId);
+        }
+        if (op.getState() != OnlinePayment.STATE_PERFORMED || op.getLedgerTxId() != null) {
+            return false;
+        }
+        creditDebt(op, op.getProvider());
+        payments.save(op);
+        return true;
     }
 
     // ============================================================ crediting

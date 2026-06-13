@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Currency;
@@ -42,15 +43,18 @@ public class ManagementService {
     private final StockMovementRepository movements;
     private final ProductRepository products;
     private final MoneyConverter converter;
+    private final ApplicationEventPublisher events;
 
     public ManagementService(ManagementCostRepository costs,
                              StockMovementRepository movements,
                              ProductRepository products,
-                             MoneyConverter converter) {
+                             MoneyConverter converter,
+                             ApplicationEventPublisher events) {
         this.costs = costs;
         this.movements = movements;
         this.products = products;
         this.converter = converter;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -138,7 +142,9 @@ public class ManagementService {
     public ManagementCostResponse createCost(ManagementCostRequest request) {
         ManagementCost cost = new ManagementCost();
         apply(cost, request);
-        return Mappers.managementCost(costs.save(cost));
+        ManagementCost saved = costs.save(cost);
+        events.publishEvent(new LedgerEvents.ManagementCostRecorded(saved.getId()));
+        return Mappers.managementCost(saved);
     }
 
     public ManagementCostResponse updateCost(Long id, ManagementCostRequest request) {

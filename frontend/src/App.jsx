@@ -43,6 +43,14 @@ const Transfers = lazyPage(() => import('./pages/Transfers.jsx'), 'Transfers');
 const Warehouse = lazyPage(() => import('./pages/Warehouse.jsx'), 'Warehouse');
 const Reports = lazyPage(() => import('./pages/Reports.jsx'), 'Reports');
 const Billing = lazyPage(() => import('./pages/Billing.jsx'), 'Billing');
+const ProfitLoss = lazyPage(() => import('./pages/ProfitLoss.jsx'), 'ProfitLoss');
+const BalanceSheet = lazyPage(() => import('./pages/BalanceSheet.jsx'), 'BalanceSheet');
+const CashFlow = lazyPage(() => import('./pages/CashFlow.jsx'), 'CashFlow');
+const JournalEntries = lazyPage(() => import('./pages/JournalEntries.jsx'), 'JournalEntries');
+const ChartOfAccounts = lazyPage(() => import('./pages/ChartOfAccounts.jsx'), 'ChartOfAccounts');
+const AccountingPeriods = lazyPage(() => import('./pages/AccountingPeriods.jsx'), 'AccountingPeriods');
+const Reconciliation = lazyPage(() => import('./pages/Reconciliation.jsx'), 'Reconciliation');
+const PurchaseOrders = lazyPage(() => import('./pages/PurchaseOrders.jsx'), 'PurchaseOrders');
 
 const OWNER_ROLES = ['ACCOUNT_OWNER', 'SUPER_ADMIN'];
 
@@ -115,6 +123,7 @@ function Authenticated() {
         <Route path="stocktake" element={g(<Stocktake />, { module: 'warehouse' })} />
         <Route path="warehouse/new" element={g(<ProductEditor />, { module: 'warehouse' })} />
         <Route path="warehouse/:id" element={g(<ProductEditor />, { module: 'warehouse' })} />
+        <Route path="purchase-orders" element={g(<PurchaseOrders />, { module: 'warehouse' })} />
         <Route path="customers" element={g(<Customers />, { module: 'customers' })} />
         <Route path="customers/:id" element={g(<CustomerDetail />, { module: 'customers' })} />
         <Route path="suppliers" element={g(<Suppliers />, { module: 'suppliers' })} />
@@ -132,6 +141,16 @@ function Authenticated() {
         <Route path="pos" element={g(<Pos />, { module: 'pos' })} />
         <Route path="pos/history" element={g(<PosHistory />, { module: 'pos-history' })} />
         <Route path="promos" element={g(<Promos />, { module: 'promos' })} />
+        {/* Accounting (Bosh kitob) — owner/finance only. One sidebar entry,
+            six tabbed sub-pages. */}
+        <Route path="accounting" element={<Navigate to="/accounting/profit-loss" replace />} />
+        <Route path="accounting/profit-loss" element={g(<ProfitLoss />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/balance-sheet" element={g(<BalanceSheet />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/cash-flow" element={g(<CashFlow />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/journal" element={g(<JournalEntries />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/accounts" element={g(<ChartOfAccounts />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/periods" element={g(<AccountingPeriods />, { roles: OWNER_ROLES })} />
+        <Route path="accounting/reconciliation" element={g(<Reconciliation />, { roles: OWNER_ROLES })} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

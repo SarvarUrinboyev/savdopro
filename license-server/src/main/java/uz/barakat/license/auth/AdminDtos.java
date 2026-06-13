@@ -83,6 +83,10 @@ public final class AdminDtos {
     public record BlockRequest(boolean blocked) {
     }
 
+    /** Body of {@code PATCH /api/admin/accounts/{id}/require-mfa}. */
+    public record RequireMfaRequest(boolean requireMfa) {
+    }
+
     /** Body of password reset / new user creation. */
     public record SetPasswordRequest(
             @NotBlank(message = "Parol kiritilishi shart")

@@ -1,10 +1,13 @@
-import { useRef, useState } from 'react';
-import { ProductApi } from '../api/endpoints.js';
+import { useEffect, useRef, useState } from 'react';
+import { ExchangeRateApi, ProductApi } from '../api/endpoints.js';
 import { normalizeBarcode } from '../lib/barcode.js';
 import { lookupCatalog } from '../lib/catalog.js';
 import { useT } from '../context/Settings.jsx';
 import { Modal } from './Modal.jsx';
 import { useToast } from './Toast.jsx';
+import { CurrencyToggle } from './ui.jsx';
+import { useStickyState } from '../hooks/useStickyState.js';
+import { money, usd } from '../lib/format.js';
 
 // Sentinel category value: "create the catalogue's suggested category on save".
 const NEW_CATEGORY = '__suggested__';
@@ -44,11 +47,54 @@ export function ScanModal({ categories, onClose, onChanged }) {
   const [name, setName] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
+  const [rate, setRate] = useState(null);
+  const [priceCurrency, setPriceCurrency] = useStickyState('barakat.cur.product', 'USD');
   const [quantity, setQuantity] = useState('1');
   const [categoryId, setCategoryId] = useState('');
   const [suggestedCategory, setSuggestedCategory] = useState('');
   const [mxikCode, setMxikCode] = useState('');
   const [fromCatalog, setFromCatalog] = useState(false);
+
+  const usdRate = rate?.available && Number(rate.rate) > 0 ? Number(rate.rate) : null;
+  const curr = usdRate ? priceCurrency : 'USD';
+  const uzsToUsd = (n) => Math.round((n / usdRate) * 100) / 100;
+
+  useEffect(() => {
+    let alive = true;
+    ExchangeRateApi.get()
+      .then((snapshot) => { if (alive) setRate(snapshot); })
+      .catch(() => { if (alive) setRate(null); });
+    return () => { alive = false; };
+  }, []);
+
+  const switchCurrency = (next) => {
+    if (next === curr) return;
+    if (!usdRate) {
+      toast.error(t("Dollar kursi yuklanmadi — narxni hozircha USDda kiriting"));
+      return;
+    }
+    const conv = (v) => {
+      const n = Number(v);
+      if (v === '' || v == null || !Number.isFinite(n)) return '';
+      return next === 'UZS' ? String(Math.round(n * usdRate)) : String(uzsToUsd(n));
+    };
+    setPurchasePrice(conv);
+    setSalePrice(conv);
+    setPriceCurrency(next);
+  };
+
+  const priceEquivalent = (v) => {
+    const n = Number(v);
+    if (!usdRate || !Number.isFinite(n) || n <= 0) return null;
+    return curr === 'UZS'
+      ? `≈ ${usd(uzsToUsd(n))}`
+      : `≈ ${money(Math.round(n * usdRate))} so'm`;
+  };
+
+  const priceToUsd = (v) => {
+    const n = Number(v) || 0;
+    return curr === 'UZS' && usdRate ? uzsToUsd(n) : n;
+  };
 
   const refocus = () => setTimeout(() => inputRef.current?.focus(), 30);
 
@@ -88,7 +134,7 @@ export function ScanModal({ categories, onClose, onChanged }) {
           const global = await lookupGlobal(canonical);
           setSearching(false);
           if (global.timedOut) {
-            toast.warn(t("Global baza javob bermadi — qo'lda kiriting"));
+            toast.warn(t("Global baza javob bermadi - qo'lda kiriting"));
             prefillNew(null);
           } else if (global.found) {
             prefillNewFromGlobal(global);
@@ -128,9 +174,8 @@ export function ScanModal({ categories, onClose, onChanged }) {
     setCategoryId(match ? String(match.id) : suggested ? NEW_CATEGORY : '');
   };
 
-  // Global-database fallback (Open Food Facts / UPC Item DB) via the backend,
-  // capped at 3s on the client so a slow API can never hang the scan — the
-  // backend has its own per-call timeout, but it tries two services in sequence.
+  // Global-database fallback via the backend, capped at 3s on the client so a
+  // slow external API can never hang the scan.
   // Resolves to { found, name?, suggestedCategory? } or { timedOut: true }.
   const lookupGlobal = async (canonical) => {
     const timeout = new Promise((resolve) =>
@@ -144,15 +189,14 @@ export function ScanModal({ categories, onClose, onChanged }) {
         ? { found: true, name: res.name, suggestedCategory: res.suggestedCategory }
         : { found: false };
     } catch {
-      // Backend / network error → behave like a miss and let the cashier type it.
+      // Backend / network error -> behave like a miss and let the cashier type it.
       return { found: false };
     }
   };
 
-  // Seed the new-product form from a GLOBAL database hit. Unlike the national
-  // catalogue these carry no MXIK code, and their (English) category is adopted
-  // ONLY when it matches an existing category — otherwise the dropdown stays
-  // blank, since an English label isn't offered as a new (Uzbek) category.
+  // Seed the new-product form from a global database hit. These carry no MXIK
+  // code, but the backend maps common global categories to local Uzbek buckets;
+  // new categories are offered for auto-creation on save.
   const prefillNewFromGlobal = (hit) => {
     setName(hit.name || '');
     setMxikCode('');
@@ -160,12 +204,12 @@ export function ScanModal({ categories, onClose, onChanged }) {
     setSalePrice('');
     setQuantity('1');
     setFromCatalog(true);
-    setSuggestedCategory('');
     const suggested = (hit.suggestedCategory || '').trim();
+    setSuggestedCategory(suggested);
     const match = suggested
       ? categories.find((c) => c.name.toLowerCase() === suggested.toLowerCase())
       : null;
-    setCategoryId(match ? String(match.id) : '');
+    setCategoryId(match ? String(match.id) : suggested ? NEW_CATEGORY : '');
   };
 
   const submitRestock = async () => {
@@ -211,8 +255,8 @@ export function ScanModal({ categories, onClose, onChanged }) {
       const created = await ProductApi.create({
         name: name.trim(),
         barcode,
-        purchasePrice: Number(purchasePrice) || 0,
-        salePrice: Number(salePrice) || 0,
+        purchasePrice: priceToUsd(purchasePrice),
+        salePrice: priceToUsd(salePrice),
         quantity: parseInt(quantity, 10) || 0,
         categoryId: realCategory ? Number(categoryId) : null,
         categoryName: useSuggested ? suggestedCategory : null,
@@ -276,7 +320,7 @@ export function ScanModal({ categories, onClose, onChanged }) {
           </div>
           {fromCatalog ? (
             <p className="amount-pos" style={{ marginBottom: 10, fontSize: 13 }}>
-              ✓ {t('Katalogdan topildi — ma\'lumotlar to\'ldirildi, sonini kiriting.')}
+              ✓ {t("Katalog/global bazadan topildi - nomi va toifasi to'ldirildi. Soni va kelish narxini kiriting.")}
             </p>
           ) : (
             <p className="muted" style={{ marginBottom: 10 }}>
@@ -288,16 +332,36 @@ export function ScanModal({ categories, onClose, onChanged }) {
             <input className="input" autoFocus={!fromCatalog} value={name}
                    onChange={(e) => setName(e.target.value)} />
           </div>
+          <div className="field">
+            <label>{t('Narx valyutasi')}</label>
+            <CurrencyToggle value={curr} onChange={switchCurrency} />
+            <div className="field-hint">
+              {usdRate
+                ? <>1 USD = {money(Math.round(usdRate))} so'm ({t('Markaziy bank')})
+                    {curr === 'UZS' && <> · {t("so'mda kiritilgan narx kurs bo'yicha USDga aylantirib saqlanadi")}</>}</>
+                : t('Dollar kursi yuklanmadi — narxlar hozircha faqat USDda kiritiladi')}
+            </div>
+          </div>
           <div className="form-row">
             <div className="field">
-              <label>{t('Kelish narxi (USD)')}</label>
+              <label>{curr === 'UZS' ? t("Kelish narxi (so'm)") : t('Kelish narxi (USD)')}</label>
               <input className="input" type="number" value={purchasePrice}
                      onChange={(e) => setPurchasePrice(e.target.value)} placeholder="0" />
+              {priceEquivalent(purchasePrice) && (
+                <div className="field-hint" style={{ fontWeight: 600 }}>
+                  {priceEquivalent(purchasePrice)}
+                </div>
+              )}
             </div>
             <div className="field">
-              <label>{t('Sotilish narxi (USD)')}</label>
+              <label>{curr === 'UZS' ? t("Sotilish narxi (so'm, ixtiyoriy)") : t('Sotilish narxi (USD, ixtiyoriy)')}</label>
               <input className="input" type="number" value={salePrice}
                      onChange={(e) => setSalePrice(e.target.value)} placeholder="0" />
+              {priceEquivalent(salePrice) && (
+                <div className="field-hint" style={{ fontWeight: 600 }}>
+                  {priceEquivalent(salePrice)}
+                </div>
+              )}
             </div>
           </div>
           <div className="form-row">
@@ -318,6 +382,11 @@ export function ScanModal({ categories, onClose, onChanged }) {
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
+              {suggestedIsNew && (
+                <div className="field-hint">
+                  {t('Topilgan toifa saqlashda avtomatik yaratiladi:')} {suggestedCategory}
+                </div>
+              )}
             </div>
           </div>
           {mxikCode && (
@@ -354,10 +423,10 @@ export function ScanModal({ categories, onClose, onChanged }) {
             disabled={busy}
           />
           {searching ? (
-            <div className="field-hint">{t('Katalogdan qidirilmoqda...')}</div>
+            <div className="field-hint">{t('Katalog/global bazadan qidirilmoqda...')}</div>
           ) : (
             <div className="field-hint">
-              {t("Skanerni mahsulot shtrix kodiga tuting — kod o'zi kiritiladi. Mavjud mahsulot: soni so'raladi. Yangi kod: ma'lumotlar katalogdan to'ldiriladi.")}
+              {t("Skanerni mahsulot shtrix kodiga tuting - kod o'zi kiritiladi. Mavjud mahsulot: soni so'raladi. Yangi kod: nomi va toifasi katalog/global bazadan to'ldiriladi.")}
             </div>
           )}
         </div>

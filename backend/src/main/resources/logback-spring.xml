@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging config. The DEFAULT (no extra profile) keeps Spring Boot's standard
+  human-readable console output unchanged. Activate the "json" profile
+  (SPRING_PROFILES_ACTIVE=prod,json) to emit structured JSON lines instead —
+  one object per event, ready for a log aggregator (Loki / ELK / Datadog).
+  Uses Logback's built-in JsonEncoder (1.5+), so no extra dependency.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Default: standard Spring Boot console layout. -->
+    <springProfile name="!json">
+        <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Opt-in: structured JSON for log aggregation. -->
+    <springProfile name="json">
+        <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="JSON"/>
+        </root>
+    </springProfile>
+
+    <logger name="uz.barakat" level="INFO"/>
+</configuration>

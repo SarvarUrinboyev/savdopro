@@ -152,6 +152,9 @@ public final class AuthDtos {
     /** One-time payload returned by the TOTP setup endpoint. */
     public record TotpSetupResponse(String secret, String otpauthUri) { }
 
+    /** One-time TOTP recovery codes, returned in plaintext exactly once. */
+    public record BackupCodesResponse(java.util.List<String> backupCodes) { }
+
     public record TotpVerifyRequest(
             @NotBlank(message = "Kod kiritilishi shart") String code) { }
 
@@ -248,7 +251,12 @@ public final class AuthDtos {
              * hide affordances the user can't action. SUPER_ADMIN comes
              * back as the single token {@code "*:*"}.
              */
-            java.util.Set<String> permissions) {
+            java.util.Set<String> permissions,
+            /**
+             * V13: true when the account requires 2FA but this user hasn't
+             * enabled it yet. A soft nudge for the UI — login still succeeds.
+             */
+            boolean mfaSetupRequired) {
     }
 
     /**

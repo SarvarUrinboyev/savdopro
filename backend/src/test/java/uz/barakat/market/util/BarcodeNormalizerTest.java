@@ -50,6 +50,20 @@ class BarcodeNormalizerTest {
     }
 
     @Test
+    void extractsGtinFromParenthesizedGs1Qr() {
+        assertEquals("8907588001769",
+                BarcodeNormalizer.normalize("(01)08907588001769(21)ABC123"));
+    }
+
+    @Test
+    void extractsGtinFromQrUrlParam() {
+        assertEquals("8907588001769",
+                BarcodeNormalizer.normalize("https://example.test/p?gtin=08907588001769&x=1"));
+        assertEquals("8907588001769",
+                BarcodeNormalizer.normalize("https://example.test/p?barcode=8907588001769"));
+    }
+
+    @Test
     void blankAndNullBecomeEmpty() {
         assertEquals("", BarcodeNormalizer.normalize(null));
         assertEquals("", BarcodeNormalizer.normalize("   "));

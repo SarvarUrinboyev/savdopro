@@ -1,7 +1,13 @@
 package uz.barakat.license.auth;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -273,7 +279,10 @@ public class AuthService {
                 // the 2FA code field rather than retry with the password.
                 throw new BadRequestException("2FA kodi kerak");
             }
-            if (!totp.verify(user.getTotpSecret(), code)) {
+            // Accept the authenticator code OR a one-time backup code. The
+            // backup code is consumed in-memory here and persisted by the
+            // users.save below — so a single code can never be reused.
+            if (!totp.verify(user.getTotpSecret(), code) && !consumeBackupCode(user, code)) {
                 throw new BadRequestException("2FA kodi noto'g'ri");
             }
         }
@@ -309,8 +318,12 @@ public class AuthService {
                 totp.otpauthUri(user.getUsername(), secret, "SavdoPRO"));
     }
 
-    /** Verify the first code from the authenticator and enable 2FA. */
-    public void confirmTotp(Long userId, String code) {
+    /**
+     * Verify the first code from the authenticator, enable 2FA, and issue a
+     * fresh set of one-time backup codes. The plaintext codes are returned
+     * ONCE (only their hashes are stored) for the user to save somewhere safe.
+     */
+    public List<String> confirmTotp(Long userId, String code) {
         AppUser user = users.findById(userId)
                 .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
         if (user.getTotpSecret() == null) {
@@ -320,7 +333,91 @@ public class AuthService {
             throw new BadRequestException("Kod noto'g'ri — qaytadan urinib ko'ring");
         }
         user.setTotpEnabled(true);
+        List<String> codes = generateBackupCodes();
+        user.setTotpBackupCodes(hashJoin(codes));
         users.save(user);
+        return codes;
+    }
+
+    /** Re-issues backup codes (invalidates the old set). 2FA must be enabled. */
+    public List<String> regenerateBackupCodes(Long userId) {
+        AppUser user = users.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Sessiya yaroqsiz"));
+        if (!user.isTotpEnabled()) {
+            throw new BadRequestException("Avval 2FA ni yoqing");
+        }
+        List<String> codes = generateBackupCodes();
+        user.setTotpBackupCodes(hashJoin(codes));
+        users.save(user);
+        return codes;
+    }
+
+    // -------------------------------------------------------- backup codes
+
+    private static final SecureRandom RNG = new SecureRandom();
+    private static final int BACKUP_CODE_COUNT = 8;
+    // Unambiguous alphabet (no 0/O/1/I) so hand-typed codes don't trip on look-alikes.
+    private static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    private static List<String> generateBackupCodes() {
+        List<String> codes = new ArrayList<>();
+        for (int i = 0; i < BACKUP_CODE_COUNT; i++) {
+            StringBuilder sb = new StringBuilder();
+            for (int c = 0; c < 10; c++) {
+                if (c == 5) {
+                    sb.append('-');
+                }
+                sb.append(CODE_ALPHABET.charAt(RNG.nextInt(CODE_ALPHABET.length())));
+            }
+            codes.add(sb.toString());
+        }
+        return codes;
+    }
+
+    /** Consumes one matching backup code (mutates the user in place). */
+    private boolean consumeBackupCode(AppUser user, String input) {
+        String stored = user.getTotpBackupCodes();
+        if (stored == null || stored.isBlank()) {
+            return false;
+        }
+        String target = sha256(normalizeCode(input));
+        List<String> remaining = new ArrayList<>();
+        boolean matched = false;
+        for (String h : stored.split("\n")) {
+            if (h.isBlank()) {
+                continue;
+            }
+            if (!matched && h.equals(target)) {
+                matched = true;   // consume exactly one
+            } else {
+                remaining.add(h);
+            }
+        }
+        if (matched) {
+            user.setTotpBackupCodes(String.join("\n", remaining));
+        }
+        return matched;
+    }
+
+    private static String hashJoin(List<String> codes) {
+        List<String> hashes = new ArrayList<>();
+        for (String c : codes) {
+            hashes.add(sha256(normalizeCode(c)));
+        }
+        return String.join("\n", hashes);
+    }
+
+    private static String normalizeCode(String c) {
+        return c == null ? "" : c.trim().toUpperCase().replace("-", "");
+    }
+
+    private static String sha256(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     /** Turn 2FA off (clears the secret too so re-enabling creates a fresh one). */
@@ -703,12 +800,13 @@ public class AuthService {
         String modules = user.getRole() == uz.barakat.license.domain.UserRole.SUPER_ADMIN
                 ? null
                 : account.getEnabledModules();
+        boolean mfaSetupRequired = account.isRequireMfa() && !user.isTotpEnabled();
         return new MeResponse(
                 user.getId(), user.getUsername(), user.getFullName(), user.getRole().name(),
                 account.getId(), account.getName(),
                 account.getSubscriptionExpires(), days, account.isBlocked(),
                 brandFor(account), modules,
-                permissions.effective(user));
+                permissions.effective(user), mfaSetupRequired);
     }
 
     /**

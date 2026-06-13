@@ -74,6 +74,10 @@ public class SecurityConfig {
                         // unpermitted callers get a 403.
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").access(perm("PRODUCTS", "READ"))
                         .requestMatchers("/api/products/**", "/api/categories/**").access(perm("PRODUCTS", "WRITE"))
+                        // Procurement (purchase orders, receiving, cost history/valuation)
+                        // is a warehouse concern — gate on the PRODUCTS permission.
+                        .requestMatchers(HttpMethod.GET, "/api/purchase-orders/**", "/api/costing/**").access(perm("PRODUCTS", "READ"))
+                        .requestMatchers("/api/purchase-orders/**").access(perm("PRODUCTS", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/orders/**").access(perm("ORDERS", "READ"))
                         .requestMatchers("/api/orders/**").access(perm("ORDERS", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/debts/**", "/api/debtors/**", "/api/customer-debts/**").access(perm("DEBTS", "READ"))
@@ -90,6 +94,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/expenses/**", "/api/home-expenses/**").access(perm("EXPENSES", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/management/**").access(perm("MANAGEMENT", "READ"))
                         .requestMatchers("/api/management/**").access(perm("MANAGEMENT", "WRITE"))
+                        // Accounting (Bosh kitob) is part of finance — reuses the
+                        // MANAGEMENT permission so shop owners / finance staff get
+                        // it and cashiers (no MANAGEMENT) are 403'd.
+                        .requestMatchers(HttpMethod.GET, "/api/accounting/**").access(perm("MANAGEMENT", "READ"))
+                        .requestMatchers("/api/accounting/**").access(perm("MANAGEMENT", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/transfers/**").access(perm("TRANSFERS", "READ"))
                         .requestMatchers("/api/transfers/**").access(perm("TRANSFERS", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/promos/**").access(perm("PROMOS", "READ"))
@@ -103,6 +112,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/shifts/history").access(perm("SHIFTS", "ADMIN"))
                         .requestMatchers(HttpMethod.GET, "/api/shifts/**", "/api/balance/**", "/api/terminal/**").access(perm("SHIFTS", "READ"))
                         .requestMatchers("/api/shifts/**", "/api/balance/**", "/api/terminal/**").access(perm("SHIFTS", "WRITE"))
+                        // Local data-mutation audit trail — read-only, owner/finance.
+                        .requestMatchers("/api/audit/**").access(perm("AUDIT", "READ"))
+                        // Acknowledging an anomaly is an owner mutation — must precede the
+                        // read-only /api/ai rule below (first match wins), else REPORTS:READ
+                        // alone (e.g. a cashier) could clear an alert.
+                        .requestMatchers(HttpMethod.POST, "/api/ai/anomalies/*/acknowledge").access(perm("REPORTS", "WRITE"))
                         // AI insights are read-only (the POST /ask is a query, not a mutation).
                         .requestMatchers("/api/ai/**").access(perm("REPORTS", "READ"))
                         .requestMatchers(HttpMethod.GET, "/api/report/**", "/api/dashboard/**", "/api/exchange-rate/**").access(perm("REPORTS", "READ"))

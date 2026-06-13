@@ -129,8 +129,8 @@ export function Warehouse() {
               [t('Shtrix-kod')]: p.barcode || '',
               [t('Toifa')]: p.categoryName || '',
               [t('Qoldiq')]: p.quantity,
-              [t('Kelish narxi (USD)')]: p.purchasePriceUsd ?? '',
-              [t('Sotilish narxi (USD)')]: p.sellingPriceUsd ?? '',
+              [t('Kelish narxi (USD)')]: p.purchasePrice ?? '',
+              [t('Sotilish narxi (USD)')]: p.salePrice ?? '',
               [t('Past stok pol')]: p.lowStockThreshold ?? '',
               [t('Holat')]: t(STATUS_LABEL[p.stockStatus] || p.stockStatus),
             }))}
@@ -145,6 +145,9 @@ export function Warehouse() {
           )}
           <button className="btn btn-ghost" onClick={() => navigate('/stocktake')}>
             📋 {t('Inventarizatsiya')}
+          </button>
+          <button className="btn btn-ghost" onClick={() => navigate('/purchase-orders')}>
+            📦 {t('Yetkazib beruvchi buyurtmalari')}
           </button>
           <button className="btn btn-primary" onClick={() => navigate('/warehouse/new')}>
             + {t('Yangi mahsulot')}

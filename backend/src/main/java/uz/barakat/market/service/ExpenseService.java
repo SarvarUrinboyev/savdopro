@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Currency;
@@ -29,13 +30,16 @@ public class ExpenseService {
     private final DebtorRepository debtors;
     private final BulkImportParser parser;
     private final MoneyConverter converter;
+    private final ApplicationEventPublisher events;
 
     public ExpenseService(ExpenseRepository expenses, DebtorRepository debtors,
-                          BulkImportParser parser, MoneyConverter converter) {
+                          BulkImportParser parser, MoneyConverter converter,
+                          ApplicationEventPublisher events) {
         this.expenses = expenses;
         this.debtors = debtors;
         this.parser = parser;
         this.converter = converter;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -61,6 +65,7 @@ public class ExpenseService {
         if (expense.getPaymentType() == PaymentType.QARZGA) {
             createLinkedDebt(expense);
         }
+        events.publishEvent(new LedgerEvents.ExpenseRecorded(expense.getId()));
         return Mappers.expense(expense);
     }
 
@@ -103,6 +108,7 @@ public class ExpenseService {
             if (expense.getPaymentType() == PaymentType.QARZGA) {
                 createLinkedDebt(expense);
             }
+            events.publishEvent(new LedgerEvents.ExpenseRecorded(expense.getId()));
             saved++;
         }
         return new BulkImportResult(parsed.date(), saved, parsed.lines().size() - saved, errors);

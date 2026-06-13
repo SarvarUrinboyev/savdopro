@@ -42,6 +42,13 @@ public class Account extends BaseEntity {
     @Column(nullable = false)
     private boolean blocked = false;
 
+    /**
+     * When true, the account's users are nudged to enable 2FA (surfaced as
+     * {@code mfaSetupRequired} in /me). Soft — never hard-blocks login (V13).
+     */
+    @Column(name = "require_mfa", nullable = false)
+    private boolean requireMfa = false;
+
     /** Subscription tier — sets the per-account limits (users / shops). */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

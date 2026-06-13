@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -73,13 +74,15 @@ public class PosService {
     private final LoyaltyService loyalty;
     private final CustomerNotificationService notifications;
     private final AnomalyAlertService anomalyAlerts;
+    private final ApplicationEventPublisher events;
 
     public PosService(SaleRepository sales, ProductRepository products,
                       PaymentRepository payments, StockMovementRepository movements,
                       CustomerRepository customers, RealtimeBus realtime,
                       PromoService promos, LoyaltyService loyalty,
                       CustomerNotificationService notifications,
-                      AnomalyAlertService anomalyAlerts) {
+                      AnomalyAlertService anomalyAlerts,
+                      ApplicationEventPublisher events) {
         this.sales = sales;
         this.products = products;
         this.payments = payments;
@@ -90,6 +93,7 @@ public class PosService {
         this.loyalty = loyalty;
         this.notifications = notifications;
         this.anomalyAlerts = anomalyAlerts;
+        this.events = events;
     }
 
     // =============================================================== checkout
@@ -260,6 +264,9 @@ public class PosService {
         // Broadcast the sale itself — POS history / monitor pages live-update.
         realtime.publishSale(saved.getId(), saved.getTotalUzs(),
                 saved.getPaymentMethod(), saved.getShopId());
+        // Post to the double-entry ledger AFTER this tx commits (best-effort;
+        // a ledger failure never affects the sale — see LedgerPostingListener).
+        events.publishEvent(new LedgerEvents.SalePosted(saved.getId()));
         return toResponse(saved);
     }
 
@@ -360,6 +367,7 @@ public class PosService {
         }
 
         BigDecimal refundedAmount = BigDecimal.ZERO;
+        List<LedgerEvents.RefundLine> returnedLines = new ArrayList<>();
         for (RefundItemRequest r : requested) {
             SaleItem si = findItem(sale, r.saleItemId());
             int remaining = si.getQuantity() - si.getRefundedQty();
@@ -369,6 +377,7 @@ public class PosService {
                         + si.getProductName() + " (qoldiq " + remaining + ")");
             }
             si.setRefundedQty(si.getRefundedQty() + r.quantity());
+            returnedLines.add(new LedgerEvents.RefundLine(si.getProductId(), r.quantity()));
 
             // Restore stock.
             if (si.getProductId() != null) {
@@ -433,7 +442,16 @@ public class PosService {
             payments.save(refundPay);
         }
 
-        return toResponse(sales.save(sale));
+        Sale persisted = sales.save(sale);
+        // Post the refund to the ledger after commit (best-effort). Unique ref
+        // per refund event so partial refunds each get their own storno.
+        if (refundedAmount.signum() > 0) {
+            String ref = "SR:" + persisted.getId() + ":" + System.currentTimeMillis();
+            events.publishEvent(new LedgerEvents.SaleRefunded(
+                    persisted.getShopId(), persisted.getId(), LocalDate.now(),
+                    persisted.getPaymentMethod(), refundedAmount, returnedLines, ref));
+        }
+        return toResponse(persisted);
     }
 
     // ============================================================== queries

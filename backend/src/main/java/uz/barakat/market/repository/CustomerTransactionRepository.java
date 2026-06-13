@@ -48,4 +48,24 @@ public interface CustomerTransactionRepository
 
         long getTxCount();
     }
+
+    /**
+     * The most recent ledger date per customer for one transaction type —
+     * e.g. the last PAYMENT date, used by the AI CFO to rank debtors by how
+     * long they've been overdue. Tenant-scoped via the same Hibernate filter.
+     */
+    @Query("""
+            SELECT t.customerId AS customerId, MAX(t.date) AS lastDate
+            FROM CustomerTransaction t
+            WHERE t.type = :type
+            GROUP BY t.customerId
+            """)
+    List<CustomerLastDate> lastDateByType(@Param("type") CustomerTxType type);
+
+    /** Projection for {@link #lastDateByType}. */
+    interface CustomerLastDate {
+        Long getCustomerId();
+
+        LocalDate getLastDate();
+    }
 }

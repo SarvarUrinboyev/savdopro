@@ -167,6 +167,17 @@ public class AdminService {
         return toAccountResponse(saved);
     }
 
+    /** Toggle whether the account's users are required to set up 2FA (soft nudge). */
+    public AdminAccountResponse setRequireMfa(Long id, boolean requireMfa) {
+        Account a = accounts.findById(id)
+                .orElseThrow(() -> NotFoundException.of("Akkaunt", id));
+        a.setRequireMfa(requireMfa);
+        Account saved = accounts.save(a);
+        audit.record(requireMfa ? "ACCOUNT_REQUIRE_MFA_ON" : "ACCOUNT_REQUIRE_MFA_OFF",
+                "ACCOUNT", id, saved.getName(), null);
+        return toAccountResponse(saved);
+    }
+
     public void deleteAccount(Long id) {
         if (id == 1L) {
             throw new BadRequestException("Super-admin akkauntini o'chirish mumkin emas");

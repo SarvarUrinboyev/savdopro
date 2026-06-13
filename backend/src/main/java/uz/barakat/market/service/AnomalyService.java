@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Sale;
 import uz.barakat.market.domain.SaleItem;
+import uz.barakat.market.dto.AnomalyResponse;
 import uz.barakat.market.repository.SaleRepository;
 
 /**
@@ -37,9 +38,11 @@ import uz.barakat.market.repository.SaleRepository;
 public class AnomalyService {
 
     private final SaleRepository sales;
+    private final AnomalyMonitorService monitor;
 
-    public AnomalyService(SaleRepository sales) {
+    public AnomalyService(SaleRepository sales, AnomalyMonitorService monitor) {
         this.sales = sales;
+        this.monitor = monitor;
     }
 
     public record Anomaly(
@@ -123,6 +126,22 @@ public class AnomalyService {
             }
         }
 
-        return out;
+        // --- Merge persisted, unacknowledged alerts from the deterministic
+        // engine (till-negative, below-cost-daily, refund-*, night-spike,
+        // cashier-anomaly). These are the source of truth, so acknowledging one
+        // removes it from the banner. Drop the transient high-refund-rate when a
+        // persisted refund-rate twin already covers today, to avoid double rows.
+        List<AnomalyResponse> persisted = monitor.activeBanner();
+        boolean persistedRefundRateToday = persisted.stream()
+                .anyMatch(a -> "refund-rate".equals(a.code()) && today.equals(a.occurredOn()));
+        if (persistedRefundRateToday) {
+            out.removeIf(a -> "high-refund-rate".equals(a.code()));
+        }
+        List<Anomaly> merged = new ArrayList<>();
+        for (AnomalyResponse a : persisted) {
+            merged.add(new Anomaly(a.severity(), a.code(), a.message(), a.at()));
+        }
+        merged.addAll(out);
+        return merged;
     }
 }

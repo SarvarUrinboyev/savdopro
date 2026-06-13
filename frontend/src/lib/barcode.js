@@ -14,6 +14,17 @@ export function normalizeBarcode(raw) {
   // Strip a leading AIM symbology identifier (e.g. "]d2", "]C1", "]Q3").
   if (s.length > 3 && s[0] === ']') s = s.slice(3);
   if (!s) return '';
+
+  const urlGtin = s.match(/(?:^|[?&#;])(?:gtin|barcode|ean|upc|code)=([0-9]{8,14})(?:\b|&|$)/i);
+  if (urlGtin) {
+    s = urlGtin[1];
+  } else {
+    const parenGs1 = s.match(/\(01\)(\d{14})/);
+    if (parenGs1) {
+      s = `01${parenGs1[1]}${s.slice(parenGs1.index + parenGs1[0].length)}`;
+    }
+  }
+
   let core = s;
   if (s.length >= 16 && s.startsWith('01') && /^\d{14}$/.test(s.slice(2, 16))) {
     core = s.slice(2, 16);

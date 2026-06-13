@@ -1,5 +1,8 @@
 package uz.barakat.market.util;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Canonicalises a scanned code so every physical unit of the same product
  * maps to one stable string.
@@ -17,6 +20,10 @@ package uz.barakat.market.util;
  * that aren't GS1/numeric are returned trimmed and unchanged.
  */
 public final class BarcodeNormalizer {
+
+    private static final Pattern PAREN_GS1_GTIN = Pattern.compile("\\(01\\)(\\d{14})");
+    private static final Pattern URL_GTIN_PARAM =
+            Pattern.compile("(?i)(?:^|[?&#;])(?:gtin|barcode|ean|upc|code)=([0-9]{8,14})(?:\\b|&|$)");
 
     private BarcodeNormalizer() {
     }
@@ -36,6 +43,17 @@ public final class BarcodeNormalizer {
         if (s.isEmpty()) {
             return "";
         }
+
+        Matcher urlGtin = URL_GTIN_PARAM.matcher(s);
+        if (urlGtin.find()) {
+            s = urlGtin.group(1);
+        } else {
+            Matcher parenGs1 = PAREN_GS1_GTIN.matcher(s);
+            if (parenGs1.find()) {
+                s = "01" + parenGs1.group(1) + s.substring(parenGs1.end());
+            }
+        }
+
         String core = s;
         // GS1 element string that opens with AI (01) + a 14-digit GTIN.
         if (s.length() >= 16 && s.startsWith("01") && isDigits(s.substring(2, 16))) {

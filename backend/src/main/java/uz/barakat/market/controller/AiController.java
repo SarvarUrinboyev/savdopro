@@ -1,15 +1,22 @@
 package uz.barakat.market.controller;
 
 import jakarta.validation.Valid;
+import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import uz.barakat.market.dto.AnomalyResponse;
 import uz.barakat.market.service.AiChatService;
 import uz.barakat.market.service.AiChatService.ChatRequest;
 import uz.barakat.market.service.AiChatService.ChatResponse;
+import uz.barakat.market.service.AnomalyMonitorService;
 import uz.barakat.market.service.AnomalyService;
 import uz.barakat.market.service.AnomalyService.Anomaly;
 import uz.barakat.market.service.ForecastService;
@@ -33,13 +40,16 @@ public class AiController {
     private final ForecastService forecast;
     private final PredictionService prediction;
     private final AnomalyService anomaly;
+    private final AnomalyMonitorService anomalyMonitor;
 
     public AiController(AiChatService chat, ForecastService forecast,
-                        PredictionService prediction, AnomalyService anomaly) {
+                        PredictionService prediction, AnomalyService anomaly,
+                        AnomalyMonitorService anomalyMonitor) {
         this.chat = chat;
         this.forecast = forecast;
         this.prediction = prediction;
         this.anomaly = anomaly;
+        this.anomalyMonitor = anomalyMonitor;
     }
 
     /** POST a natural-language question, get a plain-language answer. */
@@ -72,9 +82,29 @@ public class AiController {
         return prediction.forecastNext7Days();
     }
 
-    /** Statistical anomalies (high refunds, late-night sales, product spikes). */
+    /** Live banner feed: transient rules + persisted unacknowledged alerts. */
     @GetMapping("/anomalies")
     public List<Anomaly> anomalies() {
         return anomaly.check();
+    }
+
+    /** Persisted anomaly history (default: last 30 days), newest first. */
+    @GetMapping("/anomalies/history")
+    public List<AnomalyResponse> anomalyHistory(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "100") int limit) {
+        LocalDate today = LocalDate.now();
+        LocalDate start = from != null ? from : today.minusDays(30);
+        LocalDate end = to != null ? to : today;
+        return anomalyMonitor.history(start, end, limit);
+    }
+
+    /** Acknowledge an anomaly (owner action — gated to REPORTS:WRITE). */
+    @PostMapping("/anomalies/{id}/acknowledge")
+    public AnomalyResponse acknowledgeAnomaly(@PathVariable Long id, Principal principal) {
+        return anomalyMonitor.acknowledge(id, principal == null ? null : principal.getName());
     }
 }

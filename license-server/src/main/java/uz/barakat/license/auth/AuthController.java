@@ -63,7 +63,8 @@ public class AuthController {
             GoogleOAuthVerifier googleVerifier,
             TelegramOAuthVerifier telegramVerifier,
             FacebookOAuthVerifier fbVerifier,
-            XOAuthVerifier xVerifier) {
+            XOAuthVerifier xVerifier,
+            AuditService audit) {
         this.service = service;
         this.rateLimiter = rateLimiter;
         this.signupTemplate = signupTemplate;
@@ -73,7 +74,10 @@ public class AuthController {
         this.telegramVerifier = telegramVerifier;
         this.fbVerifier = fbVerifier;
         this.xVerifier = xVerifier;
+        this.audit = audit;
     }
+
+    private final AuditService audit;
 
     /** What the signup screen renders: enforced verification + enabled logins. */
     @GetMapping("/signup/config")
@@ -115,9 +119,17 @@ public class AuthController {
         try {
             LoginResponse response = service.login(request, ip);
             rateLimiter.recordSuccess(ip);
+            audit.record("LOGIN_SUCCESS", "USER", response.user().userId(),
+                    request.username(), null);
             return response;
         } catch (RuntimeException ex) {
             rateLimiter.recordFailure(ip);
+            // "2FA kodi kerak" is the intermediate prompt for the code field,
+            // not a failed attempt — don't audit it as one.
+            if (!"2FA kodi kerak".equals(ex.getMessage())) {
+                audit.record("LOGIN_FAILED", "USER", null,
+                        request == null ? null : request.username(), ex.getMessage());
+            }
             throw ex;
         }
     }
@@ -265,17 +277,31 @@ public class AuthController {
         return service.setupTotp(requireUserId(request));
     }
 
-    /** Confirm the first authenticator code and flip 2FA on. */
+    /** Confirm the first authenticator code, flip 2FA on, return backup codes. */
     @PostMapping("/totp/confirm")
-    public void totpConfirm(HttpServletRequest request,
+    public AuthDtos.BackupCodesResponse totpConfirm(HttpServletRequest request,
                             @Valid @RequestBody TotpVerifyRequest body) {
-        service.confirmTotp(requireUserId(request), body.code());
+        Long uid = requireUserId(request);
+        var codes = service.confirmTotp(uid, body.code());
+        audit.record("TOTP_ENABLED", "USER", uid, null, null);
+        return new AuthDtos.BackupCodesResponse(codes);
+    }
+
+    /** Re-issue backup codes for the current user (invalidates the old set). */
+    @PostMapping("/totp/backup-codes")
+    public AuthDtos.BackupCodesResponse regenerateBackupCodes(HttpServletRequest request) {
+        Long uid = requireUserId(request);
+        var codes = service.regenerateBackupCodes(uid);
+        audit.record("MFA_BACKUP_REGENERATED", "USER", uid, null, null);
+        return new AuthDtos.BackupCodesResponse(codes);
     }
 
     /** Turn 2FA off and wipe the secret. */
     @PostMapping("/totp/disable")
     public void totpDisable(HttpServletRequest request) {
-        service.disableTotp(requireUserId(request));
+        Long uid = requireUserId(request);
+        service.disableTotp(uid);
+        audit.record("TOTP_DISABLED", "USER", uid, null, null);
     }
 
     // ============================================================ Telegram OAuth

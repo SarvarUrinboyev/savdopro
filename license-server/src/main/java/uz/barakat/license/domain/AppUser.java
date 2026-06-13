@@ -79,4 +79,12 @@ public class AppUser extends BaseEntity {
      */
     @Column(name = "permissions", length = 500)
     private String permissions;
+
+    /**
+     * Newline-joined SHA-256 hashes of one-time TOTP recovery codes (V13).
+     * Generated when 2FA is enabled and shown to the user in plaintext once;
+     * a code is removed from this set when used at login. Null = none issued.
+     */
+    @Column(name = "totp_backup_codes", length = 1000)
+    private String totpBackupCodes;
 }

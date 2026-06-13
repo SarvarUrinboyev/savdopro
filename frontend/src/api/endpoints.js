@@ -166,6 +166,8 @@ export const AiApi = {
   slowMovers: () => api.get('/ai/slow-movers'),
   cashboxForecast: () => api.get('/ai/cashbox-forecast'),
   anomalies: () => api.get('/ai/anomalies'),
+  anomalyHistory: (params) => api.get('/ai/anomalies/history' + qs(params)),
+  acknowledgeAnomaly: (id) => api.post(`/ai/anomalies/${id}/acknowledge`, {}),
 };
 
 export const PromoApi = {
@@ -199,9 +201,9 @@ export const ProductApi = {
   stocktake: (body) => api.post('/products/stocktake', body),
   lowStock: () => api.get('/products/low-stock'),
   scan: (body) => api.post('/products/scan', body),
-  // Global barcode lookup (Open Food Facts / UPC Item DB) — a read-only
-  // suggestion for an unknown code. The scan modal calls it only as a fallback,
-  // when the national catalogue has nothing. Returns
+  // Global barcode lookup: a read-only suggestion for an unknown code. The scan
+  // modal calls it only as a fallback when the national catalogue has nothing.
+  // Returns
   // { found, name, suggestedCategory, source }.
   barcodeLookup: (code) => api.get('/products/barcode-lookup' + qs({ code })),
   importFile: (file) => uploadFile('/products/import', file),
@@ -266,6 +268,56 @@ export const ManagementApi = {
   createCost: (body) => api.post('/management/costs', body),
   updateCost: (id, body) => api.put(`/management/costs/${id}`, body),
   removeCost: (id) => api.del(`/management/costs/${id}`),
+};
+
+// Double-entry accounting core (Bosh kitob). Owner / finance only — gated to
+// the MANAGEMENT permission on the backend.
+export const AccountingApi = {
+  // Chart of accounts
+  accounts: () => api.get('/accounting/accounts'),
+  createAccount: (body) => api.post('/accounting/accounts', body),
+  updateAccount: (id, body) => api.put(`/accounting/accounts/${id}`, body),
+  removeAccount: (id) => api.del(`/accounting/accounts/${id}`),
+  // Journal
+  journal: (params) => api.get('/accounting/journal' + qs(params)),
+  journalEntry: (id) => api.get(`/accounting/journal/${id}`),
+  createJournal: (body) => api.post('/accounting/journal', body),
+  reverseJournal: (id) => api.post(`/accounting/journal/${id}/reverse`, {}),
+  removeJournal: (id) => api.del(`/accounting/journal/${id}`),
+  // Statements
+  trialBalance: (params) => api.get('/accounting/reports/trial-balance' + qs(params)),
+  profitLoss: (params) => api.get('/accounting/reports/profit-loss' + qs(params)),
+  balanceSheet: (params) => api.get('/accounting/reports/balance-sheet' + qs(params)),
+  cashFlow: (params) => api.get('/accounting/reports/cash-flow' + qs(params)),
+  // Periods + backfill
+  periods: () => api.get('/accounting/periods'),
+  closePeriod: (body) => api.post('/accounting/periods/close', body),
+  reopenPeriod: (id) => api.post(`/accounting/periods/${id}/reopen`, {}),
+  removePeriod: (id) => api.del(`/accounting/periods/${id}`),
+  backfill: () => api.post('/accounting/backfill', {}),
+};
+
+// Bank/payments reconciliation (Click/Payme ↔ debt, terminal ↔ card sales).
+export const ReconciliationApi = {
+  get: (params) => api.get('/accounting/reconciliation' + qs(params)),
+  creditOnline: (id) => api.post(`/accounting/reconciliation/online/${id}/credit`, {}),
+};
+
+// Supplier purchase orders + receiving + costing (FIFO/WAC).
+export const PurchaseOrderApi = {
+  list: () => api.get('/purchase-orders'),
+  get: (id) => api.get(`/purchase-orders/${id}`),
+  create: (body) => api.post('/purchase-orders', body),
+  update: (id, body) => api.put(`/purchase-orders/${id}`, body),
+  order: (id) => api.post(`/purchase-orders/${id}/order`, {}),
+  receive: (id, body) => api.post(`/purchase-orders/${id}/receive`, body),
+  cancel: (id) => api.post(`/purchase-orders/${id}/cancel`, {}),
+  remove: (id) => api.del(`/purchase-orders/${id}`),
+};
+
+export const CostingApi = {
+  history: (productId) => api.get('/costing/history' + qs({ productId })),
+  valuation: () => api.get('/costing/valuation'),
 };
 
 export const PaymentApi = {

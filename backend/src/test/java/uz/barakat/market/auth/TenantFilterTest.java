@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ import uz.barakat.market.repository.ShopRepository;
 class TenantFilterTest {
 
     private final ShopRepository shops = mock(ShopRepository.class);
-    private final TenantFilter filter = new TenantFilter(shops);
+    private final TenantFilter filter = new TenantFilter(shops, new SimpleMeterRegistry());
 
     @AfterEach
     void clearContext() {

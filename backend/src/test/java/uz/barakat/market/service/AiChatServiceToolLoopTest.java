@@ -34,6 +34,7 @@ class AiChatServiceToolLoopTest {
     @Mock SaleRepository sales;
     @Mock ProductRepository products;
     @Mock AiToolService tools;
+    @Mock CustomerService customers;
 
     /** A provider whose {@code complete} returns the next scripted reply each call. */
     private static final class ScriptedProvider implements AiProvider {
@@ -49,8 +50,11 @@ class AiChatServiceToolLoopTest {
     }
 
     private AiChatService newChatWith(AiProvider provider) throws Exception {
+        // Real CfoActionService over mocked repos — with no ACTION lines in the
+        // scripted replies it just returns the text unchanged (touches nothing).
+        CfoActionService cfoActions = new CfoActionService(products, customers);
         AiChatService chat = new AiChatService(
-                reports, analytics, sales, products, tools,
+                reports, analytics, sales, products, tools, cfoActions,
                 "gemini", "", "m", "", "m", "", "m", "", "m");
         // Replace the (unconfigured) real chain with our scripted stub.
         Field f = AiChatService.class.getDeclaredField("chain");

@@ -3,7 +3,9 @@ package uz.barakat.market.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import uz.barakat.market.auth.AuditInterceptor;
 
 /**
  * CORS for the API.
@@ -23,11 +25,19 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebConfig implements WebMvcConfigurer {
 
     private final String[] allowedOrigins;
+    private final AuditInterceptor auditInterceptor;
 
     public WebConfig(
             @Value("${app.web.allowed-origins:http://localhost:3000,http://127.0.0.1:3000,http://localhost:8086}")
-            String[] allowedOrigins) {
+            String[] allowedOrigins,
+            AuditInterceptor auditInterceptor) {
         this.allowedOrigins = allowedOrigins;
+        this.auditInterceptor = auditInterceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(auditInterceptor).addPathPatterns("/api/**");
     }
 
     @Override

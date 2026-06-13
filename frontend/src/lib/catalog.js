@@ -1,43 +1,96 @@
-// Browser-side product lookup in Uzbekistan's national catalogue (tasnif.soliq.uz)
-// via a CORS relay the operator controls (a Cloudflare Worker — see
-// ops/mxik-cors-worker.js), whose URL is set in VITE_MXIK_PROXY_URL.
+// Browser-side product lookup in Uzbekistan's national catalogue
+// (tasnif.soliq.uz) through a small CORS relay.
 //
-// Why a relay: the hosted web portal runs on a foreign server that CANNOT reach
-// Uzbek government endpoints, and tasnif sends no CORS headers so the browser
-// can't read it directly either. The relay (on Cloudflare's edge) fetches tasnif
-// and adds CORS. When VITE_MXIK_PROXY_URL is unset the lookup is simply skipped
-// and the cashier types the product details by hand.
+// Why a relay:
+// - the hosted VPS is outside Uzbekistan and often cannot reach tasnif;
+// - tasnif rejects public-browser CORS requests;
+// - the cashier's computer in Uzbekistan can reach tasnif, so the local relay
+//   at 127.0.0.1 fetches it and adds CORS/PNA headers.
 //
-// Best-effort: any failure (relay down, not found, timeout) resolves to null.
+// VITE_MXIK_PROXY_URL may contain one URL or comma-separated URLs. Even when it
+// is unset we try the default local relay used by ops/mxik-local-proxy.cjs.
 
-const PROXY = (import.meta.env.VITE_MXIK_PROXY_URL || '').trim();
+const DEFAULT_LOCAL_PROXY = 'http://127.0.0.1:8077/';
+const LOCAL_STORAGE_PROXY_KEY = 'savdopro.mxikProxyUrl';
+const configuredProxies = (import.meta.env.VITE_MXIK_PROXY_URL || '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+const savedProxy = (() => {
+  try {
+    return localStorage.getItem(LOCAL_STORAGE_PROXY_KEY)?.trim() || '';
+  } catch {
+    return '';
+  }
+})();
+const PROXIES = Array.from(new Set([
+  ...configuredProxies,
+  savedProxy,
+  DEFAULT_LOCAL_PROXY,
+].filter(Boolean)));
 
 /**
  * @param {string} gtin canonical numeric GTIN (from the scan response)
  * @returns {Promise<null | {name, mxikCode, categoryName, unit}>}
  */
 export async function lookupCatalog(gtin) {
-  if (!PROXY || !gtin || !/^\d+$/.test(gtin)) {
+  if (!gtin || !/^\d+$/.test(gtin)) {
     return null;
   }
-  const sep = PROXY.includes('?') ? '&' : '?';
-  const url = `${PROXY}${sep}gtin=${encodeURIComponent(gtin)}&lang=uz`;
+  for (const proxy of PROXIES) {
+    const suggestion = await lookupViaProxy(proxy, gtin);
+    if (suggestion) {
+      return suggestion;
+    }
+  }
+  // CIS/RU barcodes are often missing from MXIK but present in barcode-list.ru.
+  // Route it through the same local/ngrok relay so the hosted app does not hit
+  // CORS or VPS geo-blocking.
+  if (gtin.startsWith('46')) {
+    for (const proxy of PROXIES) {
+      const suggestion = await lookupViaProxy(proxy, gtin, 'barcode-list');
+      if (suggestion) {
+        return suggestion;
+      }
+    }
+  }
+  return null;
+}
+
+async function lookupViaProxy(proxy, gtin, source = 'mxik') {
+  const sep = proxy.includes('?') ? '&' : '?';
+  const sourceParam = source === 'mxik' ? '' : `&source=${encodeURIComponent(source)}`;
+  const url = `${proxy}${sep}gtin=${encodeURIComponent(gtin)}&lang=uz${sourceParam}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
+  const timeoutMs = proxy.startsWith(DEFAULT_LOCAL_PROXY) ? 3000 : 8000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const headers = { Accept: 'application/json' };
+    if (proxy.includes('ngrok-free.app')) {
+      headers['ngrok-skip-browser-warning'] = 'true';
+    }
     const res = await fetch(url, {
       signal: controller.signal,
-      headers: { Accept: 'application/json' },
+      headers,
+      ...(proxy.startsWith(DEFAULT_LOCAL_PROXY) ? { targetAddressSpace: 'loopback' } : {}),
     });
     if (!res.ok) {
       return null;
     }
     const data = await res.json();
-    const item = data?.data?.content?.[0];
+    const simpleItem = data?.name
+      ? {
+          mxikName: data.name,
+          groupName: data.categoryName,
+          mxikCode: data.mxikCode,
+          commonUnitName: data.unit,
+        }
+      : null;
+    const item = data?.data?.content?.[0] || simpleItem;
     if (!item) {
       return null;
     }
-    let name = firstNonBlank(item.brandName, item.mxikName, item.positionName);
+    let name = firstNonBlank(item.mxikName, item.brandName, item.positionName);
     if (!name) {
       return null;
     }
@@ -52,7 +105,7 @@ export async function lookupCatalog(gtin) {
       unit: firstNonBlank(item.commonUnitName, item.unitName) || '',
     };
   } catch {
-    return null; // relay/network/abort/parse → silent fallback to manual entry
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -67,7 +120,6 @@ function firstNonBlank(...values) {
   return '';
 }
 
-// ALL-CAPS catalogue group → tidy "Sentence case".
 function sentenceCase(s) {
   const t = (s || '').trim();
   if (!t) {

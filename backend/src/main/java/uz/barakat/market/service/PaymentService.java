@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Currency;
@@ -56,6 +57,7 @@ public class PaymentService {
     private final CustomerRepository customers;
     private final MoneyConverter converter;
     private final LoyaltyService loyalty;
+    private final ApplicationEventPublisher events;
 
     public PaymentService(PaymentRepository payments,
                           ExpenseRepository expenses,
@@ -63,7 +65,8 @@ public class PaymentService {
                           CustomerTransactionRepository customerTransactions,
                           CustomerRepository customers,
                           MoneyConverter converter,
-                          LoyaltyService loyalty) {
+                          LoyaltyService loyalty,
+                          ApplicationEventPublisher events) {
         this.payments = payments;
         this.expenses = expenses;
         this.homeExpenses = homeExpenses;
@@ -71,6 +74,7 @@ public class PaymentService {
         this.customers = customers;
         this.converter = converter;
         this.loyalty = loyalty;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +139,7 @@ public class PaymentService {
                 && saved.getCustomerId() != null) {
             awardLoyaltyPoints(saved);
         }
+        events.publishEvent(new LedgerEvents.PaymentRecorded(saved.getId()));
         return Mappers.payment(saved);
     }
 

@@ -3,6 +3,7 @@ package uz.barakat.market.service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Currency;
@@ -25,10 +26,13 @@ public class HomeExpenseService {
 
     private final HomeExpenseRepository homeExpenses;
     private final BulkImportParser parser;
+    private final ApplicationEventPublisher events;
 
-    public HomeExpenseService(HomeExpenseRepository homeExpenses, BulkImportParser parser) {
+    public HomeExpenseService(HomeExpenseRepository homeExpenses, BulkImportParser parser,
+                              ApplicationEventPublisher events) {
         this.homeExpenses = homeExpenses;
         this.parser = parser;
+        this.events = events;
     }
 
     @Transactional(readOnly = true)
@@ -52,7 +56,9 @@ public class HomeExpenseService {
         rejectCredit(request.paymentType());
         HomeExpense expense = new HomeExpense();
         apply(expense, request);
-        return Mappers.homeExpense(homeExpenses.save(expense));
+        HomeExpense saved = homeExpenses.save(expense);
+        events.publishEvent(new LedgerEvents.HomeExpenseRecorded(saved.getId()));
+        return Mappers.homeExpense(saved);
     }
 
     public HomeExpenseResponse update(Long id, HomeExpenseRequest request) {
@@ -95,6 +101,7 @@ public class HomeExpenseService {
             expense.setCardAmount(line.cardAmount());
             expense.setCurrency(Currency.UZS);
             homeExpenses.save(expense);
+            events.publishEvent(new LedgerEvents.HomeExpenseRecorded(expense.getId()));
             saved++;
         }
         return new BulkImportResult(parsed.date(), saved, parsed.lines().size() - saved, errors);
