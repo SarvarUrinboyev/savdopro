@@ -2,6 +2,10 @@ package uz.barakat.market.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -34,6 +38,28 @@ public class BarcodeLookupConfig {
         factory.setConnectTimeout(timeoutMs);
         factory.setReadTimeout(timeoutMs);
         return RestClient.builder().requestFactory(factory).build();
+    }
+
+    /**
+     * Small daemon thread pool that fans the free, unlimited product databases
+     * (the Open Facts family, barcode-list, books) out concurrently, so an
+     * unknown code resolves in roughly one network round-trip instead of paying
+     * each miss in series and blowing the scanner's client-side timeout. The
+     * pool is bounded and IO-bound; threads spend their time waiting on HTTP.
+     */
+    @Bean
+    Executor barcodeLookupExecutor() {
+        ThreadFactory factory = new ThreadFactory() {
+            private final AtomicInteger seq = new AtomicInteger(1);
+
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "barcode-lookup-" + seq.getAndIncrement());
+                t.setDaemon(true);
+                return t;
+            }
+        };
+        return Executors.newFixedThreadPool(8, factory);
     }
 
     /**

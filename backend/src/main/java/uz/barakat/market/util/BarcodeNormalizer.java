@@ -79,6 +79,28 @@ public final class BarcodeNormalizer {
         return n;
     }
 
+    /**
+     * The best single numeric code to query external product databases with, or
+     * {@code null} when the code isn't usable as a GTIN (non-numeric).
+     *
+     * <p>Unlike {@link #gtin(String)} this does not give up on an over-long
+     * numeric code: a scan longer than any GTIN is most often an EAN-13 carrying
+     * a 2- or 5-digit supplement (the add-on printed beside magazines, books and
+     * some imports), or a scanner that appended extra digits. Rather than refuse
+     * to look it up — which leaves the warehouse form blank — fall back to the
+     * leading EAN-13 so the databases still get a plausible code.
+     */
+    public static String lookupGtin(String raw) {
+        String n = normalize(raw);
+        if (n.isEmpty() || !isDigits(n)) {
+            return null;
+        }
+        if (n.length() <= 14) {
+            return n;
+        }
+        return n.substring(0, 13);
+    }
+
     // ASCII 0-9 only — deliberately NOT Character.isDigit(), which also accepts
     // non-ASCII Unicode digits the JS twin (\d) rejects. Barcodes are ASCII, and
     // both sides must canonicalise identically.

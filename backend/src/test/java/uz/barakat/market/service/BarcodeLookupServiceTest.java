@@ -17,8 +17,18 @@ import org.springframework.web.client.RestClient;
 import uz.barakat.market.dto.BarcodeLookupResponse;
 
 /**
- * Unit tests for the global barcode lookup fall-through chain and never-throw
- * contract. HTTP calls are mocked; no real network is touched.
+ * Unit tests for the global barcode lookup.
+ *
+ * <p>The service fans the free, unlimited databases (the Open Facts family, plus
+ * barcode-list for CIS codes and the book sources for ISBNs) out in parallel,
+ * keeps the highest-priority hit, and only then falls back to the rate-limited
+ * sources (the optional paid lookup, then UPC Item DB) in series. So a hit in
+ * the free phase must keep the rate-limited phase from running at all.
+ *
+ * <p>HTTP calls are mocked and the lookup runs on a direct (caller-thread)
+ * executor, so the parallel fan-out executes deterministically on one thread —
+ * {@link MockRestServiceServer} (which isn't thread-safe) stays happy. Request
+ * order is ignored because the fan-out fires its sources concurrently.
  */
 class BarcodeLookupServiceTest {
 
@@ -35,19 +45,12 @@ class BarcodeLookupServiceTest {
             "https://lookup.test/v3/products?barcode={barcode}&formatted=y&key={key}";
 
     private static final String CODE = "4870204010023";
-    private static final String OFF_REQUEST = "https://off.test/api/v2/product/" + CODE + ".json";
-    private static final String OPF_REQUEST = "https://opf.test/api/v2/product/" + CODE + ".json";
-    private static final String OBF_REQUEST = "https://obf.test/api/v2/product/" + CODE + ".json";
-    private static final String PET_REQUEST = "https://pet.test/api/v2/product/" + CODE + ".json";
     private static final String UPC_REQUEST = "https://upc.test/prod/trial/lookup?upc=" + CODE;
     private static final String LOOKUP_REQUEST =
             "https://lookup.test/v3/products?barcode=" + CODE + "&formatted=y&key=secret";
     private static final String ISBN = "9781234567897";
-    private static final String ISBN_OFF_REQUEST = "https://off.test/api/v2/product/" + ISBN + ".json";
-    private static final String ISBN_OPF_REQUEST = "https://opf.test/api/v2/product/" + ISBN + ".json";
-    private static final String ISBN_OBF_REQUEST = "https://obf.test/api/v2/product/" + ISBN + ".json";
-    private static final String ISBN_PET_REQUEST = "https://pet.test/api/v2/product/" + ISBN + ".json";
     private static final String GOOGLE_BOOKS_REQUEST = "https://books.test/volumes?q=isbn:" + ISBN;
+    private static final String OPEN_LIBRARY_REQUEST = "https://ol.test/search.json?isbn=" + ISBN;
     private static final String CIS_CODE = "4603014022240";
     private static final String CIS_REQUEST =
             "https://barcode-list.test/barcode/RU/barcode-" + CIS_CODE + "/search.htm";
@@ -59,17 +62,22 @@ class BarcodeLookupServiceTest {
     @BeforeEach
     void setUp() {
         builder = RestClient.builder();
-        server = MockRestServiceServer.bindTo(builder).build();
+        // The free sources are fired concurrently, so their requests can arrive
+        // in any order; ignoreExpectOrder keeps the mock from caring.
+        server = MockRestServiceServer.bindTo(builder).ignoreExpectOrder(true).build();
         service = serviceWithKey("");
     }
 
     @Test
-    void openFoodFactsHitReturnsNameAndMappedCategoryWithoutCallingLaterSources() {
-        server.expect(requestTo(OFF_REQUEST)).andRespond(withSuccess("""
+    void openFoodFactsHitWinsOverTheOtherFreeSourcesAndSkipsTheRateLimitedPhase() {
+        server.expect(requestTo(off(CODE))).andRespond(withSuccess("""
                 { "status": 1, "product": {
                     "product_name": "Coca-Cola 0.5L",
                     "categories_tags": ["en:beverages", "en:sodas"] } }
                 """, MediaType.APPLICATION_JSON));
+        miss(obf(CODE));
+        miss(pet(CODE));
+        miss(opf(CODE));
 
         BarcodeLookupResponse result = service.lookup(CODE);
 
@@ -77,17 +85,20 @@ class BarcodeLookupServiceTest {
         assertEquals("Coca-Cola 0.5L", result.name());
         assertEquals("Ichimliklar", result.suggestedCategory());
         assertEquals("openfoodfacts", result.source());
-        server.verify();
+        server.verify(); // UPC / paid were never stubbed → they must not have fired
     }
 
     @Test
     void prefersUzbekProductNameWhenPresentAndFallsBackToFoodCategory() {
-        server.expect(requestTo(OFF_REQUEST)).andRespond(withSuccess("""
+        server.expect(requestTo(off(CODE))).andRespond(withSuccess("""
                 { "status": 1, "product": {
                     "product_name": "Cola",
                     "product_name_uz": "Kola 0.5L",
                     "categories_tags": [] } }
                 """, MediaType.APPLICATION_JSON));
+        miss(obf(CODE));
+        miss(pet(CODE));
+        miss(opf(CODE));
 
         BarcodeLookupResponse result = service.lookup(CODE);
 
@@ -96,10 +107,11 @@ class BarcodeLookupServiceTest {
     }
 
     @Test
-    void openProductsFactsHitCoversGeneralGoodsBeforeUpc() {
-        server.expect(requestTo(OFF_REQUEST)).andRespond(withSuccess("{ \"status\": 0 }",
-                MediaType.APPLICATION_JSON));
-        server.expect(requestTo(OPF_REQUEST)).andRespond(withSuccess("""
+    void openProductsFactsHitWhenTheOtherFreeSourcesMiss() {
+        miss(off(CODE));
+        miss(obf(CODE));
+        miss(pet(CODE));
+        server.expect(requestTo(opf(CODE))).andRespond(withSuccess("""
                 { "status": 1, "product": {
                     "product_name": "Galaxy USB-C Charger",
                     "categories_tags": ["en:electronics", "en:chargers"] } }
@@ -111,11 +123,12 @@ class BarcodeLookupServiceTest {
         assertEquals("Galaxy USB-C Charger", result.name());
         assertEquals("Elektronika", result.suggestedCategory());
         assertEquals("openproductsfacts", result.source());
+        server.verify();
     }
 
     @Test
-    void fallsThroughToUpcItemDbWhenOpenSourcesMiss() {
-        expectOpenFactsMisses();
+    void fallsThroughToUpcItemDbWhenTheFreeSourcesMiss() {
+        missAllOpenFacts(CODE);
         server.expect(requestTo(UPC_REQUEST)).andRespond(withSuccess("""
                 { "code": "OK", "total": 1, "items": [
                     { "title": "Snickers Bar 50g",
@@ -131,9 +144,9 @@ class BarcodeLookupServiceTest {
     }
 
     @Test
-    void optionalBarcodeLookupSourceIsUsedOnlyWhenApiKeyExists() {
+    void optionalBarcodeLookupSourceIsUsedBeforeUpcOnlyWhenApiKeyExists() {
         service = serviceWithKey("secret");
-        expectOpenFactsMisses();
+        missAllOpenFacts(CODE);
         server.expect(requestTo(LOOKUP_REQUEST)).andRespond(withSuccess("""
                 { "products": [
                     { "title": "iPhone 15 Pro",
@@ -146,11 +159,14 @@ class BarcodeLookupServiceTest {
         assertEquals("iPhone 15 Pro", result.name());
         assertEquals("Smartfonlar", result.suggestedCategory());
         assertEquals("barcodelookup", result.source());
+        server.verify(); // UPC not stubbed → the paid hit short-circuited it
     }
 
     @Test
-    void isbnCodesUseGoogleBooksBeforePaidAndUpcSources() {
-        expectOpenFactsMisses(ISBN_OFF_REQUEST, ISBN_OPF_REQUEST, ISBN_OBF_REQUEST, ISBN_PET_REQUEST);
+    void isbnCodesUseGoogleBooksAndSkipTheRateLimitedPhase() {
+        missAllOpenFacts(ISBN);
+        server.expect(requestTo(OPEN_LIBRARY_REQUEST))
+                .andRespond(withSuccess("{ \"numFound\": 0, \"docs\": [] }", MediaType.APPLICATION_JSON));
         server.expect(requestTo(GOOGLE_BOOKS_REQUEST)).andRespond(withSuccess("""
                 { "totalItems": 1, "items": [
                     { "volumeInfo": {
@@ -164,10 +180,11 @@ class BarcodeLookupServiceTest {
         assertEquals("Clean Code - Robert C. Martin", result.name());
         assertEquals("Kitoblar", result.suggestedCategory());
         assertEquals("googlebooks", result.source());
+        server.verify();
     }
 
     @Test
-    void cisBarcodeUsesBarcodeListBeforeOpenFactsSources() {
+    void cisBarcodeLetsBarcodeListWinOverTheOpenFactsSources() {
         server.expect(requestTo(CIS_REQUEST)).andRespond(withSuccess("""
                 <!DOCTYPE html>
                 <html><head>
@@ -175,19 +192,39 @@ class BarcodeLookupServiceTest {
                   <meta name="description" content="&#1064;&#1090;&#1088;&#1080;&#1093;-&#1082;&#1086;&#1076;:4603014022240 - &#1069;&#1090;&#1086;&#1090; &#1096;&#1090;&#1088;&#1080;&#1093;-&#1082;&#1086;&#1076; &#1074;&#1089;&#1090;&#1088;&#1077;&#1095;&#1072;&#1077;&#1090;&#1089;&#1103; &#1074; &#1089;&#1083;&#1077;&#1076;&#1091;&#1102;&#1097;&#1080;&#1093; &#1090;&#1086;&#1074;&#1072;&#1088;&#1072;&#1093;: &#1057;&#1087;&#1083;&#1072;&#1090; &#1083;&#1077;&#1095;&#1077;&#1073;&#1085;&#1099;&#1077; &#1090;&#1088;&#1072;&#1074;&#1099;; &#1047;&#1091;&#1073;&#1085;&#1072;&#1103; &#1087;&#1072;&#1089;&#1090;&#1072; SPLAT 100&#1075;">
                 </head><body></body></html>
                 """, MediaType.TEXT_HTML));
+        missAllOpenFacts(CIS_CODE);
 
         BarcodeLookupResponse result = service.lookup(CIS_CODE);
 
         assertTrue(result.found());
-        assertEquals("\u0421\u043f\u043b\u0430\u0442 \u043b\u0435\u0447\u0435\u0431\u043d\u044b\u0435 \u0442\u0440\u0430\u0432\u044b", result.name());
+        assertEquals("Сплат лечебные травы", result.name());
         assertEquals("Kosmetika", result.suggestedCategory());
         assertEquals("barcode-list", result.source());
         server.verify();
     }
 
     @Test
+    void overLongCodeIsLookedUpAsItsLeadingEan13() {
+        // EAN-13 + 2-digit supplement (15 digits) → query the leading EAN-13.
+        server.expect(requestTo(off("8603840531359"))).andRespond(withSuccess("""
+                { "status": 1, "product": {
+                    "product_name": "Imported Snack",
+                    "categories_tags": ["en:snacks"] } }
+                """, MediaType.APPLICATION_JSON));
+        miss(obf("8603840531359"));
+        miss(pet("8603840531359"));
+        miss(opf("8603840531359"));
+
+        BarcodeLookupResponse result = service.lookup("860384053135940");
+
+        assertTrue(result.found());
+        assertEquals("Imported Snack", result.name());
+        assertEquals("openfoodfacts", result.source());
+    }
+
+    @Test
     void allSourcesMissReturnsNotFound() {
-        expectOpenFactsMisses();
+        missAllOpenFacts(CODE);
         server.expect(requestTo(UPC_REQUEST)).andRespond(withSuccess(
                 "{ \"code\": \"OK\", \"total\": 0, \"items\": [] }", MediaType.APPLICATION_JSON));
 
@@ -200,17 +237,11 @@ class BarcodeLookupServiceTest {
     }
 
     @Test
-    void networkErrorOnAllSourcesNeverThrowsAndReportsNotFound() {
-        server.expect(requestTo(OFF_REQUEST))
-                .andRespond(withException(new IOException("connect timed out")));
-        server.expect(requestTo(OPF_REQUEST))
-                .andRespond(withException(new IOException("connect timed out")));
-        server.expect(requestTo(OBF_REQUEST))
-                .andRespond(withException(new IOException("connect timed out")));
-        server.expect(requestTo(PET_REQUEST))
-                .andRespond(withException(new IOException("connect timed out")));
-        server.expect(requestTo(UPC_REQUEST))
-                .andRespond(withException(new IOException("connect timed out")));
+    void networkErrorOnEverySourceNeverThrowsAndReportsNotFound() {
+        for (String url : new String[] {off(CODE), obf(CODE), pet(CODE), opf(CODE), UPC_REQUEST}) {
+            server.expect(requestTo(url))
+                    .andRespond(withException(new IOException("connect timed out")));
+        }
 
         BarcodeLookupResponse result = service.lookup(CODE);
 
@@ -226,22 +257,39 @@ class BarcodeLookupServiceTest {
     }
 
     private BarcodeLookupService serviceWithKey(String key) {
-        return new BarcodeLookupService(builder.build(), BARCODE_LIST_URL, OFF_URL, OPF_URL, OBF_URL, PET_URL,
+        // Runnable::run = a direct executor: the "async" sources run synchronously
+        // on the test thread, so the mock server is never hit concurrently.
+        return new BarcodeLookupService(builder.build(), Runnable::run, 3000,
+                BARCODE_LIST_URL, OFF_URL, OPF_URL, OBF_URL, PET_URL,
                 GOOGLE_BOOKS_URL, OPEN_LIBRARY_URL, UPC_URL, LOOKUP_URL, key);
     }
 
-    private void expectOpenFactsMisses() {
-        expectOpenFactsMisses(OFF_REQUEST, OPF_REQUEST, OBF_REQUEST, PET_REQUEST);
+    /** Stub all four Open Facts sources to miss for {@code code}. */
+    private void missAllOpenFacts(String code) {
+        miss(off(code));
+        miss(obf(code));
+        miss(pet(code));
+        miss(opf(code));
     }
 
-    private void expectOpenFactsMisses(String off, String opf, String obf, String pet) {
-        server.expect(requestTo(off)).andRespond(withSuccess("{ \"status\": 0 }",
-                MediaType.APPLICATION_JSON));
-        server.expect(requestTo(opf)).andRespond(withSuccess("{ \"status\": 0 }",
-                MediaType.APPLICATION_JSON));
-        server.expect(requestTo(obf)).andRespond(withSuccess("{ \"status\": 0 }",
-                MediaType.APPLICATION_JSON));
-        server.expect(requestTo(pet)).andRespond(withSuccess("{ \"status\": 0 }",
-                MediaType.APPLICATION_JSON));
+    private void miss(String request) {
+        server.expect(requestTo(request))
+                .andRespond(withSuccess("{ \"status\": 0 }", MediaType.APPLICATION_JSON));
+    }
+
+    private static String off(String code) {
+        return "https://off.test/api/v2/product/" + code + ".json";
+    }
+
+    private static String obf(String code) {
+        return "https://obf.test/api/v2/product/" + code + ".json";
+    }
+
+    private static String pet(String code) {
+        return "https://pet.test/api/v2/product/" + code + ".json";
+    }
+
+    private static String opf(String code) {
+        return "https://opf.test/api/v2/product/" + code + ".json";
     }
 }

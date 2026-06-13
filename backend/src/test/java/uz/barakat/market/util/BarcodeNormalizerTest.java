@@ -87,4 +87,25 @@ class BarcodeNormalizerTest {
         // A 15-digit (serial-only) numeric code is longer than any GTIN.
         assertNull(BarcodeNormalizer.gtin("123456789012345"));
     }
+
+    @Test
+    void lookupGtinKeepsPlainGtinAndExtractsFromMarkingCode() {
+        assertEquals("8907588001769", BarcodeNormalizer.lookupGtin("8907588001769"));
+        assertEquals("8907588001769", BarcodeNormalizer.lookupGtin(MARKING_CODE));
+    }
+
+    @Test
+    void lookupGtinFallsBackToLeadingEan13ForOverlongNumericCodes() {
+        // EAN-13 + 2-digit supplement (15 digits) -> leading EAN-13.
+        assertEquals("8603840531359", BarcodeNormalizer.lookupGtin("860384053135940"));
+        // EAN-13 + 5-digit supplement (18 digits) -> leading EAN-13.
+        assertEquals("9781234567897", BarcodeNormalizer.lookupGtin("978123456789712345"));
+    }
+
+    @Test
+    void lookupGtinIsNullForNonNumericOrBlankCodes() {
+        assertNull(BarcodeNormalizer.lookupGtin("ABC-123"));
+        assertNull(BarcodeNormalizer.lookupGtin(""));
+        assertNull(BarcodeNormalizer.lookupGtin(null));
+    }
 }

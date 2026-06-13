@@ -1,6 +1,12 @@
 package uz.barakat.market.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -33,6 +39,8 @@ public class BarcodeLookupService {
             Pattern.compile("(?is)<meta\\s+[^>]*name=[\"']description[\"'][^>]*content=[\"'](.*?)[\"']");
 
     private final RestClient restClient;
+    private final Executor executor;
+    private final long joinTimeoutMs;
     private final String barcodeListUrl;
     private final String openFoodFactsUrl;
     private final String openProductsFactsUrl;
@@ -46,6 +54,8 @@ public class BarcodeLookupService {
 
     public BarcodeLookupService(
             RestClient barcodeLookupRestClient,
+            Executor barcodeLookupExecutor,
+            @Value("${barakat.barcode.timeout-ms:3000}") int timeoutMs,
             @Value("${barakat.barcode.barcodelist.url}") String barcodeListUrl,
             @Value("${barakat.barcode.openfoodfacts.url}") String openFoodFactsUrl,
             @Value("${barakat.barcode.openproductsfacts.url}") String openProductsFactsUrl,
@@ -57,6 +67,10 @@ public class BarcodeLookupService {
             @Value("${barakat.barcode.barcodelookup.url}") String barcodeLookupUrl,
             @Value("${barakat.barcode.barcodelookup.key:}") String barcodeLookupKey) {
         this.restClient = barcodeLookupRestClient;
+        this.executor = barcodeLookupExecutor;
+        // Give the parallel phase a touch longer than a single call's read
+        // timeout so a straggler still counts before we move on.
+        this.joinTimeoutMs = timeoutMs + 1000L;
         this.barcodeListUrl = barcodeListUrl;
         this.openFoodFactsUrl = openFoodFactsUrl;
         this.openProductsFactsUrl = openProductsFactsUrl;
@@ -75,57 +89,44 @@ public class BarcodeLookupService {
      */
     @Cacheable(value = "barcodeLookup", key = "#code", unless = "!#result.found()")
     public BarcodeLookupResponse lookup(String code) {
-        String canonical = BarcodeNormalizer.gtin(code);
+        String canonical = BarcodeNormalizer.lookupGtin(code);
         if (canonical == null) {
             return BarcodeLookupResponse.notFound();
         }
 
+        // Phase 1 — the free, unlimited databases, fanned out in parallel. Each
+        // one only knows its own slice (food, cosmetics, pet, generic products,
+        // CIS goods, books), so trying them in series made a non-food scan pay
+        // four misses before reaching the next phase and time out client-side.
+        // Concurrent, the whole phase costs ~one round-trip; we then keep the
+        // highest-priority hit (a more specific source wins over a generic one).
+        List<Supplier<BarcodeLookupResponse>> freeSources = new ArrayList<>();
         // Russian/CIS products (GS1 prefix 460-469) are often absent from the
-        // Open Facts databases but present in barcode-list.ru. Try it early so
-        // the warehouse scanner still fills the form inside the client timeout.
+        // Open Facts databases but present in barcode-list.ru.
         if (canonical.startsWith("46")) {
-            BarcodeLookupResponse cis = parseBarcodeList(getHtml(barcodeListUrl, canonical));
-            if (cis != null) {
-                return cis;
-            }
+            freeSources.add(() -> parseBarcodeList(getHtml(barcodeListUrl, canonical)));
         }
-
-        BarcodeLookupResponse off = parseOpenFacts(
-                getJson(openFoodFactsUrl, canonical), "openfoodfacts", "Oziq-ovqat");
-        if (off != null) {
-            return off;
-        }
-
-        BarcodeLookupResponse opf = parseOpenFacts(
-                getJson(openProductsFactsUrl, canonical), "openproductsfacts", null);
-        if (opf != null) {
-            return opf;
-        }
-
-        BarcodeLookupResponse beauty = parseOpenFacts(
-                getJson(openBeautyFactsUrl, canonical), "openbeautyfacts", "Kosmetika");
-        if (beauty != null) {
-            return beauty;
-        }
-
-        BarcodeLookupResponse pet = parseOpenFacts(
-                getJson(openPetFoodFactsUrl, canonical), "openpetfoodfacts", "Hayvonlar uchun");
-        if (pet != null) {
-            return pet;
-        }
-
         if (isIsbn(canonical)) {
-            BarcodeLookupResponse googleBook = parseGoogleBooks(getJson(googleBooksUrl, canonical));
-            if (googleBook != null) {
-                return googleBook;
-            }
+            freeSources.add(() -> parseGoogleBooks(getJson(googleBooksUrl, canonical)));
+            freeSources.add(() -> parseOpenLibrary(getJson(openLibraryUrl, canonical)));
+        }
+        freeSources.add(() -> parseOpenFacts(
+                getJson(openFoodFactsUrl, canonical), "openfoodfacts", "Oziq-ovqat"));
+        freeSources.add(() -> parseOpenFacts(
+                getJson(openBeautyFactsUrl, canonical), "openbeautyfacts", "Kosmetika"));
+        freeSources.add(() -> parseOpenFacts(
+                getJson(openPetFoodFactsUrl, canonical), "openpetfoodfacts", "Hayvonlar uchun"));
+        freeSources.add(() -> parseOpenFacts(
+                getJson(openProductsFactsUrl, canonical), "openproductsfacts", null));
 
-            BarcodeLookupResponse openLibraryBook = parseOpenLibrary(getJson(openLibraryUrl, canonical));
-            if (openLibraryBook != null) {
-                return openLibraryBook;
-            }
+        BarcodeLookupResponse parallelHit = firstHit(freeSources);
+        if (parallelHit != null) {
+            return parallelHit;
         }
 
+        // Phase 2 — the rate-limited / paid sources, in series so we don't burn
+        // their quota on scans the free databases already covered. These are the
+        // broad general-merchandise sources (electronics, gadgets, appliances).
         BarcodeLookupResponse paidLookup = parseBarcodeLookup(getJsonWithKey(canonical));
         if (paidLookup != null) {
             return paidLookup;
@@ -136,6 +137,34 @@ public class BarcodeLookupService {
             return upc;
         }
         return BarcodeLookupResponse.notFound();
+    }
+
+    /**
+     * Run the given lookups concurrently and return the first non-null result in
+     * list (priority) order, or null if none hit within the join window. Each
+     * supplier already swallows its own failures (returns null), so a slow or
+     * dead source can't fail the batch — it just doesn't contribute a hit.
+     */
+    private BarcodeLookupResponse firstHit(List<Supplier<BarcodeLookupResponse>> sources) {
+        List<CompletableFuture<BarcodeLookupResponse>> futures = new ArrayList<>(sources.size());
+        for (Supplier<BarcodeLookupResponse> source : sources) {
+            futures.add(CompletableFuture.supplyAsync(source, executor)
+                    .exceptionally(ex -> null));
+        }
+        try {
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                    .get(joinTimeoutMs, TimeUnit.MILLISECONDS);
+        } catch (Exception ex) {
+            // Timeout / interruption: fall through and keep whatever finished.
+            log.debug("Parallel barcode lookup did not all complete in time: {}", ex.toString());
+        }
+        for (CompletableFuture<BarcodeLookupResponse> future : futures) {
+            BarcodeLookupResponse hit = future.getNow(null);
+            if (hit != null) {
+                return hit;
+            }
+        }
+        return null;
     }
 
     /** GETs a {barcode} URL template as HTML; null on any failure. */

@@ -174,12 +174,14 @@ export function ScanModal({ categories, onClose, onChanged }) {
     setCategoryId(match ? String(match.id) : suggested ? NEW_CATEGORY : '');
   };
 
-  // Global-database fallback via the backend, capped at 3s on the client so a
-  // slow external API can never hang the scan.
+  // Global-database fallback via the backend, capped on the client so a slow
+  // external API can never hang the scan. The backend fans the free databases
+  // out in parallel then tries the paid/rate-limited ones, so it usually answers
+  // in ~1-2 round-trips; 8s leaves room for the hosted VPS's slower hop abroad.
   // Resolves to { found, name?, suggestedCategory? } or { timedOut: true }.
   const lookupGlobal = async (canonical) => {
     const timeout = new Promise((resolve) =>
-      setTimeout(() => resolve({ timedOut: true }), 3000));
+      setTimeout(() => resolve({ timedOut: true }), 8000));
     try {
       const res = await Promise.race([ProductApi.barcodeLookup(canonical), timeout]);
       if (res.timedOut) {
