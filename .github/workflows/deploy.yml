@@ -120,7 +120,14 @@ jobs:
           systemctl start savdopro-license
           for i in $(seq 1 30); do sleep 4; curl -sf -m4 http://127.0.0.1:9090/actuator/health >/dev/null 2>&1 && break; done
           systemctl start savdopro-backend
-          ok=0; for i in $(seq 1 40); do sleep 4; c=$(curl -s -m4 -o /dev/null -w '%{http_code}' http://127.0.0.1:8086/actuator/health 2>/dev/null); [ "$c" = "200" ] && { ok=1; break; }; done
+          # NB: under `set -e`, `c=$(curl ...)` aborts the WHOLE script the first
+          # time curl can't connect (backend still starting → curl exit 7), so the
+          # retry loop never actually retries — the deploy reports a false failure
+          # even though the jars are already swapped and the service comes up fine.
+          # Use the same `&& { ok=1; break; }` form as the license check below: set -e
+          # exempts a command that isn't the last in an && list, so a failed poll
+          # just continues the loop. (See prod-deploy runbook, v2.1.0 deploy.)
+          ok=0; for i in $(seq 1 40); do sleep 4; curl -sf -m4 http://127.0.0.1:8086/actuator/health >/dev/null 2>&1 && { ok=1; break; }; done
           [ "$ok" = "1" ] || { echo "backend health check FAILED"; exit 1; }
           echo "deploy OK"
           REMOTE
