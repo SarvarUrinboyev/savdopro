@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExchangeRateApi, ProductApi } from '../api/endpoints.js';
 import { normalizeBarcode } from '../lib/barcode.js';
-import { lookupCatalog } from '../lib/catalog.js';
+import { getSavedProxyUrl, lookupCatalog, setSavedProxyUrl } from '../lib/catalog.js';
 import { useT } from '../context/Settings.jsx';
 import { Modal } from './Modal.jsx';
 import { useToast } from './Toast.jsx';
@@ -38,6 +38,16 @@ export function ScanModal({ categories, onClose, onChanged }) {
   const [mode, setMode] = useState('scan');
   const [barcode, setBarcode] = useState('');   // canonical code to store
   const [searching, setSearching] = useState(false); // catalogue lookup in flight
+
+  // Optional: the in-Uzbekistan relay URL for the national MXIK catalogue
+  // (so Uzbek products auto-fill name + category). Saved per browser; the global
+  // databases work without it. Takes effect on the next scan, no reload needed.
+  const [relayUrl, setRelayUrl] = useState(getSavedProxyUrl());
+  const saveRelay = () => {
+    setSavedProxyUrl(relayUrl);
+    toast.success(relayUrl.trim() ? t('Katalog manzili saqlandi') : t('Katalog manzili o‘chirildi'));
+    refocus();
+  };
 
   // Restock (known product) form.
   const [found, setFound] = useState(null);     // ProductResponse
@@ -431,6 +441,26 @@ export function ScanModal({ categories, onClose, onChanged }) {
               {t("Skanerni mahsulot shtrix kodiga tuting - kod o'zi kiritiladi. Mavjud mahsulot: soni so'raladi. Yangi kod: nomi va toifasi katalog/global bazadan to'ldiriladi.")}
             </div>
           )}
+          <details style={{ marginTop: 12 }}>
+            <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
+              ⚙ {t('Milliy katalog ulanishi (MXIK) — ixtiyoriy')}
+            </summary>
+            <div style={{ marginTop: 8 }}>
+              <input
+                className="input"
+                value={relayUrl}
+                onChange={(e) => setRelayUrl(e.target.value)}
+                placeholder="https://domeningiz.uz/mxik.php"
+                style={{ fontSize: 13 }}
+              />
+              <div className="field-hint">
+                {t("O'zbekiston tovarlari nomi va toifasini avtomatik to'ldirish uchun O'zbekistondagi serverga joylangan relay manzili (ops/mxik-proxy.php). Bo'sh qoldirilsa faqat global bazalar ishlaydi. Saqlangach keyingi skanerdan kuchga kiradi.")}
+              </div>
+              <button className="btn btn-ghost" style={{ marginTop: 6 }} onClick={saveRelay}>
+                {t('Saqlash')}
+              </button>
+            </div>
+          </details>
         </div>
       )}
 

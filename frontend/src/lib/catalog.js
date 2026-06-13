@@ -16,18 +16,40 @@ const configuredProxies = (import.meta.env.VITE_MXIK_PROXY_URL || '')
   .split(',')
   .map((v) => v.trim())
   .filter(Boolean);
-const savedProxy = (() => {
+
+/** The relay URL the shop saved in-app (settings field), or '' on any error. */
+export function getSavedProxyUrl() {
   try {
     return localStorage.getItem(LOCAL_STORAGE_PROXY_KEY)?.trim() || '';
   } catch {
     return '';
   }
-})();
-const PROXIES = Array.from(new Set([
-  ...configuredProxies,
-  savedProxy,
-  DEFAULT_LOCAL_PROXY,
-].filter(Boolean)));
+}
+
+/** Save / clear the in-app relay URL. Takes effect on the next scan (no reload). */
+export function setSavedProxyUrl(url) {
+  try {
+    const v = (url || '').trim();
+    if (v) {
+      localStorage.setItem(LOCAL_STORAGE_PROXY_KEY, v);
+    } else {
+      localStorage.removeItem(LOCAL_STORAGE_PROXY_KEY);
+    }
+  } catch {
+    /* ignore storage failures (private mode etc.) */
+  }
+}
+
+// Built fresh on every scan so the in-app relay setting takes effect immediately,
+// without a page reload: env-configured proxies first, then the in-app one, then
+// the default local relay.
+function proxyList() {
+  return Array.from(new Set([
+    ...configuredProxies,
+    getSavedProxyUrl(),
+    DEFAULT_LOCAL_PROXY,
+  ].filter(Boolean)));
+}
 
 /**
  * @param {string} gtin canonical numeric GTIN (from the scan response)
@@ -37,7 +59,8 @@ export async function lookupCatalog(gtin) {
   if (!gtin || !/^\d+$/.test(gtin)) {
     return null;
   }
-  for (const proxy of PROXIES) {
+  const proxies = proxyList();
+  for (const proxy of proxies) {
     const suggestion = await lookupViaProxy(proxy, gtin);
     if (suggestion) {
       return suggestion;
@@ -47,7 +70,7 @@ export async function lookupCatalog(gtin) {
   // Route it through the same local/ngrok relay so the hosted app does not hit
   // CORS or VPS geo-blocking.
   if (gtin.startsWith('46')) {
-    for (const proxy of PROXIES) {
+    for (const proxy of proxies) {
       const suggestion = await lookupViaProxy(proxy, gtin, 'barcode-list');
       if (suggestion) {
         return suggestion;
