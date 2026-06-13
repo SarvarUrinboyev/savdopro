@@ -51,6 +51,8 @@ public class BarcodeLookupService {
     private final String upcItemDbUrl;
     private final String barcodeLookupUrl;
     private final String barcodeLookupKey;
+    private final String upcDatabaseUrl;
+    private final String upcDatabaseKey;
 
     public BarcodeLookupService(
             RestClient barcodeLookupRestClient,
@@ -65,7 +67,9 @@ public class BarcodeLookupService {
             @Value("${barakat.barcode.openlibrary.url}") String openLibraryUrl,
             @Value("${barakat.barcode.upcitemdb.url}") String upcItemDbUrl,
             @Value("${barakat.barcode.barcodelookup.url}") String barcodeLookupUrl,
-            @Value("${barakat.barcode.barcodelookup.key:}") String barcodeLookupKey) {
+            @Value("${barakat.barcode.barcodelookup.key:}") String barcodeLookupKey,
+            @Value("${barakat.barcode.upcdatabase.url:}") String upcDatabaseUrl,
+            @Value("${barakat.barcode.upcdatabase.key:}") String upcDatabaseKey) {
         this.restClient = barcodeLookupRestClient;
         this.executor = barcodeLookupExecutor;
         // Give the parallel phase a touch longer than a single call's read
@@ -81,6 +85,8 @@ public class BarcodeLookupService {
         this.upcItemDbUrl = upcItemDbUrl;
         this.barcodeLookupUrl = barcodeLookupUrl;
         this.barcodeLookupKey = barcodeLookupKey == null ? "" : barcodeLookupKey.trim();
+        this.upcDatabaseUrl = upcDatabaseUrl == null ? "" : upcDatabaseUrl;
+        this.upcDatabaseKey = upcDatabaseKey == null ? "" : upcDatabaseKey.trim();
     }
 
     /**
@@ -124,12 +130,19 @@ public class BarcodeLookupService {
             return parallelHit;
         }
 
-        // Phase 2 — the rate-limited / paid sources, in series so we don't burn
+        // Phase 2 — the rate-limited / keyed sources, in series so we don't burn
         // their quota on scans the free databases already covered. These are the
         // broad general-merchandise sources (electronics, gadgets, appliances).
-        BarcodeLookupResponse paidLookup = parseBarcodeLookup(getJsonWithKey(canonical));
+        BarcodeLookupResponse paidLookup = parseBarcodeLookup(
+                getJsonWithKey(barcodeLookupUrl, barcodeLookupKey, canonical));
         if (paidLookup != null) {
             return paidLookup;
+        }
+
+        BarcodeLookupResponse upcDb = parseUpcDatabase(
+                getJsonWithKey(upcDatabaseUrl, upcDatabaseKey, canonical));
+        if (upcDb != null) {
+            return upcDb;
         }
 
         BarcodeLookupResponse upc = parseUpcItemDb(getJson(upcItemDbUrl, canonical));
@@ -195,19 +208,22 @@ public class BarcodeLookupService {
         }
     }
 
-    /** GETs the optional paid lookup source; skipped when no API key is set. */
-    private JsonNode getJsonWithKey(String code) {
-        if (barcodeLookupKey.isBlank()) {
+    /**
+     * GETs a keyed lookup source as JSON, skipped when no URL or API key is set.
+     * The URL template takes {barcode} then {key} positionally. Null on failure.
+     */
+    private JsonNode getJsonWithKey(String urlTemplate, String key, String code) {
+        if (urlTemplate == null || urlTemplate.isBlank() || key == null || key.isBlank()) {
             return null;
         }
         try {
             return restClient.get()
-                    .uri(barcodeLookupUrl, code, barcodeLookupKey)
+                    .uri(urlTemplate, code, key)
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .body(JsonNode.class);
         } catch (Exception ex) {
-            log.debug("BarcodeLookup call failed ({}): {}", barcodeLookupUrl, ex.toString());
+            log.debug("Keyed barcode lookup call failed ({}): {}", urlTemplate, ex.toString());
             return null;
         }
     }
@@ -262,6 +278,28 @@ public class BarcodeLookupService {
                 lastFromArray(first.path("categoryPath")),
                 lastFromArray(first.path("categories")));
         return new BarcodeLookupResponse(true, name, localCategory(category), "barcodelookup");
+    }
+
+    /**
+     * upcdatabase.org: { success:true, title, description, brand, category,
+     * categories:"a,b,c" }. The detailed "categories" path is comma-separated and
+     * localised; "category" is a coarse English bucket — try the specific one first.
+     */
+    private BarcodeLookupResponse parseUpcDatabase(JsonNode root) {
+        if (root == null || !root.path("success").asBoolean(false)) {
+            return null;
+        }
+        String name = firstNonBlank(
+                text(root, "title"),
+                text(root, "description"),
+                text(root, "brand"));
+        if (name == null) {
+            return null;
+        }
+        String category = firstNonBlank(
+                cleanPath(text(root, "categories")),
+                cleanPath(text(root, "category")));
+        return new BarcodeLookupResponse(true, name, localCategory(category), "upcdatabase");
     }
 
     /** Google Books: { totalItems, items:[ { volumeInfo:{ title, authors, categories } } ] }. */
@@ -531,12 +569,13 @@ public class BarcodeLookupService {
                 "oziq ovqat")) {
             return "Oziq-ovqat";
         }
-        if (containsAny(c, "phone", "smartphone", "cell phone", "mobile phone", "iphone", "android",
-                "smartfon")) {
+        if (containsAny(c, "smartphone", "cell phone", "mobile phone", "iphone", "android", "smartfon")
+                || (c.contains("phone")
+                        && !containsAny(c, "headphone", "earphone", "microphone", "megaphone"))) {
             return "Smartfonlar";
         }
-        if (containsAny(c, "electronic", "computer", "camera", "audio", "video", "appliance",
-                "charger", "cable", "headphone", "elektron")) {
+        if (containsAny(c, "electronic", "computer", "laptop", "camera", "audio", "speaker", "video",
+                "appliance", "charger", "cable", "headphone", "earphone", "watch", "elektron")) {
             return "Elektronika";
         }
         if (containsAny(c, "medicine", "medication", "pharma", "drug", "pharmacy", "supplement",

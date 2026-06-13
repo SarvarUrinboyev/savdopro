@@ -43,11 +43,13 @@ class BarcodeLookupServiceTest {
     private static final String UPC_URL = "https://upc.test/prod/trial/lookup?upc={barcode}";
     private static final String LOOKUP_URL =
             "https://lookup.test/v3/products?barcode={barcode}&formatted=y&key={key}";
+    private static final String UPCDB_URL = "https://upcdb.test/product/{barcode}?apikey={key}";
 
     private static final String CODE = "4870204010023";
     private static final String UPC_REQUEST = "https://upc.test/prod/trial/lookup?upc=" + CODE;
     private static final String LOOKUP_REQUEST =
             "https://lookup.test/v3/products?barcode=" + CODE + "&formatted=y&key=secret";
+    private static final String UPCDB_REQUEST = "https://upcdb.test/product/" + CODE + "?apikey=secret";
     private static final String ISBN = "9781234567897";
     private static final String GOOGLE_BOOKS_REQUEST = "https://books.test/volumes?q=isbn:" + ISBN;
     private static final String OPEN_LIBRARY_REQUEST = "https://ol.test/search.json?isbn=" + ISBN;
@@ -163,6 +165,27 @@ class BarcodeLookupServiceTest {
     }
 
     @Test
+    void fallsThroughToUpcDatabaseWhenFreeSourcesMissAndKeyIsSet() {
+        service = service("", "secret"); // no paid lookup key; upcdatabase key set
+        missAllOpenFacts(CODE);
+        server.expect(requestTo(UPCDB_REQUEST)).andRespond(withSuccess("""
+                { "success": true,
+                  "title": "Samsung Galaxy Buds",
+                  "brand": "Samsung",
+                  "category": "Electronics",
+                  "categories": "Electronics,Audio,Headphones" }
+                """, MediaType.APPLICATION_JSON));
+
+        BarcodeLookupResponse result = service.lookup(CODE);
+
+        assertTrue(result.found());
+        assertEquals("Samsung Galaxy Buds", result.name());
+        assertEquals("Elektronika", result.suggestedCategory());
+        assertEquals("upcdatabase", result.source());
+        server.verify(); // UPC Item DB trial not stubbed → upcdatabase short-circuited it
+    }
+
+    @Test
     void isbnCodesUseGoogleBooksAndSkipTheRateLimitedPhase() {
         missAllOpenFacts(ISBN);
         server.expect(requestTo(OPEN_LIBRARY_REQUEST))
@@ -257,11 +280,16 @@ class BarcodeLookupServiceTest {
     }
 
     private BarcodeLookupService serviceWithKey(String key) {
+        return service(key, "");
+    }
+
+    private BarcodeLookupService service(String barcodeLookupKey, String upcDbKey) {
         // Runnable::run = a direct executor: the "async" sources run synchronously
         // on the test thread, so the mock server is never hit concurrently.
         return new BarcodeLookupService(builder.build(), Runnable::run, 3000,
                 BARCODE_LIST_URL, OFF_URL, OPF_URL, OBF_URL, PET_URL,
-                GOOGLE_BOOKS_URL, OPEN_LIBRARY_URL, UPC_URL, LOOKUP_URL, key);
+                GOOGLE_BOOKS_URL, OPEN_LIBRARY_URL, UPC_URL, LOOKUP_URL, barcodeLookupKey,
+                UPCDB_URL, upcDbKey);
     }
 
     /** Stub all four Open Facts sources to miss for {@code code}. */
