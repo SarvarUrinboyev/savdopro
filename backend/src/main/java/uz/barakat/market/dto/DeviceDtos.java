@@ -19,6 +19,7 @@ public final class DeviceDtos {
             String imei1,
             String imei2,
             String serialNumber,
+            String appleId,
             Long customerId,
             String customerName,
             String paymentMethod,

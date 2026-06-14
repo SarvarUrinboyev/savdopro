@@ -36,7 +36,7 @@ export function Devices() {
       if (statusFilter && d.status !== statusFilter) return false;
       if (onlyDebt && d.paymentMethod !== 'QARZGA') return false;
       if (!q) return true;
-      return [d.imei1, d.imei2, d.serialNumber, d.customerName, d.productName]
+      return [d.imei1, d.imei2, d.serialNumber, d.appleId, d.customerName, d.productName]
         .some((v) => v && String(v).toLowerCase().includes(q));
     });
   }, [devices, search, statusFilter, onlyDebt]);
@@ -64,9 +64,9 @@ export function Devices() {
   };
 
   const exportCsv = () => {
-    const header = ['IMEI1', 'IMEI2', 'Serial', 'Mahsulot', 'Mijoz', "To'lov", 'Holat', 'Sana'];
+    const header = ['IMEI1', 'IMEI2', 'Serial', 'Apple ID', 'Mahsulot', 'Mijoz', "To'lov", 'Holat', 'Sana'];
     const rows = filtered.map((d) => [
-      d.imei1, d.imei2, d.serialNumber, d.productName, d.customerName,
+      d.imei1, d.imei2, d.serialNumber, d.appleId, d.productName, d.customerName,
       d.paymentMethod, d.status, d.soldAt ? d.soldAt.replace('T', ' ').slice(0, 16) : '',
     ]);
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
@@ -142,6 +142,7 @@ export function Devices() {
                     <th>IMEI 1</th>
                     <th>IMEI 2</th>
                     <th>S/N</th>
+                    <th>Apple ID</th>
                     <th>{t('Mijoz')}</th>
                     <th className="num">{t('Narx')}</th>
                     <th>{t("To'lov")}</th>
@@ -158,6 +159,7 @@ export function Devices() {
                         <td style={{ fontFamily: 'monospace' }}>{d.imei1 || '—'}</td>
                         <td style={{ fontFamily: 'monospace' }}>{d.imei2 || '—'}</td>
                         <td style={{ fontFamily: 'monospace' }}>{d.serialNumber || '—'}</td>
+                        <td>{d.appleId || '—'}</td>
                         <td>{d.customerName || '—'}</td>
                         <td className="num">{d.salePriceUzs != null ? money(d.salePriceUzs) : '—'}</td>
                         <td>

@@ -16,7 +16,7 @@ export function ImeiCaptureModal({ lines, onConfirm, onClose }) {
     const init = {};
     for (const line of lines) {
       init[line.id] = Array.from({ length: Math.max(1, line.qty) },
-        () => ({ imei1: '', imei2: '', serial: '' }));
+        () => ({ imei1: '', imei2: '', serial: '', appleId: '' }));
     }
     return init;
   });
@@ -34,8 +34,9 @@ export function ImeiCaptureModal({ lines, onConfirm, onClose }) {
           imei1: (d.imei1 || '').trim(),
           imei2: (d.imei2 || '').trim(),
           serial: (d.serial || '').trim(),
+          appleId: (d.appleId || '').trim(),
         }))
-        .filter((d) => d.imei1 || d.imei2 || d.serial);
+        .filter((d) => d.imei1 || d.imei2 || d.serial || d.appleId);
     }
     onConfirm(captured);
   };
@@ -83,6 +84,15 @@ export function ImeiCaptureModal({ lines, onConfirm, onClose }) {
                 </div>
                 <div style={{ marginTop: 6 }}>
                   {num(line.id, idx, 'serial', t('Seriya raqami (S/N, ixtiyoriy)'))}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <input
+                    className="input"
+                    value={inputs[line.id][idx].appleId}
+                    inputMode="email"
+                    onChange={(e) => setField(line.id, idx, 'appleId', e.target.value)}
+                    placeholder={t('Apple ID / iCloud — faqat iPhone uchun (ixtiyoriy)')}
+                  />
                 </div>
               </div>
             ))}

@@ -311,7 +311,8 @@ public class PosService {
                 String imei1 = blankToNull(d.imei1());
                 String imei2 = blankToNull(d.imei2());
                 String serial = blankToNull(d.serial());
-                if (imei1 == null && imei2 == null && serial == null) {
+                String appleId = blankToNull(d.appleId());
+                if (imei1 == null && imei2 == null && serial == null && appleId == null) {
                     continue;   // nothing captured for this unit — skip
                 }
                 SoldDevice dev = new SoldDevice();
@@ -322,6 +323,7 @@ public class PosService {
                 dev.setImei1(imei1);
                 dev.setImei2(imei2);
                 dev.setSerialNumber(serial);
+                dev.setAppleId(appleId);
                 dev.setCustomerId(saved.getCustomerId());
                 dev.setCustomerName(customerName);
                 dev.setPaymentMethod(saved.getPaymentMethod());

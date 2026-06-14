@@ -58,11 +58,13 @@ public class DeviceService {
     /** CSV of the (optionally filtered) devices — IMEI list ready for Knox Guard. */
     @Transactional(readOnly = true)
     public String exportCsv(String q, String status, boolean onlyDebt) {
-        StringBuilder sb = new StringBuilder("IMEI1,IMEI2,Serial,Mahsulot,Mijoz,To'lov,Holat,Sana\n");
+        StringBuilder sb = new StringBuilder(
+                "IMEI1,IMEI2,Serial,Apple ID,Mahsulot,Mijoz,To'lov,Holat,Sana\n");
         for (DeviceResponse d : list(q, status, onlyDebt)) {
             sb.append(csv(d.imei1())).append(',')
               .append(csv(d.imei2())).append(',')
               .append(csv(d.serialNumber())).append(',')
+              .append(csv(d.appleId())).append(',')
               .append(csv(d.productName())).append(',')
               .append(csv(d.customerName())).append(',')
               .append(csv(d.paymentMethod())).append(',')
@@ -94,7 +96,7 @@ public class DeviceService {
 
     private static DeviceResponse toResponse(SoldDevice d) {
         return new DeviceResponse(d.getId(), d.getSaleId(), d.getProductId(), d.getProductName(),
-                d.getImei1(), d.getImei2(), d.getSerialNumber(), d.getCustomerId(),
+                d.getImei1(), d.getImei2(), d.getSerialNumber(), d.getAppleId(), d.getCustomerId(),
                 d.getCustomerName(), d.getPaymentMethod(), d.getSalePriceUzs(),
                 d.getStatus(), d.getNote(), d.getSoldAt());
     }

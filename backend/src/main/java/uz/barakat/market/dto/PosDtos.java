@@ -34,7 +34,9 @@ public final class PosDtos {
     public record DeviceInput(
             String imei1,
             String imei2,
-            String serial) {
+            String serial,
+            /** Apple ID (iCloud) login for an iPhone — email only, no password. */
+            String appleId) {
     }
 
     public record CheckoutRequest(

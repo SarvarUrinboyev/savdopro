@@ -55,6 +55,11 @@ public class SoldDevice extends TenantScopedEntity {
     @Column(name = "serial_number", length = 80)
     private String serialNumber;
 
+    /** Apple ID (iCloud) signed into an iPhone at sale, for the manual Find My
+     *  lock. Login/email only — the password is never stored here. */
+    @Column(name = "apple_id", length = 120)
+    private String appleId;
+
     @Column(name = "customer_id")
     private Long customerId;
 
