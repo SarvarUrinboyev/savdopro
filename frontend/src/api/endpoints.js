@@ -229,6 +229,13 @@ export const CategoryApi = {
   remove: (id) => api.del(`/categories/${id}`),
 };
 
+export const DeviceApi = {
+  // Sold-device (IMEI) tracking. params: { q, status, onlyDebt }.
+  list: (params) => api.get('/devices' + qs(params)),
+  // Update bookkeeping status: { status: ACTIVE|BLOCKED|RETURNED, note }.
+  setStatus: (id, body) => api.patch(`/devices/${id}`, body),
+};
+
 export const TerminalApi = {
   today: () => api.get('/terminal/today'),
   history: () => api.get('/terminal/history'),

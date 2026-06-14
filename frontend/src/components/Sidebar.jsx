@@ -308,6 +308,22 @@ export function Sidebar({ open }) {
             <span>{t('Integratsiyalar')}</span>
           </NavLink>
         )}
+        {/* Sold-device (IMEI) register — owner only. */}
+        {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
+          <NavLink
+            to="/devices"
+            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+          >
+            <span className="ico">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                   stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="7" y="2" width="10" height="20" rx="2" />
+                <path d="M11 18h2" />
+              </svg>
+            </span>
+            <span>{t('Qurilmalar (IMEI)')}</span>
+          </NavLink>
+        )}
         {NAV_ITEMS.filter((item) => isOn(item.key)).map((item) => (
           <NavLink
             key={item.to}

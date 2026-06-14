@@ -86,6 +86,9 @@ function Editor({ isNew, product, categories, movements, rate, reloadAll }) {
   // IMEI only matters for phones — hidden by default, pre-enabled when editing a
   // product that already carries one.
   const [isPhone, setIsPhone] = useState(Boolean(product?.imei1 || product?.imei2));
+  // When true, the POS asks the cashier for each unit's IMEI/serial at sale time
+  // and records it against the customer (for warranty / debt / Knox Guard).
+  const [requiresImei, setRequiresImei] = useState(product?.requiresImei ?? false);
 
   // ----- price entry currency (USD / so'm) -----
   // Prices are STORED in USD (reports, margins and the POS all assume it);
@@ -218,6 +221,7 @@ function Editor({ isNew, product, categories, movements, rate, reloadAll }) {
       vatRate: vatRate === '' ? null : Number(vatRate),
       unit: unit || 'dona',
       expiryDate: expiryDate || null,
+      requiresImei,
     };
     if (isNew) {
       body.quantity = Number(initialQty) || 0;
@@ -356,6 +360,18 @@ function Editor({ isNew, product, categories, movements, rate, reloadAll }) {
                              placeholder={t('ikkinchi SIM')} t={t} />
                 </div>
               )}
+              <div className="field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8,
+                                cursor: 'pointer', userSelect: 'none' }}>
+                  <input type="checkbox" checked={requiresImei}
+                         onChange={(e) => setRequiresImei(e.target.checked)}
+                         style={{ width: 16, height: 16, accentColor: 'var(--green)' }} />
+                  🔒 {t('Sotuvda IMEI talab qilinsin')}
+                </label>
+                <div className="field-hint">
+                  {t('Elektronika/smartfonlar uchun yoqing — sotilganda har bir donaning IMEI/seriya raqami so‘raladi va mijozga bog‘lab saqlanadi (Qurilmalar bo‘limida ko‘rinadi).')}
+                </div>
+              </div>
               <div className="field">
                 <label>{t('Toifa')}</label>
                 <select className="select" value={categoryId}

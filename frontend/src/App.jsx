@@ -52,6 +52,7 @@ const AccountingPeriods = lazyPage(() => import('./pages/AccountingPeriods.jsx')
 const Reconciliation = lazyPage(() => import('./pages/Reconciliation.jsx'), 'Reconciliation');
 const PurchaseOrders = lazyPage(() => import('./pages/PurchaseOrders.jsx'), 'PurchaseOrders');
 const Integrations = lazyPage(() => import('./pages/Integrations.jsx'), 'Integrations');
+const Devices = lazyPage(() => import('./pages/Devices.jsx'), 'Devices');
 
 const OWNER_ROLES = ['ACCOUNT_OWNER', 'SUPER_ADMIN'];
 
@@ -153,6 +154,7 @@ function Authenticated() {
         <Route path="accounting/periods" element={g(<AccountingPeriods />, { roles: OWNER_ROLES })} />
         <Route path="accounting/reconciliation" element={g(<Reconciliation />, { roles: OWNER_ROLES })} />
         <Route path="integrations" element={g(<Integrations />, { roles: OWNER_ROLES })} />
+        <Route path="devices" element={g(<Devices />, { roles: OWNER_ROLES })} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
     </Routes>

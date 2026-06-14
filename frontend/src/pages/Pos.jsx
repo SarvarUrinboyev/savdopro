@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CustomerApi, PosApi, ProductApi } from '../api/endpoints.js';
+import { ImeiCaptureModal } from '../components/ImeiCaptureModal.jsx';
 import { ConfirmDialog, Modal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { Spinner } from '../components/ui.jsx';
@@ -155,6 +156,8 @@ export function Pos() {
   const discountAmount = activeCheck.discountAmount ?? '';
   const [method, setMethod] = useState('NAQD');
   const [payOpen, setPayOpen] = useState(false);
+  // Non-null while the IMEI-capture dialog is open (the lines needing IMEI).
+  const [imeiLines, setImeiLines] = useState(null);
   const [clientOpen, setClientOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -276,6 +279,7 @@ export function Pos() {
         id: p.id, name: p.name, sku: p.barcode,
         unitPrice: Number(p.salePrice ?? p.sellingPriceUzs ?? 0),
         stock: p.quantity, qty: 1, lineDiscount: 0,
+        requiresImei: Boolean(p.requiresImei),
       }];
     });
     // The register keeps the just-rung row selected so the numpad's
@@ -463,17 +467,28 @@ export function Pos() {
     );
   });
 
-  const doCheckout = async () => {
+  const doCheckout = async (capturedDevices = null) => {
     if (busy) return;
     if (cart.length === 0) {
       toast.error(t("Savatcha bo'sh"));
       return;
     }
+    // IMEI-tracked lines: collect each unit's IMEI/serial before paying. The
+    // modal calls doCheckout(captured) back once the cashier confirms.
+    if (!capturedDevices) {
+      const need = cart.filter((it) => it.requiresImei);
+      if (need.length > 0) {
+        setImeiLines(need.map((it) => ({ id: it.id, name: it.name, qty: it.qty })));
+        return;
+      }
+    }
+    const devicesFor = (id) => (capturedDevices && capturedDevices[id]) || undefined;
     const payload = {
       items: cart.map((it) => ({
         productId: it.id,
         quantity: it.qty,
         lineDiscountUzs: Number(it.lineDiscount) || 0,
+        devices: devicesFor(it.id),
       })),
       discountPercent: percent,
       discountAmount: Number(discountAmount) || 0,
@@ -1081,6 +1096,15 @@ export function Pos() {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* ===== IMEI capture (shown before payment for IMEI-tracked lines) ===== */}
+      {imeiLines && (
+        <ImeiCaptureModal
+          lines={imeiLines}
+          onClose={() => setImeiLines(null)}
+          onConfirm={(captured) => { setImeiLines(null); doCheckout(captured); }}
+        />
       )}
 
       {/* ============ payment dialog ============ */}
