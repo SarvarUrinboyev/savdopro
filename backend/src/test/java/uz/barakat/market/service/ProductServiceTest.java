@@ -57,7 +57,7 @@ class ProductServiceTest {
         return new ProductRequest(
                 "Coca-Cola 0.5L", null, null, null,
                 new BigDecimal("1.00"), new BigDecimal("2.00"),
-                quantity, null, null, null, null, null, null, null, null);
+                quantity, null, null, null, null, null, null, null, null, false);
     }
 
     @Test

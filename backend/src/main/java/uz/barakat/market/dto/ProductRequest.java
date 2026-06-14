@@ -34,5 +34,7 @@ public record ProductRequest(
         String mxikCode,
         @PositiveOrZero(message = "QQS stavkasi manfiy bo'la olmaydi") BigDecimal vatRate,
         String unit,
-        LocalDate expiryDate) {
+        LocalDate expiryDate,
+        /** Mark smartphones / electronics so the POS captures each unit's IMEI. */
+        boolean requiresImei) {
 }

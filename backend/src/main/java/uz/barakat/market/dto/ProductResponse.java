@@ -29,5 +29,6 @@ public record ProductResponse(
         BigDecimal vatRate,
         String unit,
         LocalDate expiryDate,
+        boolean requiresImei,
         LocalDateTime createdAt) {
 }

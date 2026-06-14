@@ -119,7 +119,8 @@ public final class Mappers {
                 p.getImei2(), p.getPurchasePrice(), p.getSalePrice(), p.getQuantity(),
                 p.getCategoryId(), categoryName, p.getDescription(), p.getLowStockThreshold(),
                 margin, stockValue, stockStatus(p),
-                p.getMxikCode(), p.getVatRate(), p.getUnit(), p.getExpiryDate(), p.getCreatedAt());
+                p.getMxikCode(), p.getVatRate(), p.getUnit(), p.getExpiryDate(),
+                p.isRequiresImei(), p.getCreatedAt());
     }
 
     /** Derived stock bucket: OUT (0) / LOW (at or below threshold) / IN_STOCK. */

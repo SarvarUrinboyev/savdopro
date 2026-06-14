@@ -6,8 +6,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.context.ApplicationEventPublisher;
@@ -23,11 +25,13 @@ import uz.barakat.market.domain.PaymentType;
 import uz.barakat.market.domain.Product;
 import uz.barakat.market.domain.Sale;
 import uz.barakat.market.domain.SaleItem;
+import uz.barakat.market.domain.SoldDevice;
 import uz.barakat.market.domain.StockMovement;
 import uz.barakat.market.domain.StockReason;
 import uz.barakat.market.dto.PageSlice;
 import uz.barakat.market.dto.PosDtos.CartItem;
 import uz.barakat.market.dto.PosDtos.CheckoutRequest;
+import uz.barakat.market.dto.PosDtos.DeviceInput;
 import uz.barakat.market.dto.PosDtos.RefundItemRequest;
 import uz.barakat.market.dto.PosDtos.RefundRequest;
 import uz.barakat.market.dto.PosDtos.SaleItemResponse;
@@ -38,6 +42,7 @@ import uz.barakat.market.repository.CustomerRepository;
 import uz.barakat.market.repository.PaymentRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.SaleRepository;
+import uz.barakat.market.repository.SoldDeviceRepository;
 import uz.barakat.market.repository.StockMovementRepository;
 
 /**
@@ -69,6 +74,7 @@ public class PosService {
     private final PaymentRepository payments;
     private final StockMovementRepository movements;
     private final CustomerRepository customers;
+    private final SoldDeviceRepository soldDevices;
     private final RealtimeBus realtime;
     private final PromoService promos;
     private final LoyaltyService loyalty;
@@ -78,7 +84,8 @@ public class PosService {
 
     public PosService(SaleRepository sales, ProductRepository products,
                       PaymentRepository payments, StockMovementRepository movements,
-                      CustomerRepository customers, RealtimeBus realtime,
+                      CustomerRepository customers, SoldDeviceRepository soldDevices,
+                      RealtimeBus realtime,
                       PromoService promos, LoyaltyService loyalty,
                       CustomerNotificationService notifications,
                       AnomalyAlertService anomalyAlerts,
@@ -88,6 +95,7 @@ public class PosService {
         this.payments = payments;
         this.movements = movements;
         this.customers = customers;
+        this.soldDevices = soldDevices;
         this.realtime = realtime;
         this.promos = promos;
         this.loyalty = loyalty;
@@ -134,6 +142,9 @@ public class PosService {
 
         BigDecimal subtotal = BigDecimal.ZERO;
         Set<Long> seenIds = new HashSet<>();
+        // Per-unit IMEI/serial captures, keyed by productId (unique per sale).
+        // Saved as sold_devices rows after the sale (and its item ids) persist.
+        Map<Long, List<DeviceInput>> deviceCaptures = new HashMap<>();
         for (CartItem c : req.items()) {
             if (c.productId() == null) {
                 throw new BadRequestException("Mahsulot tanlanmagan");
@@ -170,6 +181,15 @@ public class PosService {
             item.setLineDiscountUzs(lineDisc);
             item.setLineTotalUzs(lineTotal);
             sale.addItem(item);
+
+            // Capture per-unit IMEIs for IMEI-tracked goods (saved after the sale).
+            if (c.devices() != null && !c.devices().isEmpty()) {
+                if (c.devices().size() > c.quantity()) {
+                    throw new BadRequestException(
+                            "IMEI soni miqdordan ko'p: " + p.getName());
+                }
+                deviceCaptures.put(p.getId(), c.devices());
+            }
 
             subtotal = subtotal.add(gross);
 
@@ -251,6 +271,10 @@ public class PosService {
         }
 
         Sale saved = sales.save(sale);
+        // Record per-unit IMEIs now that the sale + its item ids exist.
+        if (!deviceCaptures.isEmpty()) {
+            recordSoldDevices(saved, deviceCaptures);
+        }
         // Best-effort owner alert if any line sold below cost (loss / mis-pricing).
         anomalyAlerts.checkBelowCost(saved);
         // Credit loyalty points and push the receipt if tied to a customer.
@@ -268,6 +292,45 @@ public class PosService {
         // a ledger failure never affects the sale — see LedgerPostingListener).
         events.publishEvent(new LedgerEvents.SalePosted(saved.getId()));
         return toResponse(saved);
+    }
+
+    /**
+     * Persist one {@link SoldDevice} per captured unit, linked to the saved sale,
+     * its line, and the customer. Entries with no IMEI/serial at all are skipped.
+     */
+    private void recordSoldDevices(Sale saved, Map<Long, List<DeviceInput>> captures) {
+        String customerName = saved.getCustomerId() == null ? null
+                : customers.findById(saved.getCustomerId())
+                        .map(Customer::getName).orElse(null);
+        for (SaleItem item : saved.getItems()) {
+            List<DeviceInput> devs = captures.get(item.getProductId());
+            if (devs == null) {
+                continue;
+            }
+            for (DeviceInput d : devs) {
+                String imei1 = blankToNull(d.imei1());
+                String imei2 = blankToNull(d.imei2());
+                String serial = blankToNull(d.serial());
+                if (imei1 == null && imei2 == null && serial == null) {
+                    continue;   // nothing captured for this unit — skip
+                }
+                SoldDevice dev = new SoldDevice();
+                dev.setSaleId(saved.getId());
+                dev.setSaleItemId(item.getId());
+                dev.setProductId(item.getProductId());
+                dev.setProductName(item.getProductName());
+                dev.setImei1(imei1);
+                dev.setImei2(imei2);
+                dev.setSerialNumber(serial);
+                dev.setCustomerId(saved.getCustomerId());
+                dev.setCustomerName(customerName);
+                dev.setPaymentMethod(saved.getPaymentMethod());
+                dev.setSalePriceUzs(item.getUnitPriceUzs());
+                dev.setStatus("ACTIVE");
+                dev.setSoldAt(saved.getCreatedAt());
+                soldDevices.save(dev);
+            }
+        }
     }
 
     // ========================================================= receipt send

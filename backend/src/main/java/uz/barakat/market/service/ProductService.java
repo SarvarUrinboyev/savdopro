@@ -370,6 +370,7 @@ public class ProductService {
         String unit = blankToNull(request.unit());
         product.setUnit(unit != null ? unit : "dona");
         product.setExpiryDate(request.expiryDate());
+        product.setRequiresImei(request.requiresImei());
     }
 
     private void logMovement(Product product, int delta, int resulting,

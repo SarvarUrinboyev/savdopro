@@ -85,6 +85,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/debts/**", "/api/debtors/**", "/api/customer-debts/**").access(perm("DEBTS", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/pos/**", "/api/print/**").access(perm("SALES", "READ"))
                         .requestMatchers("/api/pos/**", "/api/print/**").access(perm("SALES", "WRITE"))
+                        // Sold-device (IMEI) tracking — a sales artefact; list/export
+                        // is SALES:READ, status changes are SALES:WRITE.
+                        .requestMatchers(HttpMethod.GET, "/api/devices/**").access(perm("SALES", "READ"))
+                        .requestMatchers("/api/devices/**").access(perm("SALES", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/payments/**").access(perm("PAYMENTS", "READ"))
                         .requestMatchers("/api/payments/**").access(perm("PAYMENTS", "WRITE"))
                         .requestMatchers(HttpMethod.GET, "/api/customers/**").access(perm("CUSTOMERS", "READ"))

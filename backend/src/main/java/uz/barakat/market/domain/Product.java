@@ -74,4 +74,9 @@ public class Product extends TenantScopedEntity {
     /** Optional best-before / expiry date (perishable goods). Null = not tracked. */
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
+
+    /** When true, the POS prompts for each unit's IMEI/serial at sale time
+     *  (smartphones, electronics) and records them as sold devices. */
+    @Column(name = "requires_imei", nullable = false)
+    private boolean requiresImei = false;
 }

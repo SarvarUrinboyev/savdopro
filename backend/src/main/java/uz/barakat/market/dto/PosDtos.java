@@ -21,7 +21,20 @@ public final class PosDtos {
             @NotNull Long productId,
             @Min(1) int quantity,
             /** Per-line discount in UZS. 0 = no line discount. */
-            BigDecimal lineDiscountUzs) {
+            BigDecimal lineDiscountUzs,
+            /**
+             * Per-unit IMEI / serial captures for IMEI-tracked products. Optional;
+             * when present the list size must not exceed {@code quantity} (one
+             * entry per physical unit). Each unit becomes a {@code sold_devices} row.
+             */
+            List<DeviceInput> devices) {
+    }
+
+    /** One physical unit's identifiers, captured at checkout for IMEI-tracked goods. */
+    public record DeviceInput(
+            String imei1,
+            String imei2,
+            String serial) {
     }
 
     public record CheckoutRequest(
