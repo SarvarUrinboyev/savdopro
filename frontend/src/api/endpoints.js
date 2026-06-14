@@ -234,6 +234,8 @@ export const DeviceApi = {
   list: (params) => api.get('/devices' + qs(params)),
   // Register incoming IMEIs at intake: { productId, devices:[{imei1,imei2,serial,appleId}] }.
   intake: (body) => api.post('/devices/intake', body),
+  // Chiqim: scan one IMEI out of stock: { imei }.
+  dispatch: (body) => api.post('/devices/dispatch', body),
   // Update lifecycle status: { status: IN_STOCK|SOLD|BLOCKED|RETURNED, note }.
   setStatus: (id, body) => api.patch(`/devices/${id}`, body),
 };

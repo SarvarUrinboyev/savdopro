@@ -321,7 +321,7 @@ export function Sidebar({ open }) {
                 <path d="M11 18h2" />
               </svg>
             </span>
-            <span>{t('Qurilmalar (IMEI)')}</span>
+            <span>{t('IMEI baza')}</span>
           </NavLink>
         )}
         {NAV_ITEMS.filter((item) => isOn(item.key)).map((item) => (

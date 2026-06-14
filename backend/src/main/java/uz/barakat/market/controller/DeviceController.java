@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uz.barakat.market.dto.DeviceDtos.DeviceResponse;
 import uz.barakat.market.dto.DeviceDtos.DeviceStatusRequest;
+import uz.barakat.market.dto.DeviceDtos.DispatchRequest;
 import uz.barakat.market.dto.DeviceDtos.IntakeRequest;
 import uz.barakat.market.service.DeviceService;
 
@@ -34,6 +35,12 @@ public class DeviceController {
     @PostMapping("/intake")
     public List<DeviceResponse> intake(@Valid @RequestBody IntakeRequest request) {
         return service.intake(request);
+    }
+
+    /** Chiqim: scan one IMEI out of stock — marks it SOLD + decrements stock. */
+    @PostMapping("/dispatch")
+    public DeviceResponse dispatch(@Valid @RequestBody DispatchRequest request) {
+        return service.dispatchByImei(request.imei());
     }
 
     /** List/search tracked devices; q matches IMEI/serial/customer/product. */

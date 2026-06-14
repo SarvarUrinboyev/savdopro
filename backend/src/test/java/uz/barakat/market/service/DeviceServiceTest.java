@@ -114,6 +114,33 @@ class DeviceServiceTest {
     }
 
     @Test
+    void dispatchMarksInStockDeviceSoldAndDecrementsStock() {
+        SoldDevice d = device(9L, "999888777666555", "iPhone 15", null, null, "IN_STOCK");
+        d.setProductId(50L);
+        when(repo.findFirstByImei1AndStatus("999888777666555", "IN_STOCK")).thenReturn(Optional.of(d));
+        when(repo.save(any(SoldDevice.class))).thenAnswer(i -> i.getArgument(0));
+        Product p = new Product();
+        p.setId(50L);
+        p.setName("iPhone 15");
+        p.setQuantity(5);
+        p.setSalePrice(BigDecimal.TEN);
+        p.setPurchasePrice(BigDecimal.ONE);
+        when(products.findById(50L)).thenReturn(Optional.of(p));
+
+        DeviceResponse r = service.dispatchByImei(" 999888777666555 ");   // trims whitespace
+
+        assertEquals("SOLD", r.status());
+        assertEquals(4, p.getQuantity());                                  // 5 − 1
+        verify(movements).save(any(StockMovement.class));
+    }
+
+    @Test
+    void dispatchRejectsImeiThatIsNotInStock() {
+        when(repo.findFirstByImei1AndStatus("000", "IN_STOCK")).thenReturn(Optional.empty());
+        assertThrows(BadRequestException.class, () -> service.dispatchByImei("000"));
+    }
+
+    @Test
     void exportCsvHasHeaderAndRows() {
         String csv = service.exportCsv(null, null, false);
         assertTrue(csv.startsWith("IMEI1,IMEI2,Serial,"));

@@ -95,6 +95,45 @@ public class DeviceService {
         return created.stream().map(DeviceService::toResponse).toList();
     }
 
+    /**
+     * Chiqim: scan one IMEI out of stock. Finds the IN_STOCK unit by its primary
+     * IMEI, flips it to SOLD, and decrements the product's stock by one. Errors
+     * (with a clear message) if the IMEI isn't in stock — so a code that was never
+     * received, or already gone, can't decrement twice.
+     */
+    public DeviceResponse dispatchByImei(String imei) {
+        String code = trim(imei);
+        if (code == null) {
+            throw new BadRequestException("IMEI bo'sh");
+        }
+        SoldDevice d = devices.findFirstByImei1AndStatus(code, "IN_STOCK")
+                .orElseThrow(() -> new BadRequestException(
+                        "Bu IMEI omborda topilmadi (kirim qilinmagan yoki allaqachon chiqqan): " + code));
+        d.setStatus("SOLD");
+        d.setSoldAt(LocalDateTime.now());
+        if (d.getNote() == null) {
+            d.setNote("IMEI chiqim (skaner)");
+        }
+        SoldDevice saved = devices.save(d);
+        if (d.getProductId() != null) {
+            products.findById(d.getProductId()).ifPresent(p -> {
+                int newQty = Math.max(0, p.getQuantity() - 1);
+                p.setQuantity(newQty);
+                products.save(p);
+                StockMovement mv = new StockMovement();
+                mv.setProductId(p.getId());
+                mv.setDelta(-1);
+                mv.setResultingQuantity(newQty);
+                mv.setReason(StockReason.SALE);
+                mv.setNote("IMEI chiqim (skaner)");
+                mv.setUnitSalePrice(p.getSalePrice());
+                mv.setUnitCostPrice(p.getPurchasePrice());
+                movements.save(mv);
+            });
+        }
+        return toResponse(saved);
+    }
+
     /** All tracked devices, newest first, optionally filtered. */
     @Transactional(readOnly = true)
     public List<DeviceResponse> list(String q, String status, boolean onlyDebt) {

@@ -20,6 +20,11 @@ public final class DeviceDtos {
             @NotEmpty(message = "Kamida bitta IMEI kiriting") List<DeviceInput> devices) {
     }
 
+    /** Scan one IMEI out of stock (chiqim): finds the IN_STOCK unit and marks it gone. */
+    public record DispatchRequest(
+            @NotBlank(message = "IMEI kiritilmadi") String imei) {
+    }
+
     /** API view of one tracked device. */
     public record DeviceResponse(
             Long id,
