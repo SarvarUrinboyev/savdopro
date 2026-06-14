@@ -12,9 +12,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 import uz.barakat.market.dto.DeviceDtos.DeviceResponse;
 import uz.barakat.market.dto.DeviceDtos.DeviceStatusRequest;
+import uz.barakat.market.dto.DeviceDtos.IntakeRequest;
 import uz.barakat.market.service.DeviceService;
 
 /** REST API for sold-device (IMEI) tracking. */
@@ -26,6 +28,12 @@ public class DeviceController {
 
     public DeviceController(DeviceService service) {
         this.service = service;
+    }
+
+    /** Register incoming units' IMEIs at intake (IN_STOCK) + bump stock. */
+    @PostMapping("/intake")
+    public List<DeviceResponse> intake(@Valid @RequestBody IntakeRequest request) {
+        return service.intake(request);
     }
 
     /** List/search tracked devices; q matches IMEI/serial/customer/product. */

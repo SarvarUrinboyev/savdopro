@@ -73,13 +73,18 @@ public class SoldDevice extends TenantScopedEntity {
     @Column(name = "sale_price_uzs", precision = 15, scale = 2)
     private BigDecimal salePriceUzs;
 
-    /** ACTIVE | BLOCKED | RETURNED — the shop's own bookkeeping. */
+    /** Lifecycle: IN_STOCK (received) | SOLD | BLOCKED | RETURNED. */
     @Column(nullable = false, length = 20)
-    private String status = "ACTIVE";
+    private String status = "IN_STOCK";
 
     @Column(length = 500)
     private String note;
 
+    /** When the unit was received into stock (intake / kirim). */
+    @Column(name = "intake_date")
+    private LocalDateTime intakeDate;
+
+    /** When the unit was sold to a customer; null while IN_STOCK. */
     @Column(name = "sold_at")
     private LocalDateTime soldAt;
 }

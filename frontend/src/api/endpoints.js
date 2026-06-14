@@ -230,9 +230,11 @@ export const CategoryApi = {
 };
 
 export const DeviceApi = {
-  // Sold-device (IMEI) tracking. params: { q, status, onlyDebt }.
+  // Device (IMEI) register. params: { q, status, onlyDebt }.
   list: (params) => api.get('/devices' + qs(params)),
-  // Update bookkeeping status: { status: ACTIVE|BLOCKED|RETURNED, note }.
+  // Register incoming IMEIs at intake: { productId, devices:[{imei1,imei2,serial,appleId}] }.
+  intake: (body) => api.post('/devices/intake', body),
+  // Update lifecycle status: { status: IN_STOCK|SOLD|BLOCKED|RETURNED, note }.
   setStatus: (id, body) => api.patch(`/devices/${id}`, body),
 };
 

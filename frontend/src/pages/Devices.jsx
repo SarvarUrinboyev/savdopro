@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { DeviceApi } from '../api/endpoints.js';
+import { DeviceApi, ProductApi } from '../api/endpoints.js';
+import { DeviceIntakeModal } from '../components/DeviceIntakeModal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { EmptyState, Loader, MetricCard, PageHeader } from '../components/ui.jsx';
 import { useT } from '../context/Settings.jsx';
@@ -7,28 +8,37 @@ import { useApi } from '../hooks/useApi.js';
 import { money } from '../lib/format.js';
 
 const STATUS_BADGE = {
-  ACTIVE: { badge: 'badge-naqd', label: 'Faol' },
+  IN_STOCK: { badge: 'badge-karta', label: 'Omborda' },
+  SOLD: { badge: 'badge-naqd', label: 'Sotilgan' },
   BLOCKED: { badge: 'badge-qarzga', label: 'Bloklangan' },
   RETURNED: { badge: 'badge-muted', label: 'Qaytarilgan' },
 };
 
+const shortDate = (s) => (s ? s.replace('T', ' ').slice(0, 10) : '');
+
 /**
- * Sold-device (IMEI) register. Lists every phone/electronics unit handed to a
- * customer with its IMEI/serial, links to the sale + customer, and lets the
- * owner mark a device BLOCKED (e.g. after a Knox Guard lock) or export the IMEIs
- * as CSV (ready to upload into a Knox Guard device list). The app never locks a
- * phone itself — this is a record + the data feed for Knox Guard.
+ * Device (IMEI) register. Every IMEI-tracked unit is recorded at intake
+ * (Omborda), flips to Sotilgan when sold (linked to the customer + date), and is
+ * searchable here — so when a customer brings a device back you can verify "did
+ * we sell this IMEI, when, and to whom?". The app never locks a phone; Samsung →
+ * Knox Guard, iPhone → the shop's Apple ID + Find My.
  */
 export function Devices() {
   const t = useT();
   const toast = useToast();
   const { data, loading, error, reload } = useApi(() => DeviceApi.list(), []);
+  const productsApi = useApi(() => ProductApi.list(), []);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [onlyDebt, setOnlyDebt] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
 
   const devices = data || [];
+  const imeiProducts = useMemo(
+    () => (productsApi.data || []).filter((p) => p.requiresImei),
+    [productsApi.data],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -42,8 +52,9 @@ export function Devices() {
   }, [devices, search, statusFilter, onlyDebt]);
 
   const summary = useMemo(() => ({
-    count: devices.length,
-    debt: devices.filter((d) => d.paymentMethod === 'QARZGA').length,
+    inStock: devices.filter((d) => d.status === 'IN_STOCK').length,
+    sold: devices.filter((d) => d.status === 'SOLD' || d.status === 'BLOCKED').length,
+    debt: devices.filter((d) => d.paymentMethod === 'QARZGA' && d.status !== 'IN_STOCK').length,
     blocked: devices.filter((d) => d.status === 'BLOCKED').length,
   }), [devices]);
 
@@ -64,10 +75,11 @@ export function Devices() {
   };
 
   const exportCsv = () => {
-    const header = ['IMEI1', 'IMEI2', 'Serial', 'Apple ID', 'Mahsulot', 'Mijoz', "To'lov", 'Holat', 'Sana'];
+    const header = ['IMEI1', 'IMEI2', 'Serial', 'Apple ID', 'Mahsulot', 'Mijoz', "To'lov",
+      'Holat', 'Kirim', 'Sotilgan'];
     const rows = filtered.map((d) => [
       d.imei1, d.imei2, d.serialNumber, d.appleId, d.productName, d.customerName,
-      d.paymentMethod, d.status, d.soldAt ? d.soldAt.replace('T', ' ').slice(0, 16) : '',
+      d.paymentMethod, d.status, shortDate(d.intakeDate), shortDate(d.soldAt),
     ]);
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const csv = [header, ...rows].map((r) => r.map(esc).join(',')).join('\n');
@@ -83,17 +95,22 @@ export function Devices() {
   return (
     <>
       <PageHeader title={t('Qurilmalar (IMEI)')}
-                  desc={t('Sotilgan smartfon/elektronika qurilmalari — IMEI bo‘yicha kuzatuv')}>
+                  desc={t('Kirimdan sotuvgacha — har bir qurilma IMEI bo‘yicha kuzatuv')}>
         <button className="btn btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}
                 title={t('IMEI ro‘yxatini CSV qilib yuklab olish (Knox Guard uchun ham)')}>
           ⬇ {t('CSV (IMEI)')}
         </button>
+        <button className="btn btn-primary" onClick={() => setIntakeOpen(true)}>
+          + {t('IMEI kirim')}
+        </button>
       </PageHeader>
 
       <div className="metrics section">
-        <MetricCard tone="blue" icon="📱" label={t('Jami qurilmalar')} value={summary.count}
+        <MetricCard tone="blue" icon="📦" label={t('Omborda (IMEI)')} value={summary.inStock}
                     currency={false} />
-        <MetricCard tone="red" icon="📒" label={t('Qarzga berilgan')} value={summary.debt}
+        <MetricCard tone="green" icon="✅" label={t('Sotilgan')} value={summary.sold}
+                    currency={false} />
+        <MetricCard tone="red" icon="📒" label={t('Qarzga')} value={summary.debt}
                     currency={false} />
         <MetricCard tone="muted" icon="🔒" label={t('Bloklangan')} value={summary.blocked}
                     currency={false} />
@@ -111,7 +128,8 @@ export function Devices() {
             <select className="select" value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">{t('Hammasi')}</option>
-              <option value="ACTIVE">{t('Faol')}</option>
+              <option value="IN_STOCK">{t('Omborda')}</option>
+              <option value="SOLD">{t('Sotilgan')}</option>
               <option value="BLOCKED">{t('Bloklangan')}</option>
               <option value="RETURNED">{t('Qaytarilgan')}</option>
             </select>
@@ -145,14 +163,15 @@ export function Devices() {
                     <th>Apple ID</th>
                     <th>{t('Mijoz')}</th>
                     <th className="num">{t('Narx')}</th>
-                    <th>{t("To'lov")}</th>
                     <th>{t('Holat')}</th>
+                    <th>{t('Sana')}</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((d) => {
-                    const st = STATUS_BADGE[d.status] || STATUS_BADGE.ACTIVE;
+                    const st = STATUS_BADGE[d.status] || STATUS_BADGE.IN_STOCK;
+                    const sold = d.status === 'SOLD' || d.status === 'BLOCKED';
                     return (
                       <tr key={d.id}>
                         <td>{d.productName}</td>
@@ -160,23 +179,24 @@ export function Devices() {
                         <td style={{ fontFamily: 'monospace' }}>{d.imei2 || '—'}</td>
                         <td style={{ fontFamily: 'monospace' }}>{d.serialNumber || '—'}</td>
                         <td>{d.appleId || '—'}</td>
-                        <td>{d.customerName || '—'}</td>
+                        <td>{d.customerName || (sold ? '—' : '')}</td>
                         <td className="num">{d.salePriceUzs != null ? money(d.salePriceUzs) : '—'}</td>
-                        <td>
-                          {d.paymentMethod === 'QARZGA'
-                            ? <span className="badge badge-qarzga">{t('Qarzga')}</span>
-                            : (d.paymentMethod || '—')}
-                        </td>
                         <td><span className={`badge ${st.badge}`}>{t(st.label)}</span></td>
+                        <td className="faint" style={{ fontSize: 12 }}>
+                          {sold
+                            ? `${t('Sotildi')}: ${shortDate(d.soldAt)}`
+                            : `${t('Kirim')}: ${shortDate(d.intakeDate)}`}
+                        </td>
                         <td className="num">
-                          {d.status !== 'BLOCKED' ? (
+                          {d.status === 'SOLD' && (
                             <button className="btn btn-ghost btn-sm" disabled={busyId === d.id}
                                     onClick={() => setStatus(d, 'BLOCKED')}>
                               🔒 {t('Bloklash')}
                             </button>
-                          ) : (
+                          )}
+                          {d.status === 'BLOCKED' && (
                             <button className="btn btn-ghost btn-sm" disabled={busyId === d.id}
-                                    onClick={() => setStatus(d, 'ACTIVE')}>
+                                    onClick={() => setStatus(d, 'SOLD')}>
                               🔓 {t('Ochish')}
                             </button>
                           )}
@@ -190,6 +210,14 @@ export function Devices() {
           )}
         </Loader>
       </div>
+
+      {intakeOpen && (
+        <DeviceIntakeModal
+          products={imeiProducts}
+          onClose={() => setIntakeOpen(false)}
+          onDone={() => { setIntakeOpen(false); reload(); productsApi.reload(); }}
+        />
+      )}
     </>
   );
 }

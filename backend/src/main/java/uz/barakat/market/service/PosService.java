@@ -315,20 +315,35 @@ public class PosService {
                 if (imei1 == null && imei2 == null && serial == null && appleId == null) {
                     continue;   // nothing captured for this unit — skip
                 }
-                SoldDevice dev = new SoldDevice();
+                // Prefer flipping an already-registered in-stock unit to SOLD, so the
+                // intake record and the sale are ONE row (one device, full history).
+                SoldDevice dev = imei1 == null ? null
+                        : soldDevices.findFirstByImei1AndStatus(imei1, "IN_STOCK").orElse(null);
+                if (dev == null) {
+                    // Not pre-registered at intake — create the row now.
+                    dev = new SoldDevice();
+                    dev.setProductId(item.getProductId());
+                    dev.setProductName(item.getProductName());
+                    dev.setImei1(imei1);
+                    dev.setIntakeDate(saved.getCreatedAt());
+                }
+                // Fill any ids captured at the till that intake didn't have.
+                if (imei2 != null) {
+                    dev.setImei2(imei2);
+                }
+                if (serial != null) {
+                    dev.setSerialNumber(serial);
+                }
+                if (appleId != null) {
+                    dev.setAppleId(appleId);
+                }
                 dev.setSaleId(saved.getId());
                 dev.setSaleItemId(item.getId());
-                dev.setProductId(item.getProductId());
-                dev.setProductName(item.getProductName());
-                dev.setImei1(imei1);
-                dev.setImei2(imei2);
-                dev.setSerialNumber(serial);
-                dev.setAppleId(appleId);
                 dev.setCustomerId(saved.getCustomerId());
                 dev.setCustomerName(customerName);
                 dev.setPaymentMethod(saved.getPaymentMethod());
                 dev.setSalePriceUzs(item.getUnitPriceUzs());
-                dev.setStatus("ACTIVE");
+                dev.setStatus("SOLD");
                 dev.setSoldAt(saved.getCreatedAt());
                 soldDevices.save(dev);
             }
