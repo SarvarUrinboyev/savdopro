@@ -1,15 +1,42 @@
-# SavdoPRO — Multi-Tenant Cloud POS SaaS
+<p align="center">
+  <img src="./.logos/logo1.svg" width="104" alt="SavdoPRO logo" />
+</p>
 
-**Live at [savdopro.uz](https://savdopro.uz)**
+<h1 align="center">SavdoPRO — Multi-Tenant Cloud POS SaaS</h1>
 
-SavdoPRO is a production multi-tenant cloud point-of-sale (POS) platform for retail shops in Uzbekistan — especially phone/electronics stores. Shop owners and cashiers ring up sales (kassa), manage inventory (ombor) with barcode scanning and national-catalogue (MXIK) auto-fill, track customer debt (qarz), handle per-unit **IMEI/device lifecycle** (intake → sale → verify, with Apple ID capture), run fiscalization, and view dashboards and reports. It ships as a **hosted web portal, an Electron desktop kiosk, and a mobile app**, all on a shared Spring Boot backend, with a **separate licensing/billing microservice**.
+<p align="center"><strong>The point-of-sale platform that runs real retail shops in Uzbekistan — live in production.</strong></p>
 
-> Tenants (shops) are isolated at the database layer; a super-admin operates the SaaS platform itself.
+<p align="center">
+  <a href="https://savdopro.uz"><img src="https://img.shields.io/badge/live-savdopro.uz-2ea44f?logo=icloud&logoColor=white" alt="Live at savdopro.uz"></a>
+  <a href="https://github.com/SarvarUrinboyev/savdopro/actions/workflows/ci.yml"><img src="https://github.com/SarvarUrinboyev/savdopro/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/tests-307%20passing-brightgreen" alt="307 tests passing">
+  <img src="https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white" alt="Java 21">
+  <img src="https://img.shields.io/badge/Spring%20Boot-3.3-6DB33F?logo=springboot&logoColor=white" alt="Spring Boot 3.3">
+  <img src="https://img.shields.io/badge/license-proprietary-lightgrey" alt="Proprietary">
+</p>
 
----
+A production **multi-tenant cloud point-of-sale (POS)** platform for retail shops in Uzbekistan — especially phone/electronics stores. Shop owners and cashiers ring up sales (*kassa*), manage inventory (*ombor*) with barcode scanning and national-catalogue (MXIK) auto-fill, track customer debt (*qarz*), handle per-unit **IMEI/device lifecycle** (intake → sale → verify, with Apple ID capture), run fiscalization, and view dashboards and reports. It ships as a **hosted web portal, an Electron desktop kiosk, and a mobile app**, all on a shared Spring Boot backend, with a **separate licensing/billing microservice**.
 
-## Architecture — five deployable modules
+> Built and operated solo, **live at [savdopro.uz](https://savdopro.uz)** · **[307 automated tests](https://github.com/SarvarUrinboyev/savdopro/actions/workflows/ci.yml)** gated in CI · **47 Flyway migrations** · **35 tagged releases**. Tenants (shops) are isolated at the database layer; a super-admin operates the SaaS platform itself.
 
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph Clients
+    W[Web portal<br/>React 18 + Vite]
+    E[Desktop kiosk<br/>Electron 33 auto-update]
+    M[Mobile<br/>Flutter + RN/Expo]
+  end
+  W & E & M -->|JWT REST + WebSocket| API[Spring Boot 3.3 backend<br/>Java 21 · 258 endpoints]
+  API --> TF{{TenantFilterAspect<br/>fail-closed row-level scope}}
+  TF -->|"WHERE shop_id = :shopId"| DB[(PostgreSQL<br/>47 Flyway migrations)]
+  API <-->|activation · billing| LIC[License / billing service<br/>own DB · Click / Payme]
+  API --> OBS[Micrometer + Prometheus · Sentry]
+  API --> INT[Telegram bot · Eskiz SMS · MXIK catalogue]
+```
+
+**Five deployable modules:**
 1. **Backend** — Spring Boot 3.3 / Java 21: 324 main Java files (33 controllers, 95 services, 57 JPA entities), layered domain/repository/dto/service/controller.
 2. **License server** — a separate Spring Boot service (own DB) for activation, billing (Click/Payme), refresh tokens, and admin audit.
 3. **Web portal** — React 18 + Vite SPA (40 pages).
@@ -35,6 +62,10 @@ Tenant isolation is enforced **in the persistence layer**, not in business code:
 | Public API | API keys + OpenAPI docs + webhooks |
 | Notable | AI sales-anomaly detection · IMEI/Apple-ID device tracking · MXIK national-catalogue barcode auto-fill |
 
+## Screens
+
+> 📸 *Screenshots to add (see [SCREENSHOTS.md](SCREENSHOTS.md)):* the cashier (kassa) screen mid-sale, the inventory/IMEI intake view, the owner dashboard with charts, and the Electron desktop kiosk. Capturing these is the last step to a fully visual README.
+
 ## Security
 
 - JWT auth where `JwtService` **refuses to boot** on a weak/placeholder secret unless an explicit dev opt-in flag is set.
@@ -47,4 +78,4 @@ docker-compose deploy (backend + license + Postgres), scripted VPS provisioning,
 
 ## License
 
-Proprietary — production SaaS codebase, shared as an engineering work sample.
+Proprietary — production SaaS codebase, shared as an engineering work sample. See [LICENSE](LICENSE).
