@@ -54,10 +54,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
+        // Mobile clients are native apps that authenticate with a Bearer JWT in
+        // the Authorization header, not cookies — so credentials are NOT needed.
+        // Keeping allowCredentials=false is what makes the permissive "*" origin
+        // safe: a wildcard origin WITH credentials would let any website call the
+        // API with the user's session (the audit's wildcard-CORS-with-credentials
+        // finding). Pin WEB_ALLOWED_ORIGINS instead if a browser SPA is ever added.
         cfg.setAllowedOriginPatterns(List.of("*"));
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
-        cfg.setAllowCredentials(true);
+        cfg.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", cfg);
         return source;

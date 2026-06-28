@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/Auth.jsx';
 import { useT } from '../context/Settings.jsx';
 import { IS_WEB } from '../config.js';
 
-// localStorage keys for the "remember me" feature. The login screen
-// only appears when the JWT is gone, so when the user does land here
-// these are pre-filled and the form auto-submits — one round-trip and
-// they're back in. No more typing the password every time.
+// localStorage key for the "remember me" convenience. Only the USERNAME is
+// remembered and pre-filled — never the password, which would be a
+// credential-theft vector on a shared till (even on the desktop kiosk build).
 const SAVED_USERNAME_KEY = 'savdopro:saved-username';
-const SAVED_PASSWORD_KEY = 'savdopro:saved-password';
+// Legacy key: older desktop builds also stored the password here. We delete it
+// on mount so any previously-saved password is purged on the next launch.
+const LEGACY_PASSWORD_KEY = 'savdopro:saved-password';
 
 /**
  * Centered login form rendered when no session token is present.
@@ -20,64 +21,42 @@ const SAVED_PASSWORD_KEY = 'savdopro:saved-password';
  *   - Server URL is baked in (licenseClient.js DEFAULT_URL → nip.io VPS),
  *     and there is intentionally no UI to edit it — ordinary users never
  *     see the server address.
- *   - On a successful login, the username + password are persisted to
- *     localStorage. Next time the login screen appears, both fields are
- *     pre-filled and the form auto-submits so the user only has to press
- *     "Kirish" once in their lifetime.
- *   - The auto-submit is suppressed if the previous attempt failed (so
- *     bad saved credentials don't lock the user into a redirect loop).
+ *   - On a successful login only the USERNAME is remembered, so that field is
+ *     pre-filled next time; the password is never persisted and must always be
+ *     re-entered. (The desktop build previously saved the password too — a
+ *     credential-theft risk on a shared machine — which the audit flagged.)
  */
 export function Login() {
   const { login } = useAuth();
   const t = useT();
 
-  // Read saved credentials synchronously so the inputs render pre-filled.
+  // Read the saved username synchronously so the input renders pre-filled.
   const savedUsername = (() => {
     try { return localStorage.getItem(SAVED_USERNAME_KEY) || ''; }
     catch { return ''; }
   })();
-  // Never persist/restore the password on the hosted web build — that
-  // localStorage entry is a credential-theft vector on a shared machine.
-  // The desktop kiosk build keeps the "press Kirish once" convenience.
-  const savedPassword = (() => {
-    if (IS_WEB) return '';
-    try { return localStorage.getItem(SAVED_PASSWORD_KEY) || ''; }
-    catch { return ''; }
-  })();
 
   const [username, setUsername] = useState(savedUsername);
-  const [password, setPassword] = useState(savedPassword);
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [twofaRequired, setTwofaRequired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto-submit guard: fires once if we already have saved creds.
-  // After a failure we set this to true so the user can correct the
-  // fields without us re-submitting on every keystroke.
-  const triedAutoLoginRef = useRef(false);
-
   const doLogin = async (uname, pwd, code) => {
     setBusy(true);
     setError('');
     try {
       await login(uname.trim(), pwd, code);
-      // Remember the username for convenience. The password is persisted
-      // only on the desktop kiosk build — never on the web portal.
+      // Remember ONLY the username for next time — never the password.
       try {
         localStorage.setItem(SAVED_USERNAME_KEY, uname.trim());
-        if (!IS_WEB) localStorage.setItem(SAVED_PASSWORD_KEY, pwd);
       } catch { /* private mode / quota — non-fatal */ }
     } catch (err) {
       const msg = err.message || t('Login muvaffaqiyatsiz');
       if (/totp|2fa|ikki|kod/i.test(msg)) {
         setTwofaRequired(true);
-      } else {
-        // Bad password? Wipe the saved password so the next reload
-        // doesn't auto-submit the same wrong credentials in a loop.
-        // (Keep the username — usually the right one, just typo'd pwd.)
-        try { localStorage.removeItem(SAVED_PASSWORD_KEY); } catch { /* */ }
       }
       setError(msg);
     } finally {
@@ -85,19 +64,10 @@ export function Login() {
     }
   };
 
-  // One-shot auto-login on mount, only when both credentials are saved
-  // and we haven't tried yet this session.
+  // One-time migration: purge any password an older desktop build saved to
+  // localStorage so existing installs stop carrying it after this update.
   useEffect(() => {
-    if (
-      !triedAutoLoginRef.current
-      && savedUsername
-      && savedPassword
-      && !twofaRequired
-    ) {
-      triedAutoLoginRef.current = true;
-      void doLogin(savedUsername, savedPassword);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try { localStorage.removeItem(LEGACY_PASSWORD_KEY); } catch { /* ignore */ }
   }, []);
 
   const submit = async (e) => {

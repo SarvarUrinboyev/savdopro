@@ -82,8 +82,17 @@ public class TransferService {
         requireOwnedShop(accountId, r.toShopId());
 
         BigDecimal qty = r.qty();
-        if (qty.signum() <= 0) {
+        if (qty == null || qty.signum() <= 0) {
             throw new BadRequestException("Miqdor 0 dan katta bo'lishi kerak");
+        }
+        // products.quantity is an INTEGER column — a transfer moves whole units.
+        // Reject a fractional request up front instead of letting the DB silently
+        // truncate it (which would corrupt the stock count).
+        long units;
+        try {
+            units = qty.stripTrailingZeros().longValueExact();
+        } catch (ArithmeticException ex) {
+            throw new BadRequestException("Miqdor butun son bo'lishi kerak");
         }
 
         // 1. Load source product (native — bypasses tenant filter).
@@ -92,10 +101,12 @@ public class TransferService {
         if (!srcShop.equals(r.fromShopId())) {
             throw new BadRequestException("Tanlangan mahsulot manba do'konga tegishli emas");
         }
-        BigDecimal srcStock = (BigDecimal) src[5];
-        if (srcStock.compareTo(qty) < 0) {
+        // quantity comes back from JDBC as an Integer (INTEGER column); read it
+        // through Number — casting straight to BigDecimal throws ClassCastException.
+        long srcStock = ((Number) src[5]).longValue();
+        if (srcStock < units) {
             throw new BadRequestException(
-                    "Yetarli zaxira yo'q: mavjud " + srcStock + ", so'ralgan " + qty);
+                    "Yetarli zaxira yo'q: mavjud " + srcStock + ", so'ralgan " + units);
         }
         String productName    = (String) src[2];
         String productBarcode = (String) src[3];
@@ -106,9 +117,9 @@ public class TransferService {
             destId = cloneProductInto(r.sourceProductId(), r.toShopId(), src);
         }
 
-        // 3. Apply the stock changes atomically.
-        adjustStock(r.sourceProductId(), qty.negate());
-        adjustStock(destId, qty);
+        // 3. Apply the stock changes atomically (integer units).
+        adjustStock(r.sourceProductId(), -units);
+        adjustStock(destId, units);
 
         // 4. Audit row.
         ShopTransfer row = new ShopTransfer();
@@ -174,16 +185,19 @@ public class TransferService {
      */
     private Long cloneProductInto(Long sourceProductId, Long toShopId, Object[] src) {
         // Pull a wider snapshot so we copy category, unit, tax fields etc.
+        // NB: the national catalogue column is `mxik_code` (see V9 migration /
+        // Product#mxikCode); the old `ikpu_code` name never existed in the schema
+        // and made every transfer-to-new-product crash with a missing-column error.
         Query snapshot = em.createNativeQuery(
                 "SELECT name, barcode, sale_price, purchase_price, category_id, "
-                + "       unit, ikpu_code, vat_rate "
+                + "       unit, mxik_code, vat_rate "
                 + "FROM products WHERE id = ?");
         snapshot.setParameter(1, sourceProductId);
         Object[] s = (Object[]) snapshot.getSingleResult();
 
         Query ins = em.createNativeQuery(
                 "INSERT INTO products (shop_id, name, barcode, sale_price, purchase_price, "
-                + "  category_id, unit, ikpu_code, vat_rate, quantity, created_at) "
+                + "  category_id, unit, mxik_code, vat_rate, quantity, created_at) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)");
         ins.setParameter(1, toShopId);
         for (int i = 0; i < s.length; i++) {
@@ -199,7 +213,7 @@ public class TransferService {
         return ((Number) idLookup.getSingleResult()).longValue();
     }
 
-    private void adjustStock(Long productId, BigDecimal delta) {
+    private void adjustStock(Long productId, long delta) {
         Query q = em.createNativeQuery(
                 "UPDATE products SET quantity = quantity + ? WHERE id = ?");
         q.setParameter(1, delta);

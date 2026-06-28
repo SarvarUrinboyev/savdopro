@@ -23,7 +23,7 @@ class RateLimitFilterTest {
     @Test
     void blocksAfterTheLimitIsReached() throws Exception {
         // Floor is 30/min; passing a smaller value clamps up to 30.
-        RateLimitFilter filter = new RateLimitFilter(true, 30, new SimpleMeterRegistry());
+        RateLimitFilter filter = new RateLimitFilter(true, 30, new SimpleMeterRegistry(), new ClientIpResolver(false, ""));
         int[] passed = {0};
         FilterChain chain = (req, res) -> passed[0]++;
 
@@ -42,7 +42,7 @@ class RateLimitFilterTest {
 
     @Test
     void disabledFilterAlwaysPasses() throws Exception {
-        RateLimitFilter filter = new RateLimitFilter(false, 30, new SimpleMeterRegistry());
+        RateLimitFilter filter = new RateLimitFilter(false, 30, new SimpleMeterRegistry(), new ClientIpResolver(false, ""));
         int[] passed = {0};
         FilterChain chain = (req, res) -> passed[0]++;
         for (int i = 0; i < 100; i++) {
@@ -53,7 +53,7 @@ class RateLimitFilterTest {
 
     @Test
     void healthIsNeverThrottled() throws Exception {
-        RateLimitFilter filter = new RateLimitFilter(true, 30, new SimpleMeterRegistry());
+        RateLimitFilter filter = new RateLimitFilter(true, 30, new SimpleMeterRegistry(), new ClientIpResolver(false, ""));
         int[] passed = {0};
         FilterChain chain = (req, res) -> passed[0]++;
         for (int i = 0; i < 50; i++) {
@@ -61,5 +61,36 @@ class RateLimitFilterTest {
             filter.doFilter(req, new MockHttpServletResponse(), chain);
         }
         assertThat(passed[0]).isEqualTo(50);
+    }
+
+    /**
+     * Audit hardening: an unauthenticated caller must not be able to mint a
+     * fresh per-IP bucket every request by rotating a spoofed X-Forwarded-For.
+     * With proxy-header trust off (the default), every request from the same
+     * socket address shares one bucket regardless of the forged header.
+     */
+    @Test
+    void spoofedForwardedForCannotBypassTheIpBucket() throws Exception {
+        RateLimitFilter filter = new RateLimitFilter(true, 30, new SimpleMeterRegistry(),
+                new ClientIpResolver(false, ""));
+        int[] passed = {0};
+        FilterChain chain = (req, res) -> passed[0]++;
+
+        for (int i = 0; i < 30; i++) {
+            filter.doFilter(spoofedRequest(i), new MockHttpServletResponse(), chain);
+        }
+        MockHttpServletResponse blocked = new MockHttpServletResponse();
+        filter.doFilter(spoofedRequest(99), blocked, chain);
+
+        assertThat(blocked.getStatus()).isEqualTo(429);   // a different XFF did NOT help
+        assertThat(passed[0]).isEqualTo(30);
+    }
+
+    /** Unauthenticated request from one socket address but a rotating fake XFF. */
+    private static MockHttpServletRequest spoofedRequest(int i) {
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/products");
+        req.setRemoteAddr("10.0.0.5");
+        req.addHeader("X-Forwarded-For", "203.0.113." + i);
+        return req;
     }
 }

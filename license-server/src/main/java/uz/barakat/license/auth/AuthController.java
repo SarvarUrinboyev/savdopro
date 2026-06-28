@@ -41,6 +41,7 @@ public class AuthController {
 
     private final AuthService service;
     private final LoginRateLimiter rateLimiter;
+    private final ClientIpResolver clientIpResolver;
     // Signup-screen feature flags (read once at startup). Phone verification is
     // only enforced when SMS is actually wired; social logins show only when
     // their provider is configured.
@@ -54,6 +55,7 @@ public class AuthController {
 
     public AuthController(
             AuthService service, LoginRateLimiter rateLimiter,
+            ClientIpResolver clientIpResolver,
             @org.springframework.beans.factory.annotation.Value(
                     "${savdopro.license.sms.signup-template:}") String signupTemplate,
             @org.springframework.beans.factory.annotation.Value(
@@ -67,6 +69,7 @@ public class AuthController {
             AuditService audit) {
         this.service = service;
         this.rateLimiter = rateLimiter;
+        this.clientIpResolver = clientIpResolver;
         this.signupTemplate = signupTemplate;
         this.otpRequired = otpRequired;
         this.telegramBot = telegramBot;
@@ -360,17 +363,13 @@ public class AuthController {
     }
 
     /**
-     * Resolves the caller's IP, honouring {@code X-Forwarded-For} so a
-     * reverse proxy (Caddy / nginx in front of the VPS) doesn't collapse
-     * every client to the loopback address. Trust only the first hop in
-     * the header — anything else is forgeable.
+     * Resolves the caller's IP via {@link ClientIpResolver}, which honours
+     * {@code X-Forwarded-For} ONLY when the request actually arrives from a
+     * configured trusted proxy (so a reverse proxy in front of the VPS doesn't
+     * collapse every client to the loopback address, while an arbitrary client
+     * still can't forge the header to dodge the rate limiter or poison audit).
      */
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
-        }
-        return request.getRemoteAddr();
+    private String clientIp(HttpServletRequest request) {
+        return clientIpResolver.resolve(request);
     }
 }

@@ -61,7 +61,7 @@ public final class AdminDtos {
             @NotBlank(message = "Login kiritilishi shart")
             @Size(min = 3, max = 80) String ownerUsername,
             @NotBlank(message = "Parol kiritilishi shart")
-            @Size(min = 4, max = 80) String ownerPassword,
+            @StrongPassword String ownerPassword,
             String ownerFullName) {
     }
 
@@ -90,7 +90,7 @@ public final class AdminDtos {
     /** Body of password reset / new user creation. */
     public record SetPasswordRequest(
             @NotBlank(message = "Parol kiritilishi shart")
-            @Size(min = 4, max = 80) String password) {
+            @StrongPassword String password) {
     }
 
     /** Super-admin manual subscription grant: set a plan for N months. */
@@ -101,7 +101,7 @@ public final class AdminDtos {
 
     public record CreateUserRequest(
             @NotBlank @Size(min = 3, max = 80) String username,
-            @NotBlank @Size(min = 4, max = 80) String password,
+            @NotBlank @StrongPassword String password,
             String fullName,
             String role) {
     }

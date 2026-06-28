@@ -13,15 +13,21 @@
     "@stomp/stompjs": "^7.3.0",
     "dexie": "^4.0.10",
     "exceljs": "^4.4.0",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
+    "jspdf": "^4.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.27.0"
+    "react-router-dom": "^6.30.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^5.4.11",
     "vite-plugin-javascript-obfuscator": "^3.1.0"
+  },
+  "comments": {
+    "overrides": "exceljs@4.4.0 is the latest upstream release but pins vulnerable tmp/uuid transitives with no fixed exceljs available; force the patched versions (API-compatible — exceljs calls uuid.v4() and tmp only at runtime). jspdf-autotable was removed because it was unused in src/."
+  },
+  "overrides": {
+    "tmp": "^0.2.7",
+    "uuid": "^11.1.1"
   }
 }
