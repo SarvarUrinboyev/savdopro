@@ -124,15 +124,18 @@ public class ProductService {
         return Mappers.product(product, categoryName(product.getCategoryId()));
     }
 
-    /** Blocks entering the same product twice — by name (case-insensitive) or barcode. */
+    /**
+     * Blocks entering the same product twice. The product's real identity is its
+     * BARCODE (Excel "КОД"), unique per shop — NOT its name. A shop legitimately
+     * carries many items that share a display name but have distinct codes (e.g. a
+     * supplier catalogue re-registered under new codes over time), so two products
+     * with the same name and different barcodes are allowed. Barcode is still
+     * unique within the shop; an empty barcode is unconstrained (the editor allows
+     * barcode-less products and the same-name rule used to be the only guard there
+     * — that guard is intentionally dropped). Per-shop scoping is unchanged: the
+     * {@code existsByBarcode*} queries run under the tenant filter.
+     */
     private void requireNoDuplicate(Product product, Long selfId) {
-        String name = product.getName();
-        boolean nameTaken = selfId == null
-                ? products.existsByNameIgnoreCase(name)
-                : products.existsByNameIgnoreCaseAndIdNot(name, selfId);
-        if (nameTaken) {
-            throw new BadRequestException("Bu nomli mahsulot allaqachon mavjud: " + name);
-        }
         String barcode = product.getBarcode();
         if (barcode != null && !barcode.isBlank()) {
             boolean barcodeTaken = selfId == null
@@ -141,6 +144,17 @@ public class ProductService {
             if (barcodeTaken) {
                 throw new BadRequestException("Bu shtrix-kod allaqachon mavjud: " + barcode);
             }
+            return;
+        }
+        // No barcode → fall back to the NAME as identity so two indistinguishable
+        // barcode-less products can't collide. (Products that DO have a barcode may
+        // freely share a name — that is the whole point of this change.)
+        String name = product.getName();
+        boolean nameTaken = selfId == null
+                ? products.existsByNameIgnoreCase(name)
+                : products.existsByNameIgnoreCaseAndIdNot(name, selfId);
+        if (nameTaken) {
+            throw new BadRequestException("Bu nomli mahsulot allaqachon mavjud: " + name);
         }
     }
 

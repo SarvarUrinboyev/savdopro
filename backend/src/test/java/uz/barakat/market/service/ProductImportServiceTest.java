@@ -60,22 +60,25 @@ class ProductImportServiceTest {
     }
 
     @Test
-    void duplicateNameRowIsRejectedWithRowError() {
-        when(importer.parse(file)).thenReturn(List.of(row(2, "Coca-Cola", null)));
-        when(products.existsByNameIgnoreCase("Coca-Cola")).thenReturn(true);
+    void sameNameDifferentBarcodeRowsAreImported() {
+        // New rule: product NAME is NOT unique per shop. Two rows that share a name
+        // but have distinct barcodes are both imported — the barcode is the identity.
+        when(importer.parse(file)).thenReturn(List.of(
+                row(2, "Coca-Cola", "11111"), row(3, "Coca-Cola", "22222")));
+        when(products.existsByBarcode(anyString())).thenReturn(false);
 
         ProductImportResult result = service.importProducts(file);
 
-        verify(products, never()).save(any(Product.class));
-        assertThat(result.importedCount()).isZero();
-        assertThat(result.skippedCount()).isEqualTo(1);
-        assertThat(result.errors()).anySatisfy(e -> assertThat(e).contains("Qator 2"));
+        verify(products, times(2)).save(any(Product.class));
+        assertThat(result.importedCount()).isEqualTo(2);
+        assertThat(result.skippedCount()).isZero();
+        // The duplicate guard must never consult the name anymore.
+        verify(products, never()).existsByNameIgnoreCase(anyString());
     }
 
     @Test
     void duplicateBarcodeRowIsRejected() {
         when(importer.parse(file)).thenReturn(List.of(row(3, "Unique Name", "4780000000001")));
-        when(products.existsByNameIgnoreCase(anyString())).thenReturn(false);
         when(products.existsByBarcode(anyString())).thenReturn(true);
 
         ProductImportResult result = service.importProducts(file);
@@ -88,7 +91,6 @@ class ProductImportServiceTest {
     @Test
     void validRowsAreImported() {
         when(importer.parse(file)).thenReturn(List.of(row(2, "Alpha", null), row(3, "Beta", null)));
-        when(products.existsByNameIgnoreCase(anyString())).thenReturn(false);
 
         ProductImportResult result = service.importProducts(file);
 
@@ -98,14 +100,15 @@ class ProductImportServiceTest {
     }
 
     @Test
-    void mixedFileImportsValidRowsAndReportsDuplicatesWithoutAborting() {
-        when(importer.parse(file)).thenReturn(List.of(row(2, "Fresh", null), row(3, "Existing", null)));
-        when(products.existsByNameIgnoreCase("Fresh")).thenReturn(false);
-        when(products.existsByNameIgnoreCase("Existing")).thenReturn(true);
+    void mixedFileImportsValidRowsAndReportsDuplicateBarcodeWithoutAborting() {
+        when(importer.parse(file)).thenReturn(List.of(
+                row(2, "Fresh", "55555"), row(3, "Existing", "99999")));
+        when(products.existsByBarcode("55555")).thenReturn(false);
+        when(products.existsByBarcode("99999")).thenReturn(true);
 
         ProductImportResult result = service.importProducts(file);
 
-        // Valid row persisted; duplicate skipped — no all-or-nothing abort.
+        // Valid row persisted; duplicate-BARCODE row skipped — no all-or-nothing abort.
         verify(products, times(1)).save(any(Product.class));
         assertThat(result.importedCount()).isEqualTo(1);
         assertThat(result.skippedCount()).isEqualTo(1);

@@ -57,3 +57,11 @@ mobile/server/data/
 
 # --- Local working docs (not part of the product) ---
 savdopro_audit_prompt_v2.md
+
+# Warehouse import: keep importer scripts, never commit source data or run outputs
+imports/*.xlsx
+imports/_dryrun/
+imports/_import/
+# Vite transient config timestamp files
+frontend/vite.config.js.timestamp-*.mjs
+imports/__pycache__/
