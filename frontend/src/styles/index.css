@@ -3885,3 +3885,59 @@ a.cc-card:hover .cc-cta i { transform: translateX(3px); }
 .hlp-faq-item[open] summary::after { content: '−'; }
 .hlp-faq-item[open] summary { border-bottom: 1px solid var(--border); }
 .hlp-faq-item p { padding: 14px 16px; margin: 0; color: var(--text-muted); font-size: 13.5px; line-height: 1.6; }
+
+/* ====================================================================
+   Collapsible ChatGPT-style sidebar — desktop expanded ↔ icon rail,
+   mobile off-canvas drawer. State persisted (savdopro.sidebar.collapsed).
+   ==================================================================== */
+:root { --sidebar-w-collapsed: 76px; }
+
+.sidebar { transition: width .2s ease, transform .22s ease; }
+.main { transition: margin-left .2s ease; }
+
+/* Desktop collapse toggle (topbar) — hidden on mobile, where the hamburger rules */
+.collapse-toggle {
+  display: inline-grid; place-items: center; flex-shrink: 0;
+  width: 38px; height: 38px; margin-right: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.collapse-toggle:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.collapse-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Mobile drawer close (✕) inside the sidebar header — hidden on desktop */
+.sidebar-close {
+  display: none; margin-left: auto; flex-shrink: 0;
+  width: 34px; height: 34px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--sidebar-border); background: rgba(255, 255, 255, .05);
+  color: var(--sidebar-text); font-size: 15px; line-height: 1;
+}
+.sidebar-close:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+
+/* ---------------- desktop: collapsed icon rail ---------------- */
+@media (min-width: 721px) {
+  .app-shell.sidebar-collapsed .sidebar { width: var(--sidebar-w-collapsed); }
+  .app-shell.sidebar-collapsed .main { margin-left: var(--sidebar-w-collapsed); }
+
+  .app-shell.sidebar-collapsed .sidebar-brand { justify-content: center; gap: 0; padding: 20px 8px 18px; }
+  .app-shell.sidebar-collapsed .brand-text { display: none; }
+
+  .app-shell.sidebar-collapsed .sidebar-nav { padding: 14px 10px; }
+  .app-shell.sidebar-collapsed .nav-link { justify-content: center; gap: 0; padding-left: 8px; padding-right: 8px; }
+  .app-shell.sidebar-collapsed .nav-link > span:not(.ico) { display: none; }
+
+  .app-shell.sidebar-collapsed .sidebar-foot { padding: 13px 8px; }
+  .app-shell.sidebar-collapsed .operator-pill { flex-direction: column; gap: 8px; padding: 10px 6px; align-items: center; }
+  .app-shell.sidebar-collapsed .op-info { display: none; }
+  .app-shell.sidebar-collapsed .op-avatar { margin: 0; }
+}
+
+/* ---------------- mobile: drawer (collapse rail does NOT apply) ------------ */
+@media (max-width: 720px) {
+  .collapse-toggle { display: none; }
+  .sidebar { width: var(--sidebar-w); box-shadow: 18px 0 50px -22px rgba(0, 0, 0, .7); }
+  .sidebar.show .sidebar-close { display: grid; place-items: center; }
+  /* collapsed flag is ignored on mobile — the drawer is always the full sidebar */
+  .app-shell.sidebar-collapsed .main { margin-left: 0; }
+}

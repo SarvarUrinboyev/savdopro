@@ -208,7 +208,7 @@ const NAV_ITEMS = [
   { key: 'reports',       to: '/reports',       label: 'Hisobotlar' },
 ];
 
-export function Sidebar({ open }) {
+export function Sidebar({ open, onClose }) {
   const t = useT();
   const { user, logout } = useAuth();
   const initials = (user?.fullName || user?.username || '?')
@@ -245,17 +245,27 @@ export function Sidebar({ open }) {
                   strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <div>
+        <div className="brand-text">
           <div className="name">
             SavdoPRO <span className="brand-tag">POS</span>
           </div>
           <div className="sub">Avtomatlashtirish</div>
         </div>
+        <button
+          type="button"
+          className="sidebar-close"
+          onClick={onClose}
+          aria-label={t('Yopish')}
+          title={t('Yopish')}
+        >
+          ✕
+        </button>
       </div>
       <nav className="sidebar-nav">
         {user?.role === 'SUPER_ADMIN' && (
           <NavLink
             to="/admin"
+            title={t('Super-admin')}
             className={({ isActive }) => `nav-link nav-link-admin ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/admin') }}>{ICON['/admin']}</span>
@@ -265,6 +275,7 @@ export function Sidebar({ open }) {
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && isOn('shops') && (
           <NavLink
             to="/shops"
+            title={t("Do'konlar")}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/shops') }}>{ICON['/shops']}</span>
@@ -277,6 +288,7 @@ export function Sidebar({ open }) {
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
           <NavLink
             to="/billing"
+            title={t("Tarif va to'lov")}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/billing') }}>{ICON['/billing']}</span>
@@ -287,6 +299,7 @@ export function Sidebar({ open }) {
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
           <NavLink
             to="/accounting"
+            title={t('Buxgalteriya')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/accounting') }}>{ICON['/accounting']}</span>
@@ -297,6 +310,7 @@ export function Sidebar({ open }) {
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
           <NavLink
             to="/integrations"
+            title={t('Integratsiyalar')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico">
@@ -312,6 +326,7 @@ export function Sidebar({ open }) {
         {(user?.role === 'ACCOUNT_OWNER' || user?.role === 'SUPER_ADMIN') && (
           <NavLink
             to="/devices"
+            title={t('IMEI baza')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico">
@@ -328,6 +343,7 @@ export function Sidebar({ open }) {
           <NavLink
             key={item.to}
             to={item.to}
+            title={t(item.label)}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor(item.to) }}>{ICON[item.to]}</span>
@@ -336,6 +352,7 @@ export function Sidebar({ open }) {
         ))}
         <NavLink
           to="/help"
+          title={t("Bog'lanish")}
           className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
         >
           <span className="ico" style={{ color: iconColor('/help') }}>{ICON['/help']}</span>
