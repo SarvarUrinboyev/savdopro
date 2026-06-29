@@ -4,43 +4,45 @@
    ==================================================================== */
 
 :root {
-  /* ---- emerald accent ---- */
-  --accent:        #10b981;
-  --accent-strong: #059669;
+  /* ---- premium emerald accent (reference green / deep green) ---- */
+  --accent:        #16b86f;
+  --accent-strong: #0f8f55;
   --accent-soft:   #ecfdf5;
   --accent-line:   #a7f3d0;
 
   /* legacy aliases — kept so any --navy* reference still resolves */
-  --navy:        #10b981;
-  --navy-dark:   #059669;
+  --navy:        #16b86f;
+  --navy-dark:   #0f8f55;
   --navy-light:  #34d399;
 
-  --bg:          #f4f6fa;
+  --bg:          #f5f7fb;
   --surface:     #ffffff;
   --surface-2:   #f1f5f9;
-  --border:      #e7ebf1;
+  --border:      #e5e9f0;
   --border-strong: #d4dbe6;
 
-  --sidebar-bg:     #ffffff;
-  --sidebar-border: #e7ebf1;
-  --sidebar-text:   #5b6675;
+  /* dark navy sidebar (premium SaaS shell) */
+  --sidebar-bg:     #0b1728;
+  --sidebar-bg-2:   #07111f;
+  --sidebar-border: rgba(255, 255, 255, .07);
+  --sidebar-text:   #93a1b5;
 
   --text:        #0f172a;
   --text-muted:  #64748b;
   --text-faint:  #94a3b8;
 
-  --red:    #e11d48;  --red-soft:    #fff1f2;  --red-line:    #fecdd3;
+  --red:    #ef4444;  --red-soft:    #fef2f2;  --red-line:    #fecaca;
   --amber:  #d97706;  --amber-soft:  #fffbeb;  --amber-line:  #fde68a;
-  --green:  #059669;  --green-soft:  #ecfdf5;  --green-line:  #a7f3d0;
-  --blue:   #0891b2;  --blue-soft:   #ecfeff;  --blue-line:   #a5f0fc;
-  --orange: #ea580c;  --orange-soft: #fff7ed;  --orange-line: #fed7aa;
+  --green:  #0f8f55;  --green-soft:  #ecfdf5;  --green-line:  #a7f3d0;
+  --blue:   #3b82f6;  --blue-soft:   #eff6ff;  --blue-line:   #bfdbfe;
+  --orange: #f97316;  --orange-soft: #fff7ed;  --orange-line: #fed7aa;
   --purple: #7c3aed;  --purple-soft: #f5f3ff;  --purple-line: #ddd6fe;
 
-  --radius:    14px;
-  --radius-sm: 10px;
-  --shadow:    0 1px 2px rgba(15, 23, 42, .05), 0 6px 16px -8px rgba(15, 23, 42, .12);
-  --shadow-lg: 0 24px 48px -16px rgba(15, 23, 42, .22);
-  --sidebar-w: 256px;
+  --radius:    18px;
+  --radius-sm: 12px;
+  --shadow:    0 1px 2px rgba(15, 23, 42, .04), 0 10px 28px -14px rgba(15, 23, 42, .14);
+  --shadow-lg: 0 28px 56px -20px rgba(15, 23, 42, .26);
+  --sidebar-w: 258px;
 
   --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
           Roboto, Arial, sans-serif;
@@ -3272,3 +3274,149 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 .onb-step.done .onb-step-title { text-decoration: line-through; }
 .onb-step-desc { color: var(--text-muted); font-size: 12.5px; }
 .onb-arrow { color: var(--brand-primary, #3b82f6); font-weight: 700; font-size: 16px; }
+
+/* ====================================================================
+   PREMIUM SaaS REDESIGN — overhaul layer (feat/premium-saas-ui)
+   Appended last so it wins the cascade; only restyles existing classes,
+   no markup or business logic changes. Dark navy shell + light canvas.
+   ==================================================================== */
+
+/* -------------------------------------------------- dark navy sidebar */
+.sidebar {
+  background: linear-gradient(185deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%);
+  border-right: 1px solid var(--sidebar-border);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, .02), 18px 0 40px -28px rgba(2, 6, 16, .6);
+}
+.sidebar-brand { border-bottom: 1px solid var(--sidebar-border); }
+.sidebar-brand .name { color: #f8fafc; }
+.sidebar-brand .name .brand-tag {
+  background: rgba(22, 184, 111, .16); color: #5eead4;
+  border-color: rgba(22, 184, 111, .32);
+}
+.sidebar-brand .sub { color: #5f6e85; }
+
+.sidebar-nav { padding: 12px 12px; }
+.sidebar-nav .nav-link { color: var(--sidebar-text); }
+.sidebar-nav .nav-link:hover {
+  background: rgba(255, 255, 255, .055);
+  color: #f1f5f9;
+}
+.sidebar-nav .nav-link.active {
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px -8px rgba(15, 143, 85, .6);
+}
+.sidebar-nav .nav-link.active .ico { color: #fff !important; }
+.sidebar-nav .nav-link.active:hover { color: #fff; filter: brightness(1.04); }
+.nav-link.nav-link-admin:not(.active):hover { background: rgba(245, 158, 11, .14); }
+
+.sidebar-foot { border-top: 1px solid var(--sidebar-border); }
+.operator-pill {
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+.operator-pill .op-info > div:first-child,
+.operator-pill .op-role { color: #e2e8f0 !important; }
+.operator-pill .op-avatar {
+  background: rgba(22, 184, 111, .18); color: #5eead4;
+}
+.operator-pill .op-logout { color: #93a1b5; }
+.operator-pill .op-logout:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* mobile drawer backdrop reads better over the dark sidebar */
+.sidebar { transition: transform .22s ease; }
+
+/* ---------------------------------------------------------- topbar */
+.topbar {
+  height: 64px;
+  backdrop-filter: saturate(1.1);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+.topbar .title { font-size: 18px; }
+
+/* ----------------------------------------------- cards & containers */
+.card { border-radius: var(--radius); }
+.card-head h2 { letter-spacing: -.01em; }
+
+/* --------------------------------------------------- KPI metric grid */
+/* auto-fit so 3 OR 4 KPI cards both sit on one premium row, then wrap */
+.metrics { grid-template-columns: repeat(auto-fit, minmax(214px, 1fr)); }
+.metric { border-radius: var(--radius); padding: 18px 20px; }
+.metric .m-ico {
+  width: 46px; height: 46px; border-radius: 13px; font-size: 20px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .04);
+}
+.metric .m-value { font-size: 23px; }
+
+/* ------------------------------------------------------------ buttons */
+.btn { border-radius: var(--radius-sm); }
+.btn-primary {
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  box-shadow: 0 6px 16px -6px rgba(15, 143, 85, .55);
+}
+.btn-accent { background: linear-gradient(100deg, #3b82f6 0%, #2563eb 100%); }
+
+/* -------------------------------------------------------------- forms */
+.input:focus, input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(22, 184, 111, .15);
+}
+
+/* page-head accent bar uses the refreshed green */
+.page-head::before {
+  background: linear-gradient(180deg, #34d399, var(--accent) 55%, var(--accent-strong));
+}
+
+/* ------------------------------------------------------ POS polish */
+.ypos-pay-total {
+  font-size: 18px; font-weight: 700;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  color: var(--accent-strong);
+}
+.ypos-pm { border-radius: 11px; transition: background .12s, border-color .12s, color .12s; }
+.ypos-pm:hover { border-color: var(--accent-line); }
+.ypos-pm.active {
+  background: linear-gradient(100deg, var(--accent), var(--accent-strong));
+  border-color: var(--accent-strong);
+}
+.ypos-pay {
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  box-shadow: 0 8px 20px -8px rgba(15, 143, 85, .55);
+}
+
+/* ------------------------------------------------- landing polish */
+.lp-hero {
+  position: relative;
+  background:
+    radial-gradient(60% 70% at 50% -10%, rgba(22, 184, 111, .10), transparent 70%),
+    radial-gradient(40% 50% at 100% 0%, rgba(59, 130, 246, .08), transparent 70%);
+  border-radius: 0 0 28px 28px;
+}
+.lp-hero-badge {
+  background: rgba(22, 184, 111, .12);
+  color: var(--accent-strong);
+}
+.lp-trust {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  max-width: 620px; margin: 34px auto 0;
+}
+.lp-trust-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 10px; box-shadow: var(--shadow);
+}
+.lp-trust-num {
+  font-size: 24px; font-weight: 850; letter-spacing: -.02em;
+  background: linear-gradient(100deg, var(--accent), #3b82f6);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.lp-trust-label {
+  font-size: 12px; font-weight: 600; color: var(--text-muted); margin-top: 2px;
+}
+@media (max-width: 560px) {
+  .lp-trust { grid-template-columns: repeat(2, 1fr); }
+}

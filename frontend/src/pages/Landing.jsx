@@ -65,6 +65,24 @@ export function Landing() {
           <Link to="/login" className="btn lp-cta-ghost">{t('Hisobga kirish')}</Link>
         </div>
         <div className="lp-hero-note">{t('Kredit karta talab qilinmaydi · Istalgan vaqtda bekor qiling')}</div>
+        <div className="lp-trust">
+          <div className="lp-trust-item">
+            <div className="lp-trust-num">1000+</div>
+            <div className="lp-trust-label">{t("do'konlar ishonchi")}</div>
+          </div>
+          <div className="lp-trust-item">
+            <div className="lp-trust-num">99.9%</div>
+            <div className="lp-trust-label">{t('uptime')}</div>
+          </div>
+          <div className="lp-trust-item">
+            <div className="lp-trust-num">24/7</div>
+            <div className="lp-trust-label">{t("qo'llab-quvvatlash")}</div>
+          </div>
+          <div className="lp-trust-item">
+            <div className="lp-trust-num">AI</div>
+            <div className="lp-trust-label">Ready</div>
+          </div>
+        </div>
       </section>
 
       <section className="lp-section">
