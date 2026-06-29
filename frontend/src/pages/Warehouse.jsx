@@ -215,7 +215,16 @@ export function Warehouse() {
         </div>
         <Loader loading={loading} error={error} onRetry={reload}>
           {filtered.length === 0 ? (
-            <EmptyState icon="🏬" text={t('Mahsulot topilmadi')} />
+            <EmptyState
+              icon="🏬"
+              text={t('Mahsulot topilmadi')}
+              hint={t("Birinchi mahsulotni qo'shing yoki CSV/XLSX orqali yuklang.")}
+              action={(
+                <button className="btn btn-primary" onClick={() => navigate('/warehouse/new')}>
+                  + {t('Yangi mahsulot')}
+                </button>
+              )}
+            />
           ) : (
             <div className="table-wrap">
               <table className="tbl">

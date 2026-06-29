@@ -28,11 +28,13 @@ export function Loader({ loading, error, onRetry, children }) {
   return children;
 }
 
-export function EmptyState({ icon = '📭', text }) {
+export function EmptyState({ icon = '📭', text, hint, action }) {
   return (
     <div className="empty">
       <div className="e-ico">{icon}</div>
       <div className="e-text">{text}</div>
+      {hint && <div className="e-hint">{hint}</div>}
+      {action && <div className="e-action">{action}</div>}
     </div>
   );
 }

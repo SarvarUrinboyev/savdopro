@@ -337,6 +337,18 @@ public class ProductService {
             if (row.category() != null) {
                 product.setCategoryId(categoryService.resolveOrCreate(row.category()));
             }
+            // Run the SAME duplicate guard the create endpoint uses, so a bulk
+            // import can't slip in a product (by name or barcode) that a manual
+            // create would reject. A clash — whether against an existing row or
+            // an earlier row in this same file (the pending insert is flushed
+            // before the exists-check query) — is reported as a row-level error
+            // instead of aborting the whole import.
+            try {
+                requireNoDuplicate(product, null);
+            } catch (BadRequestException dup) {
+                errors.add("Qator " + row.line() + ": " + dup.getMessage());
+                continue;
+            }
             products.save(product);
             if (row.quantity() > 0) {
                 logMovement(product, row.quantity(), row.quantity(),

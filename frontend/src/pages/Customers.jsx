@@ -149,7 +149,16 @@ export function Customers() {
         </div>
         <Loader loading={loading} error={error} onRetry={reload}>
           {filtered.length === 0 ? (
-            <EmptyState icon="👥" text={t('Mijoz topilmadi')} />
+            <EmptyState
+              icon="👥"
+              text={t('Mijoz topilmadi')}
+              hint={t("Doimiy mijozlarni qo'shing — qarz va sodiqlik shu yerda yuritiladi.")}
+              action={(
+                <button className="btn btn-primary" onClick={() => setModal({ type: 'add' })}>
+                  + {t("Mijoz qo'shish")}
+                </button>
+              )}
+            />
           ) : (
             <div className="table-wrap">
               <table className="tbl">

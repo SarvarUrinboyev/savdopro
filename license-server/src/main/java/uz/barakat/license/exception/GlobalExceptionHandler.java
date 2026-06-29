@@ -10,6 +10,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +40,33 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex,
                                                           HttpServletRequest req) {
         return entity(HttpStatus.BAD_REQUEST, ex.getMessage(), req.getRequestURI(), null);
+    }
+
+    /**
+     * Spring Security authorization denial. A non-super-admin hitting an
+     * {@code @PreAuthorize("hasRole('SUPER_ADMIN')")} endpoint throws an
+     * {@link AccessDeniedException} during method invocation, which the
+     * dispatcher routes here. Without this handler the catch-all below would
+     * turn an ordinary 403 into a 500 — masking the real cause and looking
+     * like a server bug. Map it to a clean 403 with no stack trace.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex,
+                                                       HttpServletRequest req) {
+        return entity(HttpStatus.FORBIDDEN, "Bu amal uchun ruxsatingiz yo'q",
+                req.getRequestURI(), null);
+    }
+
+    /**
+     * An authentication failure surfacing inside the dispatch (rare — the
+     * security filter chain rejects most unauthenticated calls before they
+     * reach a controller). Mapped to 401 so it never collapses into a 500.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> handleAuthentication(AuthenticationException ex,
+                                                         HttpServletRequest req) {
+        return entity(HttpStatus.UNAUTHORIZED, "Avtorizatsiya talab qilinadi",
+                req.getRequestURI(), null);
     }
 
     @ExceptionHandler(Exception.class)

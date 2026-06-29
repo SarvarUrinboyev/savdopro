@@ -7,7 +7,9 @@
 // we ship a fallback that works on any printer), and a small footer
 // line for the shop name.
 
-import jsPDF from 'jspdf';
+// Named export — the stable form across jspdf 2.x → 4.x (the default export
+// was dropped in the v3 ESM rework).
+import { jsPDF } from 'jspdf';
 
 const PAGE_W = 210; // mm — A4 portrait
 const PAGE_H = 297;

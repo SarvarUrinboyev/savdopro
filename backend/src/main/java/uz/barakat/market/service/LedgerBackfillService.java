@@ -142,7 +142,8 @@ public class LedgerBackfillService {
         List<RefundLine> out = new ArrayList<>();
         for (SaleItem it : s.getItems()) {
             if (it.getRefundedQty() > 0) {
-                out.add(new RefundLine(it.getProductId(), it.getRefundedQty()));
+                out.add(new RefundLine(
+                        it.getProductId(), it.getRefundedQty(), it.getCostAtSaleUzs()));
             }
         }
         // Fully-on-credit / legacy sales may have no per-line refund detail; the

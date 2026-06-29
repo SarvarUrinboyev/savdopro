@@ -37,15 +37,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final boolean enabled;
     private final int perMinute;
     private final MeterRegistry metrics;
+    private final ClientIpResolver clientIpResolver;
     private final ConcurrentHashMap<String, Hits> buckets = new ConcurrentHashMap<>();
 
     public RateLimitFilter(
             @Value("${app.ratelimit.enabled:true}") boolean enabled,
             @Value("${app.ratelimit.requests-per-minute:600}") int perMinute,
-            MeterRegistry metrics) {
+            MeterRegistry metrics,
+            ClientIpResolver clientIpResolver) {
         this.enabled = enabled;
         this.perMinute = Math.max(30, perMinute);
         this.metrics = metrics;
+        this.clientIpResolver = clientIpResolver;
         log.info("Rate limit: {} ({} req/min/caller)", enabled ? "ON" : "OFF", this.perMinute);
     }
 
@@ -109,16 +112,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (user instanceof String s && !s.isBlank()) {
             return "u:" + s;
         }
-        return "ip:" + clientIp(req);
-    }
-
-    private static String clientIp(HttpServletRequest req) {
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            int comma = xff.indexOf(',');
-            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
-        }
-        return req.getRemoteAddr();
+        // Unauthenticated paths fall back to the IP bucket. Resolve it through
+        // ClientIpResolver so a client can't forge X-Forwarded-For to mint a
+        // fresh bucket per request and walk straight past the limit — the header
+        // is only trusted from a configured reverse proxy.
+        return "ip:" + clientIpResolver.resolve(req);
     }
 
     private static final class Hits {

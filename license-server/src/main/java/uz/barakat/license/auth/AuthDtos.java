@@ -26,7 +26,7 @@ public final class AuthDtos {
             @Size(min = 3, max = 40, message = "Login 3–40 belgidan iborat bo'lishi kerak")
             String username,
             @NotBlank(message = "Parol kiritilishi shart")
-            @Size(min = 9, message = "Parol kamida 9 belgi bo'lishi kerak")
+            @StrongPassword
             String password,
             /** Optional contact phone stored on the account. */
             String phone,
@@ -96,7 +96,7 @@ public final class AuthDtos {
             @NotBlank(message = "Telefon raqami kiritilishi shart") String phone,
             @NotBlank(message = "Kod kiritilishi shart") String code,
             @NotBlank(message = "Yangi parol kiritilishi shart")
-            @Size(min = 6, message = "Parol kamida 6 belgi bo'lishi kerak")
+            @StrongPassword
             String newPassword) {
     }
 

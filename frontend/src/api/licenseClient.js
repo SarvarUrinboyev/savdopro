@@ -116,6 +116,10 @@ export function persistAuthPair(response) {
 export function clearAuthPair() {
   setToken(null);
   setRefreshToken(null);
+  // Also drop the active shop id so a logout (or a dead session) never leaves a
+  // stale tenant header for whoever logs in next. Literal key matches
+  // ACTIVE_SHOP_KEY in client.js (kept inline to avoid an import cycle).
+  try { localStorage.removeItem('savdopro.activeShopId'); } catch { /* ignore */ }
 }
 
 // In-flight refresh promise; null when no refresh is happening. Every

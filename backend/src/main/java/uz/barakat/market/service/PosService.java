@@ -18,6 +18,8 @@ import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import uz.barakat.market.domain.Customer;
+import uz.barakat.market.domain.CustomerTransaction;
+import uz.barakat.market.domain.CustomerTxType;
 import uz.barakat.market.domain.Payment;
 import uz.barakat.market.domain.PaymentCategory;
 import uz.barakat.market.domain.PaymentDirection;
@@ -39,6 +41,7 @@ import uz.barakat.market.dto.PosDtos.SaleResponse;
 import uz.barakat.market.exception.BadRequestException;
 import uz.barakat.market.exception.NotFoundException;
 import uz.barakat.market.repository.CustomerRepository;
+import uz.barakat.market.repository.CustomerTransactionRepository;
 import uz.barakat.market.repository.PaymentRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.SaleRepository;
@@ -74,6 +77,7 @@ public class PosService {
     private final PaymentRepository payments;
     private final StockMovementRepository movements;
     private final CustomerRepository customers;
+    private final CustomerTransactionRepository customerTx;
     private final SoldDeviceRepository soldDevices;
     private final RealtimeBus realtime;
     private final PromoService promos;
@@ -84,7 +88,8 @@ public class PosService {
 
     public PosService(SaleRepository sales, ProductRepository products,
                       PaymentRepository payments, StockMovementRepository movements,
-                      CustomerRepository customers, SoldDeviceRepository soldDevices,
+                      CustomerRepository customers, CustomerTransactionRepository customerTx,
+                      SoldDeviceRepository soldDevices,
                       RealtimeBus realtime,
                       PromoService promos, LoyaltyService loyalty,
                       CustomerNotificationService notifications,
@@ -95,6 +100,7 @@ public class PosService {
         this.payments = payments;
         this.movements = movements;
         this.customers = customers;
+        this.customerTx = customerTx;
         this.soldDevices = soldDevices;
         this.realtime = realtime;
         this.promos = promos;
@@ -180,6 +186,9 @@ public class PosService {
             item.setUnitPriceUzs(unit);
             item.setLineDiscountUzs(lineDisc);
             item.setLineTotalUzs(lineTotal);
+            // Freeze the cost price now so COGS stays correct even if the
+            // product's purchase_price is edited after this sale.
+            item.setCostAtSaleUzs(nz(p.getPurchasePrice()));
             sale.addItem(item);
 
             // Capture per-unit IMEIs for IMEI-tracked goods (saved after the sale).
@@ -271,6 +280,13 @@ public class PosService {
         }
 
         Sale saved = sales.save(sale);
+        // On-credit (QARZGA) sale to a known customer: raise what they owe in
+        // their ledger (GOODS line) so the credit sale actually shows up as
+        // customer debt. Walk-in credit sales (no customer) only hit the
+        // payment/receivable ledger. A repayment is a later PAYMENT line.
+        if (method == PaymentType.QARZGA && saved.getCustomerId() != null) {
+            recordCreditSaleDebt(saved);
+        }
         // Record per-unit IMEIs now that the sale + its item ids exist.
         if (!deviceCaptures.isEmpty()) {
             recordSoldDevices(saved, deviceCaptures);
@@ -292,6 +308,21 @@ public class PosService {
         // a ledger failure never affects the sale — see LedgerPostingListener).
         events.publishEvent(new LedgerEvents.SalePosted(saved.getId()));
         return toResponse(saved);
+    }
+
+    /**
+     * Raises the customer's outstanding balance by the net total of an on-credit
+     * sale, as one GOODS line in their ledger. Stock is NOT touched here — the
+     * checkout already moved it — this only records what the customer now owes.
+     */
+    private void recordCreditSaleDebt(Sale saved) {
+        CustomerTransaction tx = new CustomerTransaction();
+        tx.setCustomerId(saved.getCustomerId());
+        tx.setDate(LocalDate.now());
+        tx.setType(CustomerTxType.GOODS);
+        tx.setAmount(nz(saved.getTotalUzs()));
+        tx.setDescription("POS qarz sotuvi #" + saved.getId());
+        customerTx.save(tx);
     }
 
     /**
@@ -457,7 +488,8 @@ public class PosService {
                         + si.getProductName() + " (qoldiq " + remaining + ")");
             }
             si.setRefundedQty(si.getRefundedQty() + r.quantity());
-            returnedLines.add(new LedgerEvents.RefundLine(si.getProductId(), r.quantity()));
+            returnedLines.add(new LedgerEvents.RefundLine(
+                    si.getProductId(), r.quantity(), si.getCostAtSaleUzs()));
 
             // Restore stock.
             if (si.getProductId() != null) {

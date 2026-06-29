@@ -744,8 +744,8 @@ export function Pos() {
           />
         </div>
 
-        {/* catalogue / selected-items table */}
-        <div className="ypos-catalog">
+        {/* catalogue (card grid) / selected-items (table) */}
+        <div className={`ypos-catalog${bottomView === 'selected' ? '' : ' ypos-catalog-grid'}`}>
           <div className="ypos-cat-head">
             <div>{t('SKU')}</div>
             <div>{t('Nomi')}</div>
@@ -760,26 +760,53 @@ export function Pos() {
                 ? t('Katalog keshda yo\'q — internet ulanganda qayta sinxron qiling')
                 : (bottomView === 'selected' ? t('Chek bo\'sh') : t('Mahsulot topilmadi'))}
             </div>
-          ) : catalogRows.map((row) => (
-            <div
-              key={row.key}
-              className={`ypos-cat-row ${row.out ? 'out' : ''}`}
-              onClick={row.out ? undefined : row.onClick}
-              title={row.name}
-            >
-              <div className="mono">{row.sku || '—'}</div>
-              <div className="nm">{row.name}</div>
-              <div className="num mono">{usd(row.price)}</div>
-              <div className="num mono">
-                {row.stock}
-                {row.reserved > 0 && (
-                  <span className="ypos-reserved" title={t('Offline navbatda rezerv')}>
-                    -{row.reserved}
-                  </span>
-                )}
+          ) : bottomView === 'selected' ? (
+            catalogRows.map((row) => (
+              <div
+                key={row.key}
+                className={`ypos-cat-row ${row.out ? 'out' : ''}`}
+                onClick={row.out ? undefined : row.onClick}
+                title={row.name}
+              >
+                <div className="mono">{row.sku || '—'}</div>
+                <div className="nm">{row.name}</div>
+                <div className="num mono">{usd(row.price)}</div>
+                <div className="num mono">
+                  {row.stock}
+                  {row.reserved > 0 && (
+                    <span className="ypos-reserved" title={t('Offline navbatda rezerv')}>
+                      -{row.reserved}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            // Premium product-card grid. Same data + click handler as the list —
+            // the whole card is the add-to-cart target, so POS logic is unchanged.
+            catalogRows.map((row) => (
+              <div
+                key={row.key}
+                className={`ypos-prod-card ${row.out ? 'out' : ''}`}
+                onClick={row.out ? undefined : row.onClick}
+                title={row.name}
+              >
+                {!row.out && (
+                  <span className="ypos-prod-add" aria-hidden="true">+</span>
+                )}
+                <div className="ypos-prod-ico">
+                  {(row.name || '?').trim().charAt(0).toUpperCase()}
+                </div>
+                <div className="ypos-prod-name">{row.name}</div>
+                <div className="ypos-prod-foot">
+                  <span className="ypos-prod-price">{usd(row.price)}</span>
+                  <span className={`ypos-prod-stock ${row.stock <= 5 ? 'low' : ''}`}>
+                    {row.stock}{row.reserved > 0 ? `−${row.reserved}` : ''}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* status bar */}

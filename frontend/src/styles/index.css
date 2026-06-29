@@ -4,43 +4,45 @@
    ==================================================================== */
 
 :root {
-  /* ---- emerald accent ---- */
-  --accent:        #10b981;
-  --accent-strong: #059669;
+  /* ---- premium emerald accent (reference green / deep green) ---- */
+  --accent:        #16b86f;
+  --accent-strong: #0f8f55;
   --accent-soft:   #ecfdf5;
   --accent-line:   #a7f3d0;
 
   /* legacy aliases — kept so any --navy* reference still resolves */
-  --navy:        #10b981;
-  --navy-dark:   #059669;
+  --navy:        #16b86f;
+  --navy-dark:   #0f8f55;
   --navy-light:  #34d399;
 
-  --bg:          #f4f6fa;
+  --bg:          #f5f7fb;
   --surface:     #ffffff;
   --surface-2:   #f1f5f9;
-  --border:      #e7ebf1;
+  --border:      #e5e9f0;
   --border-strong: #d4dbe6;
 
-  --sidebar-bg:     #ffffff;
-  --sidebar-border: #e7ebf1;
-  --sidebar-text:   #5b6675;
+  /* dark navy sidebar (premium SaaS shell) */
+  --sidebar-bg:     #0b1728;
+  --sidebar-bg-2:   #07111f;
+  --sidebar-border: rgba(255, 255, 255, .07);
+  --sidebar-text:   #93a1b5;
 
   --text:        #0f172a;
   --text-muted:  #64748b;
   --text-faint:  #94a3b8;
 
-  --red:    #e11d48;  --red-soft:    #fff1f2;  --red-line:    #fecdd3;
+  --red:    #ef4444;  --red-soft:    #fef2f2;  --red-line:    #fecaca;
   --amber:  #d97706;  --amber-soft:  #fffbeb;  --amber-line:  #fde68a;
-  --green:  #059669;  --green-soft:  #ecfdf5;  --green-line:  #a7f3d0;
-  --blue:   #0891b2;  --blue-soft:   #ecfeff;  --blue-line:   #a5f0fc;
-  --orange: #ea580c;  --orange-soft: #fff7ed;  --orange-line: #fed7aa;
+  --green:  #0f8f55;  --green-soft:  #ecfdf5;  --green-line:  #a7f3d0;
+  --blue:   #3b82f6;  --blue-soft:   #eff6ff;  --blue-line:   #bfdbfe;
+  --orange: #f97316;  --orange-soft: #fff7ed;  --orange-line: #fed7aa;
   --purple: #7c3aed;  --purple-soft: #f5f3ff;  --purple-line: #ddd6fe;
 
-  --radius:    14px;
-  --radius-sm: 10px;
-  --shadow:    0 1px 2px rgba(15, 23, 42, .05), 0 6px 16px -8px rgba(15, 23, 42, .12);
-  --shadow-lg: 0 24px 48px -16px rgba(15, 23, 42, .22);
-  --sidebar-w: 256px;
+  --radius:    18px;
+  --radius-sm: 12px;
+  --shadow:    0 1px 2px rgba(15, 23, 42, .04), 0 10px 28px -14px rgba(15, 23, 42, .14);
+  --shadow-lg: 0 28px 56px -20px rgba(15, 23, 42, .26);
+  --sidebar-w: 258px;
 
   --font: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
           Roboto, Arial, sans-serif;
@@ -284,6 +286,8 @@ h1, h2, h3, h4 { line-height: 1.22; letter-spacing: -.01em; }
   margin: 0 auto 12px;
 }
 .empty .e-text { font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.empty .e-hint { font-size: 12px; color: var(--text-faint); margin-top: 6px; max-width: 360px; margin-left: auto; margin-right: auto; }
+.empty .e-action { margin-top: 14px; }
 
 /* ----------------------------------------------------------------- card */
 
@@ -3270,3 +3274,374 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 .onb-step.done .onb-step-title { text-decoration: line-through; }
 .onb-step-desc { color: var(--text-muted); font-size: 12.5px; }
 .onb-arrow { color: var(--brand-primary, #3b82f6); font-weight: 700; font-size: 16px; }
+
+/* ====================================================================
+   PREMIUM SaaS REDESIGN — overhaul layer (feat/premium-saas-ui)
+   Appended last so it wins the cascade; only restyles existing classes,
+   no markup or business logic changes. Dark navy shell + light canvas.
+   ==================================================================== */
+
+/* -------------------------------------------------- dark navy sidebar */
+.sidebar {
+  background: linear-gradient(185deg, var(--sidebar-bg) 0%, var(--sidebar-bg-2) 100%);
+  border-right: 1px solid var(--sidebar-border);
+  box-shadow: 1px 0 0 rgba(255, 255, 255, .02), 18px 0 40px -28px rgba(2, 6, 16, .6);
+}
+.sidebar-brand { border-bottom: 1px solid var(--sidebar-border); }
+.sidebar-brand .name { color: #f8fafc; }
+.sidebar-brand .name .brand-tag {
+  background: rgba(22, 184, 111, .16); color: #5eead4;
+  border-color: rgba(22, 184, 111, .32);
+}
+.sidebar-brand .sub { color: #5f6e85; }
+
+.sidebar-nav { padding: 12px 12px; }
+.sidebar-nav .nav-link { color: var(--sidebar-text); }
+.sidebar-nav .nav-link:hover {
+  background: rgba(255, 255, 255, .055);
+  color: #f1f5f9;
+}
+.sidebar-nav .nav-link.active {
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  color: #fff;
+  box-shadow: 0 8px 20px -8px rgba(15, 143, 85, .6);
+}
+.sidebar-nav .nav-link.active .ico { color: #fff !important; }
+.sidebar-nav .nav-link.active:hover { color: #fff; filter: brightness(1.04); }
+.nav-link.nav-link-admin:not(.active):hover { background: rgba(245, 158, 11, .14); }
+
+.sidebar-foot { border-top: 1px solid var(--sidebar-border); }
+.operator-pill {
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+.operator-pill .op-info > div:first-child,
+.operator-pill .op-role { color: #e2e8f0 !important; }
+.operator-pill .op-avatar {
+  background: rgba(22, 184, 111, .18); color: #5eead4;
+}
+.operator-pill .op-logout { color: #93a1b5; }
+.operator-pill .op-logout:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* mobile drawer backdrop reads better over the dark sidebar */
+.sidebar { transition: transform .22s ease; }
+
+/* ---------------------------------------------------------- topbar */
+.topbar {
+  height: 64px;
+  backdrop-filter: saturate(1.1);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+}
+.topbar .title { font-size: 18px; }
+
+/* ----------------------------------------------- cards & containers */
+.card { border-radius: var(--radius); }
+.card-head h2 { letter-spacing: -.01em; }
+
+/* --------------------------------------------------- KPI metric grid */
+/* auto-fit so 3 OR 4 KPI cards both sit on one premium row, then wrap */
+.metrics { grid-template-columns: repeat(auto-fit, minmax(214px, 1fr)); }
+.metric { border-radius: var(--radius); padding: 18px 20px; }
+.metric .m-ico {
+  width: 46px; height: 46px; border-radius: 13px; font-size: 20px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .04);
+}
+.metric .m-value { font-size: 23px; }
+
+/* ------------------------------------------------------------ buttons */
+.btn { border-radius: var(--radius-sm); }
+.btn-primary {
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  box-shadow: 0 6px 16px -6px rgba(15, 143, 85, .55);
+}
+.btn-accent { background: linear-gradient(100deg, #3b82f6 0%, #2563eb 100%); }
+
+/* -------------------------------------------------------------- forms */
+.input:focus, input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(22, 184, 111, .15);
+}
+
+/* page-head accent bar uses the refreshed green */
+.page-head::before {
+  background: linear-gradient(180deg, #34d399, var(--accent) 55%, var(--accent-strong));
+}
+
+/* ------------------------------------------------------ POS polish */
+.ypos-pay-total {
+  font-size: 18px; font-weight: 700;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  color: var(--accent-strong);
+}
+.ypos-pm { border-radius: 11px; transition: background .12s, border-color .12s, color .12s; }
+.ypos-pm:hover { border-color: var(--accent-line); }
+.ypos-pm.active {
+  background: linear-gradient(100deg, var(--accent), var(--accent-strong));
+  border-color: var(--accent-strong);
+}
+.ypos-pay {
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--accent) 0%, var(--accent-strong) 100%);
+  box-shadow: 0 8px 20px -8px rgba(15, 143, 85, .55);
+}
+
+/* ------------------------------------------------- landing polish */
+.lp-hero {
+  position: relative;
+  background:
+    radial-gradient(60% 70% at 50% -10%, rgba(22, 184, 111, .10), transparent 70%),
+    radial-gradient(40% 50% at 100% 0%, rgba(59, 130, 246, .08), transparent 70%);
+  border-radius: 0 0 28px 28px;
+}
+.lp-hero-badge {
+  background: rgba(22, 184, 111, .12);
+  color: var(--accent-strong);
+}
+.lp-trust {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  max-width: 620px; margin: 34px auto 0;
+}
+.lp-trust-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 10px; box-shadow: var(--shadow);
+}
+.lp-trust-num {
+  font-size: 24px; font-weight: 850; letter-spacing: -.02em;
+  background: linear-gradient(100deg, var(--accent), #3b82f6);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.lp-trust-label {
+  font-size: 12px; font-weight: 600; color: var(--text-muted); margin-top: 2px;
+}
+@media (max-width: 560px) {
+  .lp-trust { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ============================================================
+   PHASE 8.1 — landing product preview + dashboard payment donut
+   ============================================================ */
+
+/* hero becomes a two-column SaaS layout: copy left, app preview right */
+.lp-hero {
+  max-width: 1200px; text-align: left;
+  display: grid; grid-template-columns: 1.05fr 1fr;
+  gap: 44px; align-items: center;
+  padding: 60px 24px 52px;
+}
+.lp-hero-copy .lp-hero-sub { margin-left: 0; margin-right: 0; }
+.lp-hero-copy .lp-hero-cta { justify-content: flex-start; }
+.lp-hero-copy .lp-trust { margin: 30px 0 0; max-width: none; }
+
+/* ---- the dashboard mock card ---- */
+.lp-hero-preview { position: relative; perspective: 1500px; }
+.lp-mock {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 40px 80px -32px rgba(15, 23, 42, .35), 0 0 0 1px rgba(15,23,42,.02);
+  overflow: hidden;
+  transform: rotateY(-7deg) rotateX(3deg);
+  transition: transform .4s ease;
+}
+.lp-hero-preview:hover .lp-mock { transform: rotateY(-3deg) rotateX(1deg); }
+.lp-mock-top {
+  display: flex; align-items: center; gap: 7px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.lp-mock-dot { width: 9px; height: 9px; border-radius: 50%; }
+.lp-mock-dot.r { background: #ef4444; } .lp-mock-dot.y { background: #f59e0b; } .lp-mock-dot.g { background: #22c55e; }
+.lp-mock-title { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.lp-mock-live {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 800; color: var(--accent-strong);
+}
+.lp-mock-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.lp-mock-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 14px; }
+.lp-mk {
+  border-radius: 11px; padding: 10px 9px;
+  border: 1px solid var(--border); background: var(--surface);
+  display: flex; flex-direction: column; gap: 1px;
+}
+.lp-mk-l { font-size: 8.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.lp-mk-v { font-size: 16px; font-weight: 850; letter-spacing: -.02em; }
+.lp-mk-t { font-size: 9px; font-weight: 800; color: var(--accent-strong); }
+.lp-mk.g { background: var(--green-soft); border-color: var(--green-line); }
+.lp-mk.b { background: var(--blue-soft); border-color: var(--blue-line); }
+.lp-mk.a { background: var(--amber-soft); border-color: var(--amber-line); }
+.lp-mk.v { background: var(--purple-soft); border-color: var(--purple-line); }
+.lp-mock-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; padding: 0 14px 16px; }
+.lp-mock-panel { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface); }
+.lp-mock-ph { font-size: 10px; font-weight: 800; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.lp-mock-bars { display: flex; align-items: flex-end; gap: 8px; height: 92px; }
+.lp-mock-bars span {
+  flex: 1; border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  opacity: .9;
+}
+.lp-mock-bars span:nth-child(6) { background: linear-gradient(180deg, #34d399, var(--accent)); opacity: 1; }
+.lp-mock-donut { display: grid; place-items: center; }
+.lp-mock-donut svg { width: 92px; height: 92px; }
+.lp-mock-leg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; margin-top: 8px; }
+.lp-mock-leg span { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 600; color: var(--text-muted); }
+.lp-mock-leg i { width: 7px; height: 7px; border-radius: 2px; }
+.lp-mock-leg i.g { background: var(--green); } .lp-mock-leg i.b { background: var(--blue); }
+.lp-mock-leg i.a { background: var(--amber); } .lp-mock-leg i.r { background: var(--red); }
+
+/* ---- small POS phone overlay ---- */
+.lp-mock-phone {
+  position: absolute; right: -30px; bottom: -34px; width: 160px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 12px; box-shadow: var(--shadow-lg);
+  transform: rotate(3deg);
+}
+.lp-mock-phone-top { font-size: 11px; font-weight: 800; margin-bottom: 8px; }
+.lp-mock-phone-row { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); padding: 3px 0; }
+.lp-mock-phone-total { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 11px; font-weight: 700; }
+.lp-mock-phone-total b { font-size: 15px; }
+.lp-mock-phone-pay {
+  text-align: center; border-radius: 10px; padding: 9px; color: #fff; font-size: 12px; font-weight: 800;
+  background: linear-gradient(100deg, var(--accent), var(--accent-strong));
+}
+
+@media (max-width: 900px) {
+  .lp-hero { grid-template-columns: 1fr; text-align: center; }
+  .lp-hero-copy .lp-hero-cta { justify-content: center; }
+  .lp-hero-copy .lp-trust { margin-left: auto; margin-right: auto; }
+  .lp-mock { transform: none; }
+  .lp-hero-preview:hover .lp-mock { transform: none; }
+}
+@media (max-width: 560px) {
+  .lp-mock-phone { display: none; }
+  .lp-mock-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ================================ dashboard payment-share donut */
+.pshare { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.pshare-svg { width: 150px; height: 150px; flex-shrink: 0; }
+.pshare-total-v { font-size: 15px; font-weight: 850; fill: var(--text); }
+.pshare-total-l { font-size: 9px; font-weight: 700; fill: var(--text-faint); text-transform: uppercase; letter-spacing: .08em; }
+.pshare-legend { flex: 1; min-width: 150px; display: flex; flex-direction: column; gap: 10px; }
+.pshare-leg { display: flex; align-items: center; gap: 9px; }
+.pshare-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.pshare-leg-label { font-weight: 600; font-size: 13px; }
+.pshare-leg-val { margin-left: auto; font-weight: 800; color: var(--text-muted); }
+
+/* ====================================================================
+   PHASE 8.2 — make the redesign UNMISTAKABLE (not just the sidebar)
+   Bold gradient-accent KPI cards (every page), a dashboard control
+   centre, stronger headers, and a POS product-card grid.
+   ==================================================================== */
+
+/* ------- KPI cards: thick gradient top-accent + bigger, on EVERY page */
+.metric {
+  position: relative;
+  overflow: hidden;
+  padding: 22px 20px 18px;
+  border-radius: 18px;
+}
+.metric::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 5px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+.metric .m-ico {
+  width: 52px; height: 52px; border-radius: 15px; font-size: 23px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .05);
+}
+.metric .m-value { font-size: 28px; font-weight: 850; margin-top: 5px; }
+.metric .m-label { font-size: 11px; letter-spacing: .05em; }
+.metric:hover { transform: translateY(-3px); }
+/* per-tone gradient accents */
+.metric.tone-red::before    { background: linear-gradient(90deg, #ef4444, #f97316); }
+.metric.tone-green::before  { background: linear-gradient(90deg, #16b86f, #0f8f55); }
+.metric.tone-blue::before   { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+.metric.tone-amber::before  { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.metric.tone-orange::before { background: linear-gradient(90deg, #f97316, #ea580c); }
+.metric .m-ico { background: linear-gradient(160deg, var(--surface-2), #fff); }
+.metric.tone-red    .m-ico { background: linear-gradient(160deg, var(--red-soft), #fff); }
+.metric.tone-green  .m-ico { background: linear-gradient(160deg, var(--green-soft), #fff); }
+.metric.tone-blue   .m-ico { background: linear-gradient(160deg, var(--blue-soft), #fff); }
+.metric.tone-amber  .m-ico { background: linear-gradient(160deg, var(--amber-soft), #fff); }
+.metric.tone-orange .m-ico { background: linear-gradient(160deg, var(--orange-soft), #fff); }
+
+/* ------- dashboard "Do'kon boshqaruv markazi" control-centre band */
+.dboard-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  padding: 22px 26px; margin-bottom: 20px;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(22, 184, 111, .14), transparent 55%),
+    linear-gradient(100deg, #0b1728 0%, #0f2238 100%);
+  color: #fff;
+  box-shadow: 0 18px 44px -22px rgba(11, 23, 40, .8);
+}
+.dboard-hero-eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: .14em;
+  color: #5eead4; text-transform: uppercase;
+}
+.dboard-hero-title {
+  font-size: 26px; font-weight: 850; letter-spacing: -.02em; margin: 4px 0 4px;
+  color: #fff;
+}
+.dboard-hero-sub { font-size: 13px; color: #aab6c9; max-width: 560px; }
+.dboard-hero .btn-primary { box-shadow: 0 10px 24px -8px rgba(22, 184, 111, .7); }
+
+/* ------- stronger page headers everywhere */
+.page-head h1 { font-size: 26px; }
+.page-head::before { width: 5px; }
+
+/* ------- POS: product CARD GRID (catalog view), preserves all logic */
+.ypos-catalog.ypos-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  align-content: start;
+  overflow-y: auto;
+}
+.ypos-catalog.ypos-catalog-grid .ypos-cat-head { display: none; }
+.ypos-catalog.ypos-catalog-grid .ypos-cat-empty { grid-column: 1 / -1; }
+.ypos-prod-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px; cursor: pointer; position: relative;
+  transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.ypos-prod-card:hover {
+  transform: translateY(-2px); border-color: var(--accent-line);
+  box-shadow: 0 10px 22px -12px rgba(15, 23, 42, .25);
+}
+.ypos-prod-card.out { opacity: .5; cursor: not-allowed; }
+.ypos-prod-ico {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; font-weight: 800; font-size: 16px;
+  color: var(--accent-strong);
+  background: linear-gradient(160deg, var(--accent-soft), #fff);
+  border: 1px solid var(--accent-line);
+}
+.ypos-prod-name {
+  font-size: 13px; font-weight: 700; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 32px;
+}
+.ypos-prod-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+.ypos-prod-price { font-size: 15px; font-weight: 850; color: var(--accent-strong); }
+.ypos-prod-stock {
+  font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px;
+  background: var(--green-soft); color: var(--green); border: 1px solid var(--green-line);
+}
+.ypos-prod-stock.low { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); }
+.ypos-prod-add {
+  position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 8px; border: 0;
+  background: linear-gradient(100deg, var(--accent), var(--accent-strong)); color: #fff;
+  font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+}

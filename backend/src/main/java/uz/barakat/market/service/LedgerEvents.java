@@ -25,8 +25,13 @@ public final class LedgerEvents {
             BigDecimal refundedAmountUsd, List<RefundLine> returnedLines, String uniqueRef) {
     }
 
-    /** One returned line: how many units of a product went back into stock. */
-    public record RefundLine(Long productId, int quantity) {
+    /**
+     * One returned line: how many units of a product went back into stock, and
+     * the per-unit cost frozen on the original sale line ({@code costAtSaleUzs},
+     * null on legacy rows). The cost drives the COGS reversal so a refund undoes
+     * exactly the cost the sale booked.
+     */
+    public record RefundLine(Long productId, int quantity, BigDecimal costAtSaleUzs) {
     }
 
     /** A market expense row was created. */
