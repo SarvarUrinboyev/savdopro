@@ -76,6 +76,16 @@ function Content({ data, rate, onEditBalance }) {
   const t = useT();
   return (
     <>
+      <div className="dboard-hero">
+        <div>
+          <div className="dboard-hero-eyebrow">SavdoPRO · {t('Boshqaruv')}</div>
+          <h1 className="dboard-hero-title">{t("Do'kon boshqaruv markazi")}</h1>
+          <p className="dboard-hero-sub">
+            {t('Bugungi savdo, foyda, qarz va kassa — barchasi bitta ekranda, jonli.')}
+          </p>
+        </div>
+        <Link to="/pos" className="btn btn-primary">💳 {t('Kassada sotuv')}</Link>
+      </div>
       <div className="section flex-between" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
         <span style={{ fontWeight: 600, color: 'var(--text-faint)', fontSize: 13 }}>
           ⚡ {t('Bugungi jonli holat — kassa, savdo va buyurtmalar')}

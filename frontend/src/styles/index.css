@@ -3530,3 +3530,118 @@ textarea.input { resize: vertical; min-height: 110px; font-family: inherit; }
 .pshare-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .pshare-leg-label { font-weight: 600; font-size: 13px; }
 .pshare-leg-val { margin-left: auto; font-weight: 800; color: var(--text-muted); }
+
+/* ====================================================================
+   PHASE 8.2 — make the redesign UNMISTAKABLE (not just the sidebar)
+   Bold gradient-accent KPI cards (every page), a dashboard control
+   centre, stronger headers, and a POS product-card grid.
+   ==================================================================== */
+
+/* ------- KPI cards: thick gradient top-accent + bigger, on EVERY page */
+.metric {
+  position: relative;
+  overflow: hidden;
+  padding: 22px 20px 18px;
+  border-radius: 18px;
+}
+.metric::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 5px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+.metric .m-ico {
+  width: 52px; height: 52px; border-radius: 15px; font-size: 23px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .05);
+}
+.metric .m-value { font-size: 28px; font-weight: 850; margin-top: 5px; }
+.metric .m-label { font-size: 11px; letter-spacing: .05em; }
+.metric:hover { transform: translateY(-3px); }
+/* per-tone gradient accents */
+.metric.tone-red::before    { background: linear-gradient(90deg, #ef4444, #f97316); }
+.metric.tone-green::before  { background: linear-gradient(90deg, #16b86f, #0f8f55); }
+.metric.tone-blue::before   { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+.metric.tone-amber::before  { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.metric.tone-orange::before { background: linear-gradient(90deg, #f97316, #ea580c); }
+.metric .m-ico { background: linear-gradient(160deg, var(--surface-2), #fff); }
+.metric.tone-red    .m-ico { background: linear-gradient(160deg, var(--red-soft), #fff); }
+.metric.tone-green  .m-ico { background: linear-gradient(160deg, var(--green-soft), #fff); }
+.metric.tone-blue   .m-ico { background: linear-gradient(160deg, var(--blue-soft), #fff); }
+.metric.tone-amber  .m-ico { background: linear-gradient(160deg, var(--amber-soft), #fff); }
+.metric.tone-orange .m-ico { background: linear-gradient(160deg, var(--orange-soft), #fff); }
+
+/* ------- dashboard "Do'kon boshqaruv markazi" control-centre band */
+.dboard-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+  padding: 22px 26px; margin-bottom: 20px;
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(22, 184, 111, .14), transparent 55%),
+    linear-gradient(100deg, #0b1728 0%, #0f2238 100%);
+  color: #fff;
+  box-shadow: 0 18px 44px -22px rgba(11, 23, 40, .8);
+}
+.dboard-hero-eyebrow {
+  font-size: 11px; font-weight: 800; letter-spacing: .14em;
+  color: #5eead4; text-transform: uppercase;
+}
+.dboard-hero-title {
+  font-size: 26px; font-weight: 850; letter-spacing: -.02em; margin: 4px 0 4px;
+  color: #fff;
+}
+.dboard-hero-sub { font-size: 13px; color: #aab6c9; max-width: 560px; }
+.dboard-hero .btn-primary { box-shadow: 0 10px 24px -8px rgba(22, 184, 111, .7); }
+
+/* ------- stronger page headers everywhere */
+.page-head h1 { font-size: 26px; }
+.page-head::before { width: 5px; }
+
+/* ------- POS: product CARD GRID (catalog view), preserves all logic */
+.ypos-catalog.ypos-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  padding: 12px;
+  align-content: start;
+  overflow-y: auto;
+}
+.ypos-catalog.ypos-catalog-grid .ypos-cat-head { display: none; }
+.ypos-catalog.ypos-catalog-grid .ypos-cat-empty { grid-column: 1 / -1; }
+.ypos-prod-card {
+  display: flex; flex-direction: column; gap: 6px;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px; cursor: pointer; position: relative;
+  transition: transform .1s ease, box-shadow .1s ease, border-color .1s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+}
+.ypos-prod-card:hover {
+  transform: translateY(-2px); border-color: var(--accent-line);
+  box-shadow: 0 10px 22px -12px rgba(15, 23, 42, .25);
+}
+.ypos-prod-card.out { opacity: .5; cursor: not-allowed; }
+.ypos-prod-ico {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; font-weight: 800; font-size: 16px;
+  color: var(--accent-strong);
+  background: linear-gradient(160deg, var(--accent-soft), #fff);
+  border: 1px solid var(--accent-line);
+}
+.ypos-prod-name {
+  font-size: 13px; font-weight: 700; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 32px;
+}
+.ypos-prod-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; }
+.ypos-prod-price { font-size: 15px; font-weight: 850; color: var(--accent-strong); }
+.ypos-prod-stock {
+  font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px;
+  background: var(--green-soft); color: var(--green); border: 1px solid var(--green-line);
+}
+.ypos-prod-stock.low { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-line); }
+.ypos-prod-add {
+  position: absolute; top: 10px; right: 10px;
+  width: 24px; height: 24px; border-radius: 8px; border: 0;
+  background: linear-gradient(100deg, var(--accent), var(--accent-strong)); color: #fff;
+  font-size: 15px; font-weight: 800; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+}
