@@ -266,6 +266,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/admin"
             title={t('Super-admin')}
+            aria-label={t('Super-admin')}
             className={({ isActive }) => `nav-link nav-link-admin ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/admin') }}>{ICON['/admin']}</span>
@@ -276,6 +277,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/shops"
             title={t("Do'konlar")}
+            aria-label={t("Do'konlar")}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/shops') }}>{ICON['/shops']}</span>
@@ -289,6 +291,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/billing"
             title={t("Tarif va to'lov")}
+            aria-label={t("Tarif va to'lov")}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/billing') }}>{ICON['/billing']}</span>
@@ -300,6 +303,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/accounting"
             title={t('Buxgalteriya')}
+            aria-label={t('Buxgalteriya')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor('/accounting') }}>{ICON['/accounting']}</span>
@@ -311,6 +315,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/integrations"
             title={t('Integratsiyalar')}
+            aria-label={t('Integratsiyalar')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico">
@@ -327,6 +332,7 @@ export function Sidebar({ open, onClose }) {
           <NavLink
             to="/devices"
             title={t('IMEI baza')}
+            aria-label={t('IMEI baza')}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico">
@@ -344,6 +350,7 @@ export function Sidebar({ open, onClose }) {
             key={item.to}
             to={item.to}
             title={t(item.label)}
+            aria-label={t(item.label)}
             className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
           >
             <span className="ico" style={{ color: iconColor(item.to) }}>{ICON[item.to]}</span>
@@ -353,6 +360,7 @@ export function Sidebar({ open, onClose }) {
         <NavLink
           to="/help"
           title={t("Bog'lanish")}
+          aria-label={t("Bog'lanish")}
           className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
         >
           <span className="ico" style={{ color: iconColor('/help') }}>{ICON['/help']}</span>

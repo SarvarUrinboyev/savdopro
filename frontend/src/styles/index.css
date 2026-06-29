@@ -3941,3 +3941,12 @@ a.cc-card:hover .cc-cta i { transform: translateX(3px); }
   /* collapsed flag is ignored on mobile — the drawer is always the full sidebar */
   .app-shell.sidebar-collapsed .main { margin-left: 0; }
 }
+
+/* a11y polish: focus ring on the drawer close, and honour reduced-motion */
+.sidebar-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .main { transition: none; }
+}
+/* defence-in-depth: the collapsed rail margin must never reach the POS kiosk
+   (the JS already withholds the class there; this neutralises it regardless) */
+.app-shell.app-shell-pos-kiosk.sidebar-collapsed .main { margin-left: 0; }
