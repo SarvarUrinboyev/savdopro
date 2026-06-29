@@ -43,6 +43,15 @@ public class SaleItem extends BaseEntity {
     @Column(name = "line_total_uzs", nullable = false, precision = 15, scale = 2)
     private BigDecimal lineTotalUzs = BigDecimal.ZERO;
 
+    /**
+     * Cost price per unit frozen at sale time ("tannarx"). Drives COGS so the
+     * profit of a past sale never changes when the product's cost is edited
+     * later. Null on legacy rows that predate the snapshot (V37); the posting
+     * and reporting code falls back to the product's current cost for those.
+     */
+    @Column(name = "cost_at_sale_uzs", precision = 15, scale = 2)
+    private BigDecimal costAtSaleUzs;
+
     /** How many units of this line have been returned via refund. */
     @Column(name = "refunded_qty", nullable = false)
     private int refundedQty = 0;

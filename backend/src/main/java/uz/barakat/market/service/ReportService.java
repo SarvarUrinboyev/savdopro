@@ -292,7 +292,11 @@ public class ReportService {
                 if (sold <= 0) {
                     continue;
                 }
-                BigDecimal unitCost = cost.getOrDefault(i.getProductId(), ZERO);
+                // Prefer the cost frozen on the line at sale time (V37); fall back
+                // to the product's current cost for legacy lines without a snapshot.
+                BigDecimal unitCost = i.getCostAtSaleUzs() != null
+                        ? i.getCostAtSaleUzs()
+                        : cost.getOrDefault(i.getProductId(), ZERO);
                 cogs = cogs.add(unitCost.multiply(BigDecimal.valueOf(sold)));
             }
         }

@@ -162,7 +162,7 @@ public class LedgerPostingService {
         BigDecimal discount = subtotal.subtract(total).max(ZERO);
         BigDecimal cogs = ZERO;
         for (SaleItem it : sale.getItems()) {
-            cogs = cogs.add(unitCost(it.getProductId())
+            cogs = cogs.add(costOf(it.getCostAtSaleUzs(), it.getProductId())
                     .multiply(BigDecimal.valueOf(it.getQuantity())));
         }
 
@@ -187,7 +187,7 @@ public class LedgerPostingService {
         BigDecimal returnedCost = ZERO;
         if (returned != null) {
             for (RefundLine r : returned) {
-                returnedCost = returnedCost.add(unitCost(r.productId())
+                returnedCost = returnedCost.add(costOf(r.costAtSaleUzs(), r.productId())
                         .multiply(BigDecimal.valueOf(r.quantity())));
             }
         }
@@ -407,6 +407,15 @@ public class LedgerPostingService {
             return;
         }
         entries.save(e);
+    }
+
+    /**
+     * Cost frozen on the sale line (V37 snapshot) when present, else the
+     * product's current cost — keeping COGS correct for new sales while
+     * staying backward-compatible with legacy lines that have no snapshot.
+     */
+    private BigDecimal costOf(BigDecimal snapshot, Long productId) {
+        return snapshot != null ? snapshot : unitCost(productId);
     }
 
     private BigDecimal unitCost(Long productId) {
