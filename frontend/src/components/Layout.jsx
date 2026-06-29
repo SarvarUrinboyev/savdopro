@@ -85,7 +85,7 @@ export function Layout() {
   }), [navigate, pathname]));
 
   return (
-    <div className={`app-shell ${isPosKiosk ? 'app-shell-pos-kiosk' : ''}${collapsed ? ' sidebar-collapsed' : ''}`}>
+    <div className={`app-shell ${isPosKiosk ? 'app-shell-pos-kiosk' : ''}${!isPosKiosk && collapsed ? ' sidebar-collapsed' : ''}`}>
       {!isPosKiosk && <QuickSearch />}
       {!isPosKiosk && <AiChatWidget />}
       {!isPosKiosk && <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />}
