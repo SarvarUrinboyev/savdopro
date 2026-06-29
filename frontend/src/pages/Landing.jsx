@@ -51,36 +51,96 @@ export function Landing() {
       </header>
 
       <section className="lp-hero">
-        <div className="lp-hero-badge">{t('3 kun bepul — kartasiz')}</div>
-        <h1 className="lp-hero-title">
-          {t("Do'koningizni bitta tizimda boshqaring")}
-        </h1>
-        <p className="lp-hero-sub">
-          {t("Kassa, ombor, mijozlar, qarz va hisobotlar — bulutda, har qanday qurilmadan. Bugun boshlang, 5 daqiqada sozlang.")}
-        </p>
-        <div className="lp-hero-cta">
-          <Link to="/register" className="btn btn-primary lp-cta-lg">
-            {t('3 kun bepul sinab ko\'rish')}
-          </Link>
-          <Link to="/login" className="btn lp-cta-ghost">{t('Hisobga kirish')}</Link>
+        <div className="lp-hero-copy">
+          <div className="lp-hero-badge">{t('3 kun bepul — kartasiz')}</div>
+          <h1 className="lp-hero-title">
+            {t("Do'koningizni bitta aqlli tizimda boshqaring")}
+          </h1>
+          <p className="lp-hero-sub">
+            {t("Kassa, ombor, mijozlar, qarz va hisobotlar — bulutda, har qanday qurilmadan. Bugun boshlang, 5 daqiqada sozlang.")}
+          </p>
+          <div className="lp-hero-cta">
+            <Link to="/register" className="btn btn-primary lp-cta-lg">
+              {t('Bepul demo ko\'rish')}
+            </Link>
+            <Link to="/login" className="btn lp-cta-ghost">{t('Hisobga kirish')}</Link>
+          </div>
+          <div className="lp-hero-note">{t('Kredit karta talab qilinmaydi · Istalgan vaqtda bekor qiling')}</div>
+          <div className="lp-trust">
+            <div className="lp-trust-item">
+              <div className="lp-trust-num">1000+</div>
+              <div className="lp-trust-label">{t("do'konlar ishonchi")}</div>
+            </div>
+            <div className="lp-trust-item">
+              <div className="lp-trust-num">99.9%</div>
+              <div className="lp-trust-label">{t('uptime')}</div>
+            </div>
+            <div className="lp-trust-item">
+              <div className="lp-trust-num">24/7</div>
+              <div className="lp-trust-label">{t("qo'llab-quvvatlash")}</div>
+            </div>
+            <div className="lp-trust-item">
+              <div className="lp-trust-num">AI</div>
+              <div className="lp-trust-label">Ready</div>
+            </div>
+          </div>
         </div>
-        <div className="lp-hero-note">{t('Kredit karta talab qilinmaydi · Istalgan vaqtda bekor qiling')}</div>
-        <div className="lp-trust">
-          <div className="lp-trust-item">
-            <div className="lp-trust-num">1000+</div>
-            <div className="lp-trust-label">{t("do'konlar ishonchi")}</div>
+
+        {/* Product preview — a static UI mock, NOT live data. */}
+        <div className="lp-hero-preview" aria-hidden="true">
+          <div className="lp-mock">
+            <div className="lp-mock-top">
+              <span className="lp-mock-dot r" />
+              <span className="lp-mock-dot y" />
+              <span className="lp-mock-dot g" />
+              <span className="lp-mock-title">SavdoPRO · {t('Boshqaruv')}</span>
+              <span className="lp-mock-live"><i />Live</span>
+            </div>
+            <div className="lp-mock-kpis">
+              <div className="lp-mk g"><span className="lp-mk-l">{t('Bugungi savdo')}</span><span className="lp-mk-v">12.4M</span><span className="lp-mk-t">▲ 8%</span></div>
+              <div className="lp-mk b"><span className="lp-mk-l">{t('Sof foyda')}</span><span className="lp-mk-v">3.2M</span><span className="lp-mk-t">▲ 5%</span></div>
+              <div className="lp-mk a"><span className="lp-mk-l">{t('Qarzlar')}</span><span className="lp-mk-v">1.8M</span></div>
+              <div className="lp-mk v"><span className="lp-mk-l">{t('Kassa')}</span><span className="lp-mk-v">5.6M</span></div>
+            </div>
+            <div className="lp-mock-grid">
+              <div className="lp-mock-panel">
+                <div className="lp-mock-ph">{t('Savdo dinamikasi')}</div>
+                <div className="lp-mock-bars">
+                  {[46, 64, 52, 78, 60, 86, 72].map((h, i) => (
+                    <span key={i} style={{ height: `${h}%` }} />
+                  ))}
+                </div>
+              </div>
+              <div className="lp-mock-panel">
+                <div className="lp-mock-ph">{t("To'lov ulushi")}</div>
+                <div className="lp-mock-donut">
+                  <svg viewBox="0 0 80 80">
+                    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--surface-2)" strokeWidth="12" />
+                    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--green)" strokeWidth="12"
+                            strokeDasharray="75.4 188.5" strokeDashoffset="0" transform="rotate(-90 40 40)" />
+                    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--blue)" strokeWidth="12"
+                            strokeDasharray="56.5 188.5" strokeDashoffset="-75.4" transform="rotate(-90 40 40)" />
+                    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--amber)" strokeWidth="12"
+                            strokeDasharray="33.9 188.5" strokeDashoffset="-131.9" transform="rotate(-90 40 40)" />
+                    <circle cx="40" cy="40" r="30" fill="none" stroke="var(--red)" strokeWidth="12"
+                            strokeDasharray="22.6 188.5" strokeDashoffset="-165.8" transform="rotate(-90 40 40)" />
+                  </svg>
+                </div>
+                <div className="lp-mock-leg">
+                  <span><i className="g" />{t('Naqd')}</span>
+                  <span><i className="b" />{t('Karta')}</span>
+                  <span><i className="a" />{t("O'tkazma")}</span>
+                  <span><i className="r" />{t('Qarz')}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="lp-trust-item">
-            <div className="lp-trust-num">99.9%</div>
-            <div className="lp-trust-label">{t('uptime')}</div>
-          </div>
-          <div className="lp-trust-item">
-            <div className="lp-trust-num">24/7</div>
-            <div className="lp-trust-label">{t("qo'llab-quvvatlash")}</div>
-          </div>
-          <div className="lp-trust-item">
-            <div className="lp-trust-num">AI</div>
-            <div className="lp-trust-label">Ready</div>
+          <div className="lp-mock-phone">
+            <div className="lp-mock-phone-top">{t('Kassa (POS)')}</div>
+            <div className="lp-mock-phone-row"><span>Coca-Cola 1.5L</span><span>11 000</span></div>
+            <div className="lp-mock-phone-row"><span>Non × 3</span><span>10 500</span></div>
+            <div className="lp-mock-phone-total"><span>{t('Jami')}</span><b>21 500</b></div>
+            <div className="lp-mock-phone-pay">{t("To'lov")}</div>
           </div>
         </div>
       </section>

@@ -115,10 +115,11 @@ function Content({ data, rate, onEditBalance }) {
 
       <div className="grid grid-2 section">
         <SalesChart />
-        <ActivityFeed />
+        <PaymentShare data={data} />
       </div>
 
-      <div className="grid grid-2">
+      <div className="grid grid-2 section">
+        <ActivityFeed />
         <div className="card">
           <div className="card-head">
             <h2>{t('Bugungi xarajatlar')}</h2>
@@ -142,16 +143,16 @@ function Content({ data, rate, onEditBalance }) {
             )}
           </div>
         </div>
+      </div>
 
-        <div className="card">
-          <div className="card-head">
-            <h2>{t('Buyurtmalar holati')}</h2>
-          </div>
-          <div className="card-pad">
-            <OrderGroup tag="tag-red" title={t('Bugun keladi')} orders={data.ordersToday} />
-            <OrderGroup tag="tag-amber" title={t('Ertaga keladi')} orders={data.ordersTomorrow} />
-            <OrderGroup tag="tag-red" title={t('Kelmagan')} orders={data.ordersOverdue} last />
-          </div>
+      <div className="card section">
+        <div className="card-head">
+          <h2>{t('Buyurtmalar holati')}</h2>
+        </div>
+        <div className="card-pad">
+          <OrderGroup tag="tag-red" title={t('Bugun keladi')} orders={data.ordersToday} />
+          <OrderGroup tag="tag-amber" title={t('Ertaga keladi')} orders={data.ordersTomorrow} />
+          <OrderGroup tag="tag-red" title={t('Kelmagan')} orders={data.ordersOverdue} last />
         </div>
       </div>
 
@@ -294,6 +295,70 @@ function SalesChart() {
               </text>
             ))}
           </svg>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Today's payment-method share as a CSS/SVG donut. Reads the real method
+ * totals already on the dashboard payload (no extra request, no fabricated
+ * numbers). Shows a safe empty state when nothing has come in yet.
+ */
+function PaymentShare({ data }) {
+  const t = useT();
+  const segs = [
+    { key: 'naqd',  label: t('Naqd'),  value: Number(data.todayNaqd) || 0,  color: 'var(--green)' },
+    { key: 'karta', label: t('Karta'), value: Number(data.todayKarta) || 0, color: 'var(--blue)' },
+    { key: 'kassa', label: t('Kassa'), value: Number(data.todayKassa) || 0, color: 'var(--amber)' },
+  ];
+  const total = segs.reduce((sum, s) => sum + s.value, 0);
+  const R = 54;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+
+  return (
+    <div className="card pshare-card">
+      <div className="card-head">
+        <h2>{t("To'lov ulushi")}</h2>
+        <span className="hint">{t('Bugun')}</span>
+      </div>
+      <div className="card-pad">
+        {total === 0 ? (
+          <EmptyState icon="💳" text={t("Bugun to'lov tushmadi")} />
+        ) : (
+          <div className="pshare">
+            <svg viewBox="0 0 140 140" className="pshare-svg" aria-hidden="true">
+              <circle cx="70" cy="70" r={R} fill="none" stroke="var(--surface-2)" strokeWidth="15" />
+              {segs.filter((s) => s.value > 0).map((s) => {
+                const frac = s.value / total;
+                const el = (
+                  <circle
+                    key={s.key}
+                    cx="70" cy="70" r={R} fill="none"
+                    stroke={s.color} strokeWidth="15"
+                    strokeDasharray={`${(frac * C).toFixed(2)} ${C.toFixed(2)}`}
+                    strokeDashoffset={`${(-acc * C).toFixed(2)}`}
+                    transform="rotate(-90 70 70)"
+                  />
+                );
+                acc += frac;
+                return el;
+              })}
+              <text x="70" y="66" textAnchor="middle" className="pshare-total-v">{usd(total)}</text>
+              <text x="70" y="86" textAnchor="middle" className="pshare-total-l">{t('Jami')}</text>
+            </svg>
+            <div className="pshare-legend">
+              {segs.map((s) => (
+                <div key={s.key} className="pshare-leg">
+                  <span className="pshare-dot" style={{ background: s.color }} />
+                  <span className="pshare-leg-label">{s.label}</span>
+                  <span className="pshare-leg-val mono">{Math.round((s.value / total) * 100)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>
