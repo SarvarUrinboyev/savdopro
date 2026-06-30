@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -25,6 +26,7 @@ import uz.barakat.market.domain.Product;
 import uz.barakat.market.domain.StockMovement;
 import uz.barakat.market.domain.StockReason;
 import uz.barakat.market.dto.ProductRequest;
+import uz.barakat.market.exception.BadRequestException;
 import uz.barakat.market.repository.CategoryRepository;
 import uz.barakat.market.repository.ProductRepository;
 import uz.barakat.market.repository.StockMovementRepository;
@@ -102,5 +104,60 @@ class ProductServiceTest {
         // the product and stock-movement writes into separate transactions.
         assertTrue(ProductService.class.isAnnotationPresent(Transactional.class),
                 "ProductService must be @Transactional for create() to be atomic");
+    }
+
+    // ---- product uniqueness rule: identity is the BARCODE, name may repeat ----
+
+    /** A create/update payload with a given name + barcode (uncategorised, stock 1). */
+    private static ProductRequest withBarcode(String name, String barcode) {
+        return new ProductRequest(name, barcode, null, null,
+                new BigDecimal("1.00"), new BigDecimal("2.00"),
+                1, null, null, null, null, null, null, null, null, false);
+    }
+
+    @Test
+    void createAllowsDuplicateNameAndNeverChecksNameUniqueness() {
+        // Same display name as an existing product is fine — only the barcode is
+        // the identity (existsByBarcode = false => create proceeds).
+        when(products.existsByBarcode(any())).thenReturn(false);
+
+        service.create(withBarcode("Coca-Cola", "10001"));
+
+        verify(products).save(any(Product.class));
+        verify(products, never()).existsByNameIgnoreCase(any());
+    }
+
+    @Test
+    void createRejectsDuplicateBarcode() {
+        when(products.existsByBarcode(any())).thenReturn(true);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> service.create(withBarcode("Anything", "10001")));
+        assertTrue(ex.getMessage().contains("shtrix-kod"));
+        verify(products, never()).save(any(Product.class));
+    }
+
+    @Test
+    void updateRejectsDuplicateBarcodeButNeverChecksDuplicateName() {
+        Product existing = new Product();
+        existing.setName("Old name");
+        when(products.findById(7L)).thenReturn(java.util.Optional.of(existing));
+        when(products.existsByBarcodeAndIdNot(any(), eq(7L))).thenReturn(true);
+
+        assertThrows(BadRequestException.class,
+                () -> service.update(7L, withBarcode("Some Other Name", "10001")));
+        verify(products, never()).existsByNameIgnoreCaseAndIdNot(any(), any());
+    }
+
+    @Test
+    void createWithoutBarcodeStillRejectsDuplicateName() {
+        // PHASE B.4: a barcode-less product keeps the name guard, so two
+        // indistinguishable code-less products can't collide.
+        when(products.existsByNameIgnoreCase("Coca-Cola")).thenReturn(true);
+
+        BadRequestException ex = assertThrows(BadRequestException.class,
+                () -> service.create(withBarcode("Coca-Cola", null)));
+        assertTrue(ex.getMessage().contains("nomli"));
+        verify(products, never()).save(any(Product.class));
     }
 }

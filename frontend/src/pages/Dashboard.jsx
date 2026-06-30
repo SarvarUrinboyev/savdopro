@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  BalanceApi, DashboardApi, ExchangeRateApi, ManagementApi, PaymentApi,
+  BalanceApi, DashboardApi, ExchangeRateApi, ManagementApi, PaymentApi, ProductApi,
 } from '../api/endpoints.js';
 import { AnomalyBanner } from '../components/AnomalyBanner.jsx';
 import { AnomalyHistory } from '../components/AnomalyHistory.jsx';
 import { CashboxForecastCard } from '../components/CashboxForecastCard.jsx';
 import { OnboardingChecklist } from '../components/OnboardingChecklist.jsx';
 import { LiveSalesFeed } from '../components/LiveSalesFeed.jsx';
-import { LowStockWidget } from '../components/LowStockWidget.jsx';
 import { Modal } from '../components/Modal.jsx';
 import { useToast } from '../components/Toast.jsx';
 import {
@@ -48,26 +47,42 @@ export function Dashboard() {
   );
 }
 
-function RateBanner({ rate }) {
+/**
+ * Compact info strip — demotes the old big dollar-rate card and the big
+ * "Ertalabgi balans" block into small chips, plus a quick link to the period
+ * finance report. No business logic — just a leaner header band.
+ */
+function DashInfoBar({ rate, startingCash, onEditBalance }) {
   const t = useT();
   return (
-    <div
-      className="card card-pad section flex-between"
-      style={{ borderLeft: '4px solid var(--blue)', flexWrap: 'wrap', gap: 8 }}
-    >
-      <span style={{ fontWeight: 600 }}>💵 {t('Bugungi dollar kursi')}</span>
-      {rate && rate.available ? (
-        <span>
-          <b style={{ fontSize: 16 }}>
-            1 USD = {money(Math.round(Number(rate.rate)))} {t("so'm")}
-          </b>
-          <span className="faint">
-            {' '}&middot; {t('Markaziy bank')} &middot; {formatDate(rate.date)}
-          </span>
-        </span>
-      ) : (
-        <span className="faint">{t("Internetga ulanib bo'lmadi — kursni keyinroq ko'ring")}</span>
-      )}
+    <div className="dash-infobar section">
+      <div className="dib-chip">
+        <span className="dib-ico">💵</span>
+        <div className="dib-body">
+          <div className="dib-k">{t('Dollar kursi')} · {t('Markaziy bank')}</div>
+          <div className="dib-v">
+            {rate && rate.available ? (
+              <>1 USD = {money(Math.round(Number(rate.rate)))} {t("so'm")}</>
+            ) : (
+              <span className="faint">{t("Internetga ulanib bo'lmadi")}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="dib-chip">
+        <span className="dib-ico">🌅</span>
+        <div className="dib-body">
+          <div className="dib-k">{t('Ertalabgi balans')}</div>
+          <div className="dib-v">{usd(startingCash)}</div>
+        </div>
+        <button className="dib-edit" onClick={onEditBalance} title={t('Tahrirlash')} aria-label={t('Tahrirlash')}>
+          ✏️
+        </button>
+      </div>
+      <Link to="/management" className="btn btn-ghost btn-sm dib-report"
+            title={t('Davr bo‘yicha foyda, xarajat va eksport')}>
+        📊 {t('Moliya hisoboti (davr)')} →
+      </Link>
     </div>
   );
 }
@@ -86,73 +101,28 @@ function Content({ data, rate, onEditBalance }) {
         </div>
         <Link to="/pos" className="btn btn-primary">💳 {t('Kassada sotuv')}</Link>
       </div>
-      <div className="section flex-between" style={{ flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontWeight: 600, color: 'var(--text-faint)', fontSize: 13 }}>
-          ⚡ {t('Bugungi jonli holat — kassa, savdo va buyurtmalar')}
-        </span>
-        <Link to="/management" className="btn btn-ghost btn-sm"
-              title={t('Davr bo‘yicha foyda, xarajat va eksport')}>
-          📊 {t('Moliya hisoboti (davr)')} →
-        </Link>
-      </div>
-      <OnboardingChecklist />
-      <RateBanner rate={rate} />
-      <AnomalyBanner />
-      <LiveSalesFeed />
-      <LowStockWidget />
-      <CashboxForecastCard />
-      <div className="balance-hero section">
-        <div>
-          <div className="bh-label">{t('ERTALABGI BALANS')}</div>
-          <div className="bh-value">{usd(data.startingCash)}</div>
-          <button className="btn btn-ghost btn-sm mt-8" onClick={onEditBalance}>
-            ✏️ {t('Tahrirlash')}
-          </button>
-        </div>
-        <div className="bh-side">
-          <div className="s-label">{t('Taxminiy qoldiq')}</div>
-          <div className="s-value">{usd(data.estimatedCash)}</div>
-        </div>
-      </div>
 
-      <div className="metrics section">
-        <MetricCard tone="red"    icon="🧾" label={t('Bugungi xarajat')}    value={data.todayExpenseTotal} tag="CHIQIM" />
-        <MetricCard tone="amber"  icon="🏦" label={t('Kassadan')}           value={data.todayKassa}        tag="KASSADA" />
-        <MetricCard tone="green"  icon="💵" label={t('Naqddan')}            value={data.todayNaqd}         tag="NAQD" />
-        <MetricCard tone="blue"   icon="💳" label={t('Kartadan')}           value={data.todayKarta}        tag="KARTA" />
-        <MetricCard tone="red"    icon="📒" label={t('Umumiy qarz')}        value={data.totalDebt}         tag="QARZ" />
-      </div>
+      <DashInfoBar rate={rate} startingCash={data.startingCash} onEditBalance={onEditBalance} />
+
+      <AnomalyBanner />
+
+      {/* Owner control-centre KPIs — headline numbers right under the hero. */}
+      <KpiGrid data={data} />
+
+      <OnboardingChecklist />
+      <LiveSalesFeed />
 
       <div className="grid grid-2 section">
         <SalesChart />
-        <PaymentShare data={data} />
+        <ExpenseBreakdown data={data} />
       </div>
 
-      <div className="grid grid-2 section">
+      <CashboxForecastCard />
+
+      <div className="grid grid-3 section">
+        <LowStockCard />
         <ActivityFeed />
-        <div className="card">
-          <div className="card-head">
-            <h2>{t('Bugungi xarajatlar')}</h2>
-            <span className="hint">{t('Eng katta xarajatlar')}</span>
-          </div>
-          <div className="card-pad">
-            {data.topExpenses.length === 0 ? (
-              <EmptyState icon="🧾" text={t('Bugun hali xarajat kiritilmagan')} />
-            ) : (
-              <div className="list-stack">
-                {data.topExpenses.map((e, i) => (
-                  <div key={i}>
-                    <div className="flex-between" style={{ marginBottom: 5 }}>
-                      <span style={{ fontWeight: 600 }}>{e.name}</span>
-                      <span className="mono">{usd(e.amount)}</span>
-                    </div>
-                    <ProgressBar percent={e.percent} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <TopExpensesCard data={data} />
       </div>
 
       <div className="card section">
@@ -168,6 +138,114 @@ function Content({ data, rate, onEditBalance }) {
 
       <AnomalyHistory />
     </>
+  );
+}
+
+/**
+ * Owner control-centre headline KPIs. Sales & net profit come from the REAL
+ * sold-goods report (totalRevenue / totalProfit = revenue − COGS); net profit
+ * then subtracts today's operating expenses from the dashboard payload. Debt
+ * and cash balance come straight off the payload. The sold-goods endpoint is
+ * the same one the dashboard already uses (role-safe), and a failure degrades
+ * only the two sales cards — debt & cash still render.
+ */
+function KpiGrid({ data }) {
+  const t = useT();
+  const today = todayIso();
+  const { data: report, loading, error } = useApi(
+    () => ManagementApi.soldGoods({ from: today, to: today }),
+    [],
+  );
+  const ok = !!report && !error;
+  const revenue = ok ? Number(report.totalRevenue) || 0 : 0;
+  const grossProfit = ok ? Number(report.totalProfit) || 0 : 0;        // revenue − COGS
+  const netProfit = grossProfit - (Number(data.todayExpenseTotal) || 0); // − operating expenses
+  const pending = loading ? t('Yuklanmoqda…') : undefined;
+
+  return (
+    <div className="metrics section">
+      <MetricCard tone="blue" icon="💳" label={t('Bugungi savdo')}
+                  value={revenue} tag="SAVDO" sub={pending} />
+      <MetricCard tone={netProfit >= 0 ? 'green' : 'red'} icon="💰" label={t('Sof foyda')}
+                  value={ok ? netProfit : 0} tag="FOYDA"
+                  sub={pending || t('Sotuv − tannarx − xarajat')} />
+      <MetricCard tone="red" icon="📒" label={t('Mijoz qarzlari')} value={data.totalDebt} tag="QARZ" />
+      <MetricCard tone="amber" icon="🏦" label={t('Kassa qoldiq')} value={data.estimatedCash} tag="KASSA" />
+    </div>
+  );
+}
+
+/** Compact "Tugayotgan mahsulotlar" card with a healthy empty state. */
+function LowStockCard() {
+  const t = useT();
+  const { data, loading } = useApi(() => ProductApi.lowStock(), []);
+  const items = Array.isArray(data) ? data : [];
+
+  return (
+    <div className="card feed-card">
+      <div className="feed-head">
+        <h3>⚠️ {t('Tugayotgan mahsulotlar')}</h3>
+        {items.length > 0 && <span className="ls-count">{items.length}</span>}
+      </div>
+      <div className="feed-body">
+        {loading ? (
+          <Spinner />
+        ) : items.length === 0 ? (
+          <EmptyState icon="✅" text={t('Hammasi joyida')} hint={t('Kam zaxira mahsulot yo‘q')} />
+        ) : (
+          <>
+            {items.slice(0, 6).map((p) => (
+              <Link key={p.id} to={`/warehouse/${p.id}`} className="ls-row">
+                <span className="feed-text">
+                  <span className="feed-desc">{p.name}</span>
+                  <span className="feed-meta">
+                    {t('Qoldiq')}: {p.quantity} · {t('Pol')}: {p.lowStockThreshold ?? '—'}
+                  </span>
+                </span>
+                <span className={`ls-pill${p.quantity === 0 ? ' zero' : ''}`}>
+                  {p.quantity === 0 ? t('Tugadi') : p.quantity}
+                </span>
+              </Link>
+            ))}
+            {items.length > 6 && (
+              <Link to="/warehouse" className="ls-more">
+                +{items.length - 6} {t('boshqa')} · {t('Omborni ko‘rish')} →
+              </Link>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Today's biggest expenses, as a card for the 3-up section. */
+function TopExpensesCard({ data }) {
+  const t = useT();
+  return (
+    <div className="card feed-card">
+      <div className="feed-head">
+        <h3>🧾 {t('Bugungi xarajatlar')}</h3>
+        <span className="hint">{t('Eng katta')}</span>
+      </div>
+      <div className="feed-body">
+        {data.topExpenses.length === 0 ? (
+          <EmptyState icon="🧾" text={t('Bugun hali xarajat kiritilmagan')} />
+        ) : (
+          <div className="list-stack">
+            {data.topExpenses.map((e, i) => (
+              <div key={i}>
+                <div className="flex-between" style={{ marginBottom: 5 }}>
+                  <span style={{ fontWeight: 600 }}>{e.name}</span>
+                  <span className="mono">{usd(e.amount)}</span>
+                </div>
+                <ProgressBar percent={e.percent} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -252,7 +330,7 @@ function SalesChart() {
       <div className="chart-head">
         <div>
           <span className="chart-eyebrow">{t('Tijorat tranzaksiyalari')}</span>
-          <h3>{t('Sotuvlar oqimi (7 kun)')}</h3>
+          <h3>{t('Savdo dinamikasi (7 kun)')}</h3>
         </div>
       </div>
       <div className="chart-body">
@@ -312,11 +390,13 @@ function SalesChart() {
 }
 
 /**
- * Today's payment-method share as a CSS/SVG donut. Reads the real method
- * totals already on the dashboard payload (no extra request, no fabricated
- * numbers). Shows a safe empty state when nothing has come in yet.
+ * Today's outgoing money split by payment method, as a CSS/SVG donut. Reads the
+ * real expense-by-method totals already on the dashboard payload (todayNaqd /
+ * todayKarta / todayKassa are EXPENSES bucketed by method per DashboardService;
+ * no extra request, no fabricated numbers). Safe empty state when nothing went
+ * out yet.
  */
-function PaymentShare({ data }) {
+function ExpenseBreakdown({ data }) {
   const t = useT();
   const segs = [
     { key: 'naqd',  label: t('Naqd'),  value: Number(data.todayNaqd) || 0,  color: 'var(--green)' },
@@ -331,12 +411,12 @@ function PaymentShare({ data }) {
   return (
     <div className="card pshare-card">
       <div className="card-head">
-        <h2>{t("To'lov ulushi")}</h2>
-        <span className="hint">{t('Bugun')}</span>
+        <h2>{t('Xarajat taqsimoti')}</h2>
+        <span className="hint">{t('Bugun · usul bo‘yicha')}</span>
       </div>
       <div className="card-pad">
         {total === 0 ? (
-          <EmptyState icon="💳" text={t("Bugun to'lov tushmadi")} />
+          <EmptyState icon="💸" text={t('Bugun xarajat bo‘lmadi')} />
         ) : (
           <div className="pshare">
             <svg viewBox="0 0 140 140" className="pshare-svg" aria-hidden="true">
@@ -364,7 +444,9 @@ function PaymentShare({ data }) {
                 <div key={s.key} className="pshare-leg">
                   <span className="pshare-dot" style={{ background: s.color }} />
                   <span className="pshare-leg-label">{s.label}</span>
-                  <span className="pshare-leg-val mono">{Math.round((s.value / total) * 100)}%</span>
+                  <span className="pshare-leg-val mono">
+                    {usd(s.value)} · {Math.round((s.value / total) * 100)}%
+                  </span>
                 </div>
               ))}
             </div>
@@ -422,7 +504,7 @@ function ActivityFeed() {
   return (
     <div className="card feed-card">
       <div className="feed-head">
-        <h3>{t('Kassa operatsiyalari')}</h3>
+        <h3>{t('So‘nggi faoliyat')}</h3>
         <span className="feed-live"><span className="dot" /> Live</span>
       </div>
       <div className="feed-body">

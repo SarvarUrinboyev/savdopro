@@ -56,6 +56,22 @@ export function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   useEffect(() => { setNavOpen(false); }, [pathname]);
 
+  // Desktop sidebar collapse (icon-only rail), persisted across reloads.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem('savdopro.sidebar.collapsed') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('savdopro.sidebar.collapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
+  }, [collapsed]);
+
+  // Escape closes the mobile drawer.
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
+
   const navigate = useNavigate();
   // Global function-key shortcuts: jump to common pages without using the mouse.
   useKeyboard(useMemo(() => ({
@@ -69,10 +85,10 @@ export function Layout() {
   }), [navigate, pathname]));
 
   return (
-    <div className={`app-shell ${isPosKiosk ? 'app-shell-pos-kiosk' : ''}`}>
+    <div className={`app-shell ${isPosKiosk ? 'app-shell-pos-kiosk' : ''}${!isPosKiosk && collapsed ? ' sidebar-collapsed' : ''}`}>
       {!isPosKiosk && <QuickSearch />}
       {!isPosKiosk && <AiChatWidget />}
-      {!isPosKiosk && <Sidebar open={navOpen} />}
+      {!isPosKiosk && <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />}
       {!isPosKiosk && navOpen && (
         <div className="nav-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />
       )}
@@ -81,9 +97,24 @@ export function Layout() {
         <header className="topbar">
           <button
             type="button"
+            className="collapse-toggle"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? t('Menyuni kengaytirish') : t("Menyuni yig'ish")}
+            aria-expanded={!collapsed}
+            title={collapsed ? t('Kengaytirish') : t("Yig'ish")}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+                 stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="9" y1="4" x2="9" y2="20" />
+            </svg>
+          </button>
+          <button
+            type="button"
             className="nav-toggle"
             onClick={() => setNavOpen((v) => !v)}
             aria-label={t('Menyu')}
+            aria-expanded={navOpen}
           >
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
                  stroke="currentColor" strokeWidth="2" strokeLinecap="round">
