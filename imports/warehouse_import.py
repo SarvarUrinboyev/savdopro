@@ -4,8 +4,22 @@ SavdoPRO — safe Warehouse Excel importer (upsert by code, never deletes).
 SAFETY
 ------
 - Refuses to run unless  ALLOW_WAREHOUSE_IMPORT=true.
-- Targets exactly one shop, resolved by name (WAREHOUSE_IMPORT_SHOP_NAME);
-  aborts if that shop is not found. Never touches other shops.
+- Targets exactly ONE shop. Two ways to name that shop:
+    * by EXPLICIT ID (WAREHOUSE_IMPORT_TARGET_MODE=shop_id) — the only mode
+      allowed against a non-local (production) API, because many accounts have
+      a main shop literally named "Asosiy do'kon", so a name is NOT unique.
+    * by name (WAREHOUSE_IMPORT_SHOP_NAME) — dev/staging convenience only.
+- ID mode verifies, before any write, that:
+    * the authenticated token's accountId == WAREHOUSE_IMPORT_ACCOUNT_ID,
+    * (super-admin mode) the token role is SUPER_ADMIN,
+    * the shop id is one the authenticated account actually OWNS — /api/shops
+      is account-scoped, so membership == ownership. The backend independently
+      re-checks X-Shop-Id ownership on every call, so a cross-account write is
+      impossible even if this guard were bypassed.
+- Sets X-Shop-Id to the EXACT target id for every product/category operation, so
+  every created/updated row's shop_id is stamped to the target and nowhere else.
+- Snapshots per-shop product counts for the whole account BEFORE and AFTER; if any
+  NON-target shop's count changed, it STOPS.
 - Upserts by product code (Excel "КОД" -> Product.barcode): existing code in the
   shop is UPDATED in place; unknown code is CREATED. Never duplicates.
 - Never deletes products that are missing from the Excel.
@@ -16,10 +30,16 @@ REQUIRED ENV
 ------------
   ALLOW_WAREHOUSE_IMPORT=true
   WAREHOUSE_IMPORT_FILE=imports/Товары.xlsx
+  WAREHOUSE_IMPORT_USER=<owner/super-admin login>
+  WAREHOUSE_IMPORT_PASSWORD=<password>
+  # Target — production REQUIRES the id triple; name mode is dev/staging only:
+  WAREHOUSE_IMPORT_TARGET_MODE=shop_id          # 'shop_id' (prod) | 'shop_name' (dev)
+  WAREHOUSE_IMPORT_SHOP_ID=<exact target shop id>
+  WAREHOUSE_IMPORT_ACCOUNT_ID=<exact account id that owns the shop>
+  # ...or, dev/staging only:
   WAREHOUSE_IMPORT_SHOP_NAME=Asosiy do'kon
-  WAREHOUSE_IMPORT_USER=<owner username>
-  WAREHOUSE_IMPORT_PASSWORD=<owner password>
 OPTIONAL ENV
+  WAREHOUSE_IMPORT_SUPERADMIN=true     # importing as the platform super-admin
   WAREHOUSE_IMPORT_API_URL=http://127.0.0.1:8086
   WAREHOUSE_IMPORT_LICENSE_URL=http://127.0.0.1:19090
   WAREHOUSE_IMPORT_DEFAULT_UNIT=dona
@@ -31,11 +51,13 @@ Mapping decisions (source has no clean field for these — flagged in the report
 - Fractional stock is rounded to the nearest integer (Product.quantity is int).
 - Category "Корневая группа" (root group) -> no category (uncategorized).
 """
+import base64
 import json
 import os
 import sys
 import time
 import warnings
+from urllib.parse import urlparse
 
 warnings.filterwarnings("ignore")
 import openpyxl
@@ -48,6 +70,11 @@ os.makedirs(OUT, exist_ok=True)
 CFG = {
     "file": os.environ.get("WAREHOUSE_IMPORT_FILE", os.path.join(HERE, "Товары.xlsx")),
     "shop": os.environ.get("WAREHOUSE_IMPORT_SHOP_NAME", "Asosiy do'kon"),
+    # Target locking (production): an explicit shop id + the account that owns it.
+    "target_mode": os.environ.get("WAREHOUSE_IMPORT_TARGET_MODE", "shop_name").strip().lower(),
+    "shop_id": os.environ.get("WAREHOUSE_IMPORT_SHOP_ID", "").strip(),
+    "account_id": os.environ.get("WAREHOUSE_IMPORT_ACCOUNT_ID", "").strip(),
+    "superadmin": os.environ.get("WAREHOUSE_IMPORT_SUPERADMIN", "false").lower() == "true",
     "user": os.environ.get("WAREHOUSE_IMPORT_USER", ""),
     "pw": os.environ.get("WAREHOUSE_IMPORT_PASSWORD", ""),
     "api": os.environ.get("WAREHOUSE_IMPORT_API_URL", "http://127.0.0.1:8086").rstrip("/"),
@@ -61,6 +88,71 @@ CFG = {
     "retries": int(os.environ.get("WAREHOUSE_IMPORT_RETRIES", "6")),
 }
 ROOT_CATEGORY = "Корневая группа"  # treated as "no category"
+
+# Hosts considered "local" — a non-local API host means production, where the
+# stricter id-locking rules below are mandatory.
+LOCAL_HOSTS = {"127.0.0.1", "localhost", "0.0.0.0", "::1", ""}
+
+
+def is_production(api_url):
+    """True when the API host is not local — production safety rules then apply."""
+    host = (urlparse(api_url).hostname or "").lower()
+    return host not in LOCAL_HOSTS
+
+
+def decode_jwt_claims(token):
+    """Read (WITHOUT verifying) the JWT payload so we can assert the token's
+    accountId / role match the explicit target before sending any write. The
+    signature is still verified server-side on every call — this is only a
+    client-side pre-flight guard, never a trust boundary."""
+    try:
+        payload = token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)  # restore base64url padding
+        return json.loads(base64.urlsafe_b64decode(payload.encode("ascii")))
+    except Exception:
+        return {}
+
+
+def verify_target(claims, shops, shop_id, account_id, superadmin):
+    """Resolve the target shop strictly by id, enforcing every guard:
+      - the token's accountId must equal the explicit account_id (when given),
+      - super-admin mode requires a SUPER_ADMIN token,
+      - the shop id must be one the authenticated account actually owns
+        (/api/shops is account-scoped, so membership == ownership).
+    Returns the matched shop dict, or raises SystemExit with a clear reason."""
+    tok_acct = claims.get("accountId")
+    tok_role = claims.get("role")
+    if account_id is not None and tok_acct != account_id:
+        raise SystemExit(
+            f"ABORT: authenticated accountId={tok_acct} does not match "
+            f"WAREHOUSE_IMPORT_ACCOUNT_ID={account_id} — wrong credentials for this target.")
+    if superadmin and tok_role != "SUPER_ADMIN":
+        raise SystemExit(
+            f"ABORT: WAREHOUSE_IMPORT_SUPERADMIN=true but the token role is {tok_role!r}, "
+            f"not SUPER_ADMIN.")
+    match = [s for s in shops if int(s.get("id")) == int(shop_id)]
+    if not match:
+        avail = [s.get("id") for s in shops]
+        raise SystemExit(
+            f"ABORT: shop_id={shop_id} is not owned by the authenticated account "
+            f"(accountId={tok_acct}). Shops it owns: {avail}. "
+            f"If you are super-admin and the target shop belongs to ANOTHER account, "
+            f"super-admin CANNOT create products there (the backend rejects a cross-account "
+            f"X-Shop-Id) — log in as that account's OWNER instead.")
+    return match[0]
+
+
+def assert_only_target_changed(before, after, target_id):
+    """Guard: every non-target shop's product count must be identical before and
+    after. Returns a list of offending [shop_id, before, after]; empty == safe."""
+    drift = []
+    for sid, b in before.items():
+        if int(sid) == int(target_id):
+            continue
+        a = after.get(sid)
+        if a != b:
+            drift.append([sid, b, a])
+    return drift
 
 HEADER_ALIASES = {
     "code": ["код", "kod", "code"], "name": ["товар", "наименование", "name"],
@@ -185,6 +277,32 @@ class Api:
     def _h(self):
         return {"X-Shop-Id": str(self.shop_id)} if self.shop_id else {}
 
+    def jwt_claims(self):
+        return decode_jwt_claims(self.token or "")
+
+    def list_shops(self):
+        """All shops the authenticated account owns (the API is account-scoped)."""
+        r = self.s.get(f"{self.cfg['api']}/api/shops", timeout=15)
+        r.raise_for_status()
+        return r.json()
+
+    def count_products_for(self, shop_id):
+        """Number of products in one shop of the authenticated account. Reads are
+        allowed for any owned shop; used to snapshot the count guard."""
+        r = self.s.get(f"{self.cfg['api']}/api/products",
+                       headers={"X-Shop-Id": str(shop_id)}, timeout=120)
+        r.raise_for_status()
+        return len(r.json())
+
+    def resolve_shop_by_id(self, shop_id, account_id, superadmin):
+        """Production path: lock the target to an exact id, after verifying the
+        token's account/role and that the account owns the shop. Returns
+        (matched_shop, [all owned shop ids])."""
+        shops = self.list_shops()
+        shop = verify_target(self.jwt_claims(), shops, shop_id, account_id, superadmin)
+        self.shop_id = int(shop_id)
+        return shop, [int(s["id"]) for s in shops]
+
     def resolve_shop(self, name):
         r = self.s.get(f"{self.cfg['api']}/api/shops", timeout=15)
         r.raise_for_status()
@@ -278,12 +396,37 @@ def main():
     if not CFG["user"] or not CFG["pw"]:
         raise SystemExit("REFUSING: WAREHOUSE_IMPORT_USER / WAREHOUSE_IMPORT_PASSWORD required.")
 
-    print(f"File   : {CFG['file']}")
-    print(f"Shop   : {CFG['shop']!r}")
-    print(f"API    : {CFG['api']}   License: {CFG['lic']}")
-    print(f"Preview: {CFG['preview']}   Limit: {CFG['limit'] or 'all'}")
+    prod = is_production(CFG["api"])
+    mode = CFG["target_mode"]
+    shop_id = int(CFG["shop_id"]) if CFG["shop_id"] else None
+    account_id = int(CFG["account_id"]) if CFG["account_id"] else None
+
+    # --- Target-locking guards (production must address the shop by exact id) ---
+    if prod and mode != "shop_id":
+        raise SystemExit(
+            "REFUSING: production import must target an explicit shop id. Set "
+            "WAREHOUSE_IMPORT_TARGET_MODE=shop_id, WAREHOUSE_IMPORT_SHOP_ID and "
+            "WAREHOUSE_IMPORT_ACCOUNT_ID. Name-only resolution is forbidden against a "
+            "non-local API — many accounts share the shop name \"Asosiy do'kon\".")
+    if prod and (shop_id is None or account_id is None):
+        raise SystemExit(
+            "REFUSING: production import requires BOTH WAREHOUSE_IMPORT_SHOP_ID and "
+            "WAREHOUSE_IMPORT_ACCOUNT_ID (exact integers).")
+    if CFG["superadmin"] and (shop_id is None or account_id is None):
+        raise SystemExit(
+            "REFUSING: WAREHOUSE_IMPORT_SUPERADMIN=true requires both "
+            "WAREHOUSE_IMPORT_SHOP_ID and WAREHOUSE_IMPORT_ACCOUNT_ID.")
+    if mode == "shop_id" and shop_id is None:
+        raise SystemExit(
+            "REFUSING: WAREHOUSE_IMPORT_TARGET_MODE=shop_id requires WAREHOUSE_IMPORT_SHOP_ID.")
+
+    print(f"File    : {CFG['file']}")
+    print(f"Target  : mode={mode} shop_id={shop_id} account_id={account_id} "
+          f"superadmin={CFG['superadmin']}  (name={CFG['shop']!r})")
+    print(f"API     : {CFG['api']}   License: {CFG['lic']}   production={prod}")
+    print(f"Preview : {CFG['preview']}   Limit: {CFG['limit'] or 'all'}")
     valid, invalid, frac, header_row, colmap, negative_corrected = parse_excel(CFG["file"])
-    print(f"Parsed : valid={len(valid)} invalid={len(invalid)} "
+    print(f"Parsed  : valid={len(valid)} invalid={len(invalid)} "
           f"negative_stock_corrected_to_zero={len(negative_corrected)} "
           f"fractional_qty_rounded={frac} header_row={header_row}")
     if CFG["limit"]:
@@ -291,10 +434,23 @@ def main():
 
     api = Api(CFG)
     api.login()
-    shop = api.resolve_shop(CFG["shop"])
-    print(f"Shop OK: id={shop['id']} name={shop.get('name')!r} main={shop.get('main')}")
+    if mode == "shop_id":
+        shop, account_shop_ids = api.resolve_shop_by_id(shop_id, account_id, CFG["superadmin"])
+    else:
+        # Name mode is dev/staging only (the production guard above already
+        # refused this path against a non-local API).
+        shop = api.resolve_shop(CFG["shop"])
+        account_shop_ids = [int(s["id"]) for s in api.list_shops()]
+    target_id = int(shop["id"])
+    print(f"Shop OK : id={target_id} name={shop.get('name')!r} main={shop.get('main')}")
+
+    # Snapshot every shop in this account BEFORE any write. The target may grow;
+    # every other shop must be byte-for-byte unchanged afterwards.
+    baseline = {sid: api.count_products_for(sid) for sid in account_shop_ids}
+    print(f"Baseline product counts (this account's shops): {baseline}")
+
     existing = api.existing_products()
-    print(f"Existing products in shop: {len(existing)}")
+    print(f"Existing products in target shop: {len(existing)}")
 
     # Pre-resolve real categories to ids (create missing) so create AND update
     # both set categoryId. "Корневая группа" (root) stays uncategorised.
@@ -335,8 +491,28 @@ def main():
         for k in range(0, len(qty_fixes), 500):
             api.stocktake(qty_fixes[k:k + 500])
 
+    # --- Count guard: re-snapshot and prove no NON-target shop changed. -------
+    # Preview writes nothing, so after == baseline by construction; we still
+    # record it. On a real import this is the stop-gate: any drift => STOP.
+    after = dict(baseline)
+    if not CFG["preview"]:
+        after = {sid: api.count_products_for(sid) for sid in account_shop_ids}
+    drift = assert_only_target_changed(baseline, after, target_id)
+    if drift:
+        print("!!! NON-TARGET SHOP DRIFT DETECTED (shop_id, before, after):", drift)
+        raise SystemExit(
+            f"STOP: {len(drift)} non-target shop(s) changed — investigate before any further "
+            f"action. Drift: {drift}")
+
     result = {
         "shop": {"id": shop["id"], "name": shop.get("name"), "main": shop.get("main")},
+        "target_mode": mode, "superadmin": CFG["superadmin"],
+        "account_id": account_id, "target_shop_id": target_id,
+        "shop_count_guard": {
+            "account_shop_ids": account_shop_ids,
+            "before": baseline, "after": after,
+            "non_target_drift": drift,
+        },
         "valid_rows": len(valid), "invalid_rows": len(invalid),
         "created": created, "updated": updated, "skipped_errors": skipped,
         "stock_corrections": len(qty_fixes), "fractional_qty_rounded": frac,
