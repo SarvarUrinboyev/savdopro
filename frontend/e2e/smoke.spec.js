@@ -23,6 +23,11 @@ async function login(page) {
   await page.locator('button[type="submit"]').click();
   // Successful login leaves /login and mounts the authenticated Layout.
   await expect(page).not.toHaveURL(/\/login/, { timeout: 20_000 });
+  // Wait until the authenticated shell (sidebar brand) is actually mounted:
+  // the URL flips before the token lands in localStorage, and on a slow CI
+  // runner a full page load right after login raced that write and bounced
+  // back to /login (caught by the first live PR run's screenshots).
+  await expect(page.getByText('SavdoPRO').first()).toBeVisible({ timeout: 20_000 });
 }
 
 test('landing page renders for anonymous visitors', async ({ page }) => {
@@ -41,7 +46,9 @@ test('demo owner can log in and see the dashboard shell', async ({ page }) => {
 
 test('POS page loads its catalogue UI', async ({ page }) => {
   await login(page);
-  await page.goto('/pos');
+  // In-app navigation (no full reload — mirrors how a cashier gets there,
+  // and avoids re-bootstrapping the SPA right after the token write).
+  await page.locator('a[href="/pos"]').first().click();
   // The search box is the heart of the POS screen.
   await expect(
     page.locator('input[placeholder*="Nomi yoki SKU"]')
