@@ -1,0 +1,35 @@
+# =====================================================================
+#  systemd drop-in for savdopro-license — production hardening
+#  Install as: /etc/systemd/system/savdopro-license.service.d/10-hardening.conf
+#
+#  Reconcile ExecStart with `sudo systemctl cat savdopro-license` first, exactly
+#  as for the backend drop-in. The license server takes no `--spring.profiles`
+#  argument today (it has no prod profile file); all prod config is env-driven.
+# =====================================================================
+[Service]
+# --- Dedicated unprivileged service account ---
+User=savdopro-license
+Group=savdopro-license
+
+# --- Secrets + prod config, root:savdopro-license-owned, chmod 600 ---
+EnvironmentFile=/etc/savdopro/license.env
+
+# --- Re-declare ExecStart: reset, then the prod command ---
+ExecStart=
+ExecStart=/usr/bin/java -Xmx256m -Xms128m -XX:+UseG1GC \
+    -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/savdopro/heapdump.hprof \
+    -jar /opt/savdopro/savdopro-license-server.jar
+
+# --- Privilege / filesystem hardening ---
+# NOTE: while the license DB is still H2, its .mv.db lives under /opt/savdopro,
+# so that path MUST stay writable (ReadWritePaths). After the Postgres
+# migration (see license-server-postgres-migration-plan.md) /opt/savdopro can
+# become read-only.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/savdopro
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true

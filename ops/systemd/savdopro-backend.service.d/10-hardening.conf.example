@@ -1,0 +1,43 @@
+# =====================================================================
+#  systemd drop-in for savdopro-backend — production hardening
+#  Install as: /etc/systemd/system/savdopro-backend.service.d/10-hardening.conf
+#
+#  Apply with:  sudo systemctl edit savdopro-backend   (paste the [Service]
+#  stanza below) OR copy this file, then `systemctl daemon-reload`.
+#
+#  IMPORTANT — reconcile ExecStart with the box first:
+#    sudo systemctl cat savdopro-backend
+#  Copy the EXISTING java command, then in the ExecStart below keep its JVM
+#  flags but (a) drop any `--spring.profiles.active=local`, (b) do NOT hardcode
+#  the profile here — SPRING_PROFILES_ACTIVE=prod comes from the EnvironmentFile
+#  so it is set once, in one place. A leftover `--spring.profiles.active=local`
+#  on the command line would OVERRIDE the env var, so it MUST be removed.
+# =====================================================================
+[Service]
+# --- Dedicated unprivileged service account (see runbook step 1) ---
+User=savdopro
+Group=savdopro
+
+# --- Secrets + prod config, root:savdopro-owned, chmod 600 ---
+EnvironmentFile=/etc/savdopro/backend.env
+
+# --- Re-declare ExecStart: reset, then the prod command (no `local` arg) ---
+# Profile is supplied via SPRING_PROFILES_ACTIVE in backend.env, NOT here.
+ExecStart=
+ExecStart=/usr/bin/java -Xmx512m -Xms256m -XX:+UseG1GC \
+    -XX:InitiatingHeapOccupancyPercent=40 \
+    -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/barakat/heapdump.hprof \
+    -jar /opt/barakat/barakat-market.jar
+
+# --- Privilege / filesystem hardening ---
+# ProtectSystem=strict makes / read-only except ReadWritePaths. If the app
+# fails to boot after this, widen ReadWritePaths (heap dumps, any temp) or set
+# ProtectSystem=full as a fallback; see the runbook rollback section.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/barakat /var/log/savdopro
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
