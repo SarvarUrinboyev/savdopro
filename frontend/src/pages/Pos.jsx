@@ -12,7 +12,7 @@ import { useApi } from '../hooks/useApi.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { useVoiceInput } from '../hooks/useVoiceInput.js';
 import {
-  cacheProducts, cancelQueued, clearOldSynced, enqueueCheckout, failedCount, flushQueue,
+  cacheCustomers, cacheProducts, cancelQueued, clearOldSynced, enqueueCheckout, failedCount, flushQueue, getCachedCustomers,
   getCachedProducts, listQueue, pendingCount, pendingProductQuantities, retryQueued,
 } from '../lib/offlineDb.js';
 import { normalizeBarcode } from '../lib/barcode.js';
@@ -132,7 +132,19 @@ export function Pos() {
   }, []);
   const { data: products, loading, error: productError, reload: reloadProducts } =
     useApi(loadProducts, [loadProducts]);
-  const { data: customers } = useApi(() => CustomerApi.list().catch(() => []), []);
+  // Customers mirror the product snapshot: cache online, fall back offline —
+  // a QARZGA sale can then still pick its customer and queue the checkout.
+  const loadCustomers = useCallback(async () => {
+    try {
+      const list = await CustomerApi.list();
+      await cacheCustomers(list);
+      return list;
+    } catch (err) {
+      const cached = await getCachedCustomers();
+      return cached.length > 0 ? cached : [];
+    }
+  }, []);
+  const { data: customers } = useApi(loadCustomers, [loadCustomers]);
 
   // ----- receipts (multi-check, like the register's Chek № tabs) -----
   const [checks, setChecks] = useState(() => [newCheckObj()]);
