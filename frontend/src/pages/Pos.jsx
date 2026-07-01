@@ -1203,7 +1203,18 @@ export function Pos() {
               />
             </div>
             <div className="field" style={{ margin: 0 }}>
-              <label>{t('Mijoz')} ({t('ixtiyoriy')})</label>
+              <label>
+                {t('Mijoz')} ({t('ixtiyoriy')})
+                {(() => {
+                  const sel = (customers || []).find(
+                    (c) => String(c.id) === String(activeCheck.customerId));
+                  return sel && Number(sel.pointsBalance) > 0
+                    ? <span style={{ marginLeft: 6, fontWeight: 700, color: '#d97706' }}>
+                        ⭐ {Number(sel.pointsBalance).toLocaleString()} {t('ball')}
+                      </span>
+                    : null;
+                })()}
+              </label>
               <select
                 className="input"
                 value={activeCheck.customerId}
@@ -1211,7 +1222,9 @@ export function Pos() {
               >
                 <option value="">—</option>
                 {(customers || []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}{Number(c.pointsBalance) > 0 ? ` (⭐${c.pointsBalance})` : ''}
+                  </option>
                 ))}
               </select>
             </div>

@@ -13,6 +13,17 @@ const KIND_LABELS = {
   BOGO: 'Buy-One-Get-One',
 };
 
+/** Order matches the backend bitmask: Mon = bit 0 … Sun = bit 6. */
+const WEEKDAYS = ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Ya'];
+
+/** "Du–Ya" for every day, else the checked days ("Du, Ju, Sha"). */
+function weekdaysLabel(mask) {
+  const m = mask ?? 127;
+  if ((m & 127) === 127) return null; // every day — not worth a badge
+  const names = WEEKDAYS.filter((_, i) => m & (1 << i));
+  return names.length ? names.join(', ') : '—';
+}
+
 /**
  * Promo campaign admin — list / create / edit / delete.
  * POS auto-applies the best matching active campaign at checkout.
@@ -86,6 +97,9 @@ export function Promos() {
                       </td>
                       <td className="faint mono" style={{ fontSize: 12 }}>
                         {p.startsAt?.slice(0, 10)} — {p.endsAt?.slice(0, 10)}
+                        {weekdaysLabel(p.weekdayMask) && (
+                          <div style={{ fontSize: 11 }}>📅 {weekdaysLabel(p.weekdayMask)}</div>
+                        )}
                       </td>
                       <td>
                         {p.active
@@ -210,6 +224,33 @@ function PromoFormModal({ item, onSubmit, onClose }) {
             value={(form.endsAt || '').slice(0, 16)}
             onChange={(e) => set('endsAt', e.target.value)} />
         </div>
+      </div>
+      <div className="field">
+        <label>{t('Hafta kunlari')} <span className="faint">({t('aksiya faqat belgilangan kunlarda qo\'llanadi')})</span></label>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {WEEKDAYS.map((d, i) => {
+            const bit = 1 << i; // backend: Mon = bit 0 (PromoService.findBest)
+            const on = (form.weekdayMask ?? 127) & bit;
+            return (
+              <button key={d} type="button"
+                onClick={() => set('weekdayMask', (form.weekdayMask ?? 127) ^ bit)}
+                style={{
+                  padding: '5px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer',
+                  border: on ? '1px solid var(--brand-primary, #3b82f6)' : '1px solid var(--border, #d1d5db)',
+                  background: on ? 'var(--brand-primary, #3b82f6)' : 'transparent',
+                  color: on ? '#fff' : 'inherit',
+                }}>
+                {t(d)}
+              </button>
+            );
+          })}
+        </div>
+        {((form.weekdayMask ?? 127) === 0) && (
+          <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>
+            {t('Hech bir kun tanlanmagan — aksiya hech qachon qo\'llanmaydi')}
+          </div>
+        )}
       </div>
       <div className="field">
         <label>{t('Tavsif (ixtiyoriy)')}</label>
