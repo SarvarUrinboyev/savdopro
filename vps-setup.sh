@@ -3,6 +3,18 @@
 # vps-setup.sh — Barakat SuperMarket / SavdoPRO Spring Boot VPS hardening
 # =============================================================================
 #
+# ⚠️  SUPERSEDED — DO NOT run as-is to (re)provision the CURRENT production box.
+#     This legacy script (a) installs a SINGLE `savdopro` unit, but prod now
+#     runs TWO units (`savdopro-backend`, `savdopro-license`); (b) runs the app
+#     as `User=root`; and (c) — the root cause of the "prod isn't on the prod
+#     profile" incident — activates `--spring.profiles.active=local` whenever
+#     application-local.properties exists (see step 3 below). That makes the
+#     prod box boot under the `local` profile, so application-prod.properties
+#     (Swagger-off, Postgres, CORS fail-closed, CSP, HSTS, demo-seed hard-off)
+#     never loads. For production use docs/ops/production-hardening-runbook.md
+#     instead: profile via SPRING_PROFILES_ACTIVE=prod in a 0600 env file,
+#     dedicated service users, and systemd hardening drop-ins (ops/systemd/).
+#
 # WHAT THIS DOES:
 #   1. Auto-detects the barakat-market.jar and its working directory
 #   2. Fixes NTP clock drift and sets timezone to Asia/Tashkent
