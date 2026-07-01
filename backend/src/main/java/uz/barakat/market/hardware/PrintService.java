@@ -183,6 +183,12 @@ public class PrintService {
      */
     private PrintResult sendToPrinter(Shop shop, byte[] bytes) {
         String wanted = shop == null ? null : shop.getPrinterName();
+        // Network ESC/POS: printer name "tcp://192.168.1.50" yoki
+        // "tcp://host:9100" — xom baytlar JetDirect portiga to'g'ridan-
+        // to'g'ri oqadi; Windows drayveri shart emas (LAN termal printer).
+        if (wanted != null && wanted.trim().toLowerCase(java.util.Locale.ROOT).startsWith("tcp://")) {
+            return sendToNetworkPrinter(wanted.trim(), bytes);
+        }
         javax.print.PrintService chosen = findPrinter(wanted);
         if (chosen == null) {
             throw new BadRequestException(
@@ -199,6 +205,34 @@ public class PrintService {
             log.warn("Print job failed on {}: {}", chosen.getName(), ex.toString());
             throw new BadRequestException(
                     "Chop etishda xatolik: " + ex.getMessage());
+        }
+    }
+
+    /** Raw socket print to tcp://host[:port] (default 9100 — JetDirect). */
+    private PrintResult sendToNetworkPrinter(String url, byte[] bytes) {
+        String hostPort = url.substring("tcp://".length());
+        String host = hostPort;
+        int port = 9100;
+        int colon = hostPort.lastIndexOf(':');
+        if (colon > 0) {
+            host = hostPort.substring(0, colon);
+            try {
+                port = Integer.parseInt(hostPort.substring(colon + 1));
+            } catch (NumberFormatException ignored) {
+                // "tcp://host:" — port qismi buzuq, 9100 default qoladi
+            }
+        }
+        try (java.net.Socket socket = new java.net.Socket()) {
+            socket.connect(new java.net.InetSocketAddress(host, port), 3000);
+            socket.setSoTimeout(5000);
+            socket.getOutputStream().write(bytes);
+            socket.getOutputStream().flush();
+            log.info("Printed {} bytes to network printer {}:{}", bytes.length, host, port);
+            return new PrintResult(url, bytes.length);
+        } catch (Exception ex) {
+            log.warn("Network print failed on {}: {}", url, ex.toString());
+            throw new BadRequestException(
+                    "Tarmoq printeriga ulanib bo'lmadi (" + url + "): " + ex.getMessage());
         }
     }
 
