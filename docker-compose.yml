@@ -55,6 +55,7 @@ services:
       SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
       SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:?Admin password required}
       SAVDOPRO_ADMIN_NAME: ${SAVDOPRO_ADMIN_NAME:-Super Admin}
+      METRICS_SCRAPE_TOKEN: ${METRICS_SCRAPE_TOKEN:-}
     ports:
       - "9090:9090"
 
@@ -83,6 +84,16 @@ services:
       SAVDOPRO_JWT_SECRET: ${SAVDOPRO_JWT_SECRET:?JWT secret required (64+ random chars)}
       SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
       SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:?Admin password required}
+      # --- Optional integrations (blank = feature off / degraded) ---
+      # AI assistant provider chain (see .env.example for where to get keys).
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NVIDIA_DEEPSEEK_KEY: ${NVIDIA_DEEPSEEK_KEY:-}
+      NVIDIA_KIMI_KEY: ${NVIDIA_KIMI_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      # Owner Telegram reports/alerts + Prometheus scrape token.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_IDS: ${TELEGRAM_CHAT_IDS:-}
+      METRICS_SCRAPE_TOKEN: ${METRICS_SCRAPE_TOKEN:-}
     ports:
       - "8086:8086"
 
