@@ -1,0 +1,75 @@
+# =====================================================================
+#  SavdoPRO STAGING / E2E stack — self-contained, safe to nuke.
+#
+#  Purpose: run the REAL built images (SPA baked into the backend jar) with
+#  the guarded demo seed enabled, so Playwright E2E and manual QA have a
+#  deterministic tenant to log into — without touching prod or the dev DBs.
+#
+#    docker compose -f docker-compose.staging.yml up -d --build
+#    # UI:      http://localhost:28086/login?licenseUrl=http://localhost:19090
+#    # login:   demo_owner / $DEMO_SEED_PASSWORD
+#    docker compose -f docker-compose.staging.yml down -v   # full reset
+#
+#  Differences from the prod compose (docker-compose.yml):
+#    - H2 file DBs in /tmp inside each container (the runtime images run as a
+#      non-root user whose /app is read-only; /tmp is writable) — no Postgres
+#      service, so `down -v && up` gives a pristine, freshly-seeded stack.
+#      True DB-engine parity (Postgres) stays the prod compose's job.
+#    - backend does NOT activate the prod profile: the demo seeder is
+#      hard-disabled under prod on purpose, and staging needs it.
+#    - ports shifted (28086 / 19090) so it can run next to the dev stack.
+#
+#  The SPA reaches the license server via the ?licenseUrl= query param on
+#  first visit (persisted to localStorage by licenseClient.js) — no build
+#  args needed.
+# =====================================================================
+
+name: savdopro-staging
+
+services:
+  license-server:
+    build:
+      context: ./license-server
+    image: savdopro/license-server:staging
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:h2:file:/tmp/license-data;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
+      SAVDOPRO_JWT_SECRET: ${SAVDOPRO_JWT_SECRET:-staging-only-jwt-secret-0123456789abcdef0123456789abcdef}
+      SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
+      SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:-StagingAdmin2026}
+      SAVDOPRO_ADMIN_NAME: "Staging Admin"
+      # Guarded demo login users (demo_owner / demo_kassir / demo_owner_b).
+      ALLOW_DEMO_SEED: "true"
+      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-DemoStaging2026}
+    ports:
+      - "19090:9090"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        # Hosted-web SPA behaviour (landing + /register), like prod. But
+        # VITE_LICENSE_URL stays EMPTY on purpose: a baked-in origin would
+        # override the ?licenseUrl= query param the E2E relies on.
+        VITE_TARGET: web
+    image: savdopro/backend:staging
+    restart: unless-stopped
+    depends_on:
+      license-server:
+        condition: service_started
+    environment:
+      # No prod profile on purpose (see header). H2 into writable /tmp.
+      # SERVER_ADDRESS: application.properties pins server.address=127.0.0.1
+      # (right for the desktop/droplet, wrong inside a container — docker-proxy
+      # forwards to the bridge IP where a loopback-bound app doesn't listen).
+      SERVER_ADDRESS: 0.0.0.0
+      SPRING_DATASOURCE_URL: "jdbc:h2:file:/tmp/staging-barakat;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
+      SAVDOPRO_JWT_SECRET: ${SAVDOPRO_JWT_SECRET:-staging-only-jwt-secret-0123456789abcdef0123456789abcdef}
+      SAVDOPRO_ADMIN_USER: ${SAVDOPRO_ADMIN_USER:-admin}
+      SAVDOPRO_ADMIN_PASSWORD: ${SAVDOPRO_ADMIN_PASSWORD:-StagingAdmin2026}
+      # Demo tenants: accounts 90001/90002, shops, products, sales history.
+      ALLOW_DEMO_SEED: "true"
+      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-DemoStaging2026}
+    ports:
+      - "28086:8086"

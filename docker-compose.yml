@@ -71,6 +71,11 @@ services:
         condition: service_started
     environment:
       SPRING_PROFILES_ACTIVE: prod
+      # Backend's application.properties pins server.address=127.0.0.1 (right
+      # for the systemd+nginx droplet, wrong inside a container): docker-proxy
+      # forwards to the bridge IP, so a loopback-bound app answers nothing.
+      # The published port above is what controls outside exposure.
+      SERVER_ADDRESS: 0.0.0.0
       DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-savdopro}
       DB_USER: ${DB_USER:-savdopro}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
