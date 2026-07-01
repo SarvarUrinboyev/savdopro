@@ -1,0 +1,98 @@
+# Grafana-managed alert rules for the SavdoPRO stack. Three starter rules:
+#   1. Service down       — a scrape target stopped answering (2 min)
+#   2. High 5xx rate      — >5% of backend requests failing (5 min window)
+#   3. JVM heap pressure  — heap >90% of max for 5 min (OOM predictor on the
+#                           tight -Xmx of the droplet)
+# Delivery goes through the telegram-owner contact point (see
+# contact-points.yml); tune thresholds here and `docker compose restart grafana`.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: savdopro-alerts
+    folder: SavdoPRO
+    interval: 1m
+    rules:
+      - uid: savdopro-service-down
+        title: Service down
+        condition: C
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} javob bermayapti (scrape down)"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: up{job=~"savdopro-.*"}
+              instant: true
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+
+      - uid: savdopro-error-rate
+        title: High HTTP 5xx rate
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "5xx ulushi 5% dan oshdi (5 daqiqalik oyna)"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: >-
+                sum(rate(http_server_requests_seconds_count{job=~"savdopro-.*",status=~"5.."}[5m]))
+                /
+                clamp_min(sum(rate(http_server_requests_seconds_count{job=~"savdopro-.*"}[5m])), 1e-9)
+              instant: true
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+
+      - uid: savdopro-heap-high
+        title: JVM heap above 90%
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} heap 90% dan oshdi — OOM xavfi"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              expr: >-
+                sum by(job) (jvm_memory_used_bytes{job=~"savdopro-.*",area="heap"})
+                /
+                clamp_min(sum by(job) (jvm_memory_max_bytes{job=~"savdopro-.*",area="heap"} > 0), 1e-9)
+              instant: true
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: "__expr__"
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.9] }

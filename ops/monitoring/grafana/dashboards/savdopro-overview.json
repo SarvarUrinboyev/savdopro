@@ -1,0 +1,147 @@
+{
+  "uid": "savdopro-overview",
+  "title": "SavdoPRO Overview",
+  "tags": ["savdopro"],
+  "schemaVersion": 39,
+  "editable": true,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Service up",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "up{job=~\"savdopro-.*\"}", "legendFormat": "{{job}}", "instant": true }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name" }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Request rate (req/s)",
+      "gridPos": { "h": 6, "w": 9, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by(job) (rate(http_server_requests_seconds_count{job=~\"savdopro-.*\"}[5m]))", "legendFormat": "{{job}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP 5xx rate (%)",
+      "gridPos": { "h": 6, "w": 9, "x": 15, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum by(job) (rate(http_server_requests_seconds_count{job=~\"savdopro-.*\",status=~\"5..\"}[5m])) / clamp_min(sum by(job) (rate(http_server_requests_seconds_count{job=~\"savdopro-.*\"}[5m])), 1e-9)",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Latency p95 (s)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le, job) (rate(http_server_requests_seconds_bucket{job=~\"savdopro-.*\"}[5m])))",
+          "legendFormat": "{{job}} p95"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "JVM heap used / max (%)",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum by(job) (jvm_memory_used_bytes{job=~\"savdopro-.*\",area=\"heap\"}) / clamp_min(sum by(job) (jvm_memory_max_bytes{job=~\"savdopro-.*\",area=\"heap\"} > 0), 1e-9)",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent", "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 75 }, { "color": "red", "value": 90 } ] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "DB pool (Hikari)",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum by(job) (hikaricp_connections_active{job=~\"savdopro-.*\"})", "legendFormat": "{{job}} active" },
+        { "refId": "B", "expr": "sum by(job) (hikaricp_connections_pending{job=~\"savdopro-.*\"})", "legendFormat": "{{job}} pending" },
+        { "refId": "C", "expr": "sum by(job) (hikaricp_connections_max{job=~\"savdopro-.*\"})", "legendFormat": "{{job}} max" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Error log events (/min)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "60 * sum by(job) (rate(logback_events_total{job=~\"savdopro-.*\",level=\"error\"}[5m]))", "legendFormat": "{{job}} errors" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "CPU usage",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "100 * process_cpu_usage{job=~\"savdopro-.*\"}", "legendFormat": "{{job}} process" },
+        { "refId": "B", "expr": "100 * avg(system_cpu_usage{job=~\"savdopro-.*\"})", "legendFormat": "system" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100 }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Uptime",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "process_uptime_seconds{job=~\"savdopro-.*\"}", "legendFormat": "{{job}}", "instant": true }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "none", "textMode": "value_and_name" }
+    }
+  ]
+}
