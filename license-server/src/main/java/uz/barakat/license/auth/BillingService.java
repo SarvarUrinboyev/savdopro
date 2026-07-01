@@ -24,12 +24,18 @@ import uz.barakat.license.repository.PaymentRepository;
 @Service
 public class BillingService {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(BillingService.class);
+
     private final PaymentRepository payments;
     private final AccountRepository accounts;
+    private final SmsProvider sms;
 
-    public BillingService(PaymentRepository payments, AccountRepository accounts) {
+    public BillingService(PaymentRepository payments, AccountRepository accounts,
+                          SmsProvider sms) {
         this.payments = payments;
         this.accounts = accounts;
+        this.sms = sms;
     }
 
     /**
@@ -73,7 +79,29 @@ public class BillingService {
         Account account = accounts.findById(p.getAccountId())
                 .orElseThrow(() -> NotFoundException.of("Akkaunt", p.getAccountId()));
         activate(account, p.getPlan(), p.getMonths());
+        sendReceipt(account, p);
         return p;
+    }
+
+    /**
+     * Payment receipt to the merchant's phone — best-effort: a failed SMS
+     * must never roll back a confirmed payment, so failures only log.
+     * (LoggingSmsProvider makes this a log line until Eskiz is configured.)
+     */
+    private void sendReceipt(Account account, Payment p) {
+        String phone = account.getContactPhone();
+        if (phone == null || phone.isBlank()) {
+            return;
+        }
+        try {
+            sms.send(phone, "SavdoPRO: to'lov qabul qilindi — "
+                    + p.getPlan() + ", " + p.getMonths() + " oy, "
+                    + String.format("%,d", p.getAmountUzs()).replace(',', ' ') + " so'm. "
+                    + "Obuna " + account.getSubscriptionExpires() + " gacha faol. Rahmat!");
+        } catch (Exception ex) {
+            log.warn("Payment receipt SMS failed for account {}: {}",
+                    account.getId(), ex.toString());
+        }
     }
 
     /**

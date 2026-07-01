@@ -23,8 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Subscription enforcement via the JWT claims the License Server mints:
- *   - a lapsed subscription (subExp in the past) is READ-ONLY — GETs pass but
+ *   - a lapsed subscription is READ-ONLY once the grace window (default
+ *     3 days, savdopro.subscription.grace-days) has passed — GETs pass but
  *     mutating verbs are refused with code SUBSCRIPTION_EXPIRED;
+ *   - within the grace window writes still work (dunning nudges renewal);
  *   - a manual block (blk=true) is a hard stop on every verb.
  * All tokens carry {@code *:*} so authorization never decides the outcome —
  * only the subscription gate in JwtAuthFilter does.
@@ -39,23 +41,32 @@ class SubscriptionEnforcementTest {
             "test-only-jwt-secret-not-for-production-0123456789abcdef";
 
     private static final long YESTERDAY = LocalDate.now().minusDays(1).toEpochDay();
+    /** Past the default 3-day grace window (expired 4 days ago). */
+    private static final long PAST_GRACE = LocalDate.now().minusDays(4).toEpochDay();
     private static final long TOMORROW = LocalDate.now().plusDays(1).toEpochDay();
 
     @Autowired
     private MockMvc mvc;
 
     @Test
-    void expiredSubscriptionBlocksWrites() throws Exception {
+    void expiredPastGraceBlocksWrites() throws Exception {
         mvc.perform(delete("/api/shifts/history")
-                        .header("Authorization", token(YESTERDAY, false)))
+                        .header("Authorization", token(PAST_GRACE, false)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SUBSCRIPTION_EXPIRED"));
     }
 
     @Test
+    void expiredWithinGraceStillAllowsWrites() throws Exception {
+        mvc.perform(delete("/api/shifts/history")
+                        .header("Authorization", token(YESTERDAY, false)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void expiredSubscriptionStillAllowsReads() throws Exception {
         mvc.perform(get("/api/management/summary")
-                        .header("Authorization", token(YESTERDAY, false)))
+                        .header("Authorization", token(PAST_GRACE, false)))
                 .andExpect(status().isOk());
     }
 
