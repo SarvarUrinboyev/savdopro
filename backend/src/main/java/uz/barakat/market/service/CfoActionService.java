@@ -79,8 +79,20 @@ public class CfoActionService {
             case "DISCOUNT" -> discountAction(name, num);
             case "PRICE" -> priceAction(name, num);
             case "NOTIFY" -> notifyAction(name);
+            case "NOTIFY_ALL" -> notifyAllAction();
             default -> null;
         };
+    }
+
+    /**
+     * Bulk debt-reminder chain: one button that (after an explicit confirm in
+     * the UI) hits the existing {@code POST /api/customers/remind-debtors} —
+     * every debtor gets the reminder over their best channel, and the call
+     * lands in the audit trail like any other mutation.
+     */
+    private CfoAction notifyAllAction() {
+        return new CfoAction("NOTIFY_ALL", "🔔 Barcha qarzdorlarga eslatma",
+                "har biriga o'z kanalida (Telegram/SMS)", Map.of());
     }
 
     private CfoAction orderAction(String name, String num) {
