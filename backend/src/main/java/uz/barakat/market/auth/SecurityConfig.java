@@ -2,6 +2,8 @@ package uz.barakat.market.auth;
 
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.authorization.AuthorizationManager;
@@ -13,6 +15,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 
 /**
  * Spring Security wiring for the desktop's local backend.
@@ -29,13 +33,85 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    /**
+     * Content-Security-Policy for the bundled React SPA, applied only under the
+     * {@code prod} profile (see {@link #filterChain}). Tuned against the actual
+     * built bundle so it hardens without breaking any shipped feature:
+     * <ul>
+     *   <li>{@code script-src 'unsafe-inline'} — index.html carries one inline
+     *       theme-flash guard script; a hash would white-screen prod on any
+     *       rebuild whitespace change.</li>
+     *   <li>{@code script-src 'unsafe-eval'} — the in-browser Excel / report
+     *       export chunks include a {@code Function("return this")} globalThis
+     *       polyfill; without eval the export feature throws. Because
+     *       {@code 'unsafe-inline'} is already required, adding eval costs little
+     *       extra XSS surface. Hardening path: externalise the inline script +
+     *       nonce, then drop both unsafe-* tokens.</li>
+     *   <li>{@code worker-src blob:} — the STOMP keep-alive ping runs in a
+     *       {@code new Worker(blob:)} on the Dashboard; without this every
+     *       signed-in user trips a CSP error.</li>
+     *   <li>{@code style-src/font-src} allow Google Fonts (declared in
+     *       index.html); {@code 'unsafe-inline'} covers React style attributes.</li>
+     *   <li>{@code connect-src} allows the same-origin API/WebSocket plus
+     *       tasnif.soliq.uz, which the browser queries directly for the national
+     *       product catalogue.</li>
+     *   <li>{@code frame-ancestors 'none'} + {@code object-src 'none'} +
+     *       {@code base-uri 'self'} close clickjacking / base-tag injection;
+     *       external-origin script injection is still blocked (only 'self').</li>
+     * </ul>
+     * NOTE: enabling Google / Facebook / Telegram social login later requires
+     * widening {@code script-src}, {@code frame-src} and {@code connect-src} to
+     * their widget origins.
+     */
+    private static final String PROD_CSP = String.join("; ",
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "img-src 'self' data: blob: https:",
+            "font-src 'self' https://fonts.gstatic.com data:",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "worker-src 'self' blob:",
+            "connect-src 'self' https://tasnif.soliq.uz",
+            "frame-src 'self'",
+            "form-action 'self'");
+
+    /**
+     * Powerful-feature opt-outs. The web SPA uses none of these (barcode input
+     * comes from keyboard-wedge scanners, not the camera); {@code payment=(self)}
+     * leaves room for the first-party checkout flow.
+     */
+    private static final String PERMISSIONS_POLICY =
+            "camera=(), microphone=(), geolocation=(), payment=(self)";
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
-                                           ApiKeyAuthFilter apiKeyFilter)
+                                           ApiKeyAuthFilter apiKeyFilter, Environment env)
             throws Exception {
+        boolean prod = env.acceptsProfiles(Profiles.of("prod"));
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Response security headers. X-Frame-Options=DENY and
+                // X-Content-Type-Options=nosniff are Spring Security defaults and
+                // stay on; we add Referrer-Policy, Permissions-Policy and HSTS
+                // (emitted once the request is seen as HTTPS — prod sets
+                // server.forward-headers-strategy=framework so it is). The strict
+                // CSP is prod-only: in dev/desktop the SPA calls the license
+                // server on a different origin, which a tight connect-src blocks.
+                .headers(headers -> {
+                    headers
+                            .referrerPolicy(rp -> rp.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                            .httpStrictTransportSecurity(hsts -> hsts
+                                    .includeSubDomains(true)
+                                    .maxAgeInSeconds(31_536_000L))
+                            .addHeaderWriter(new StaticHeadersWriter(
+                                    "Permissions-Policy", PERMISSIONS_POLICY));
+                    if (prod) {
+                        headers.contentSecurityPolicy(csp -> csp.policyDirectives(PROD_CSP));
+                    }
+                })
                 .authorizeHttpRequests(reg -> reg
                         // FORWARD/INCLUDE dispatches (e.g. from SpaController) are
                         // always permitted — prevents StackOverflowError in Spring
