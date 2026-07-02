@@ -1,0 +1,49 @@
+# =====================================================================
+#  /etc/systemd/system/savdopro-backend.service   (clean deploy template)
+#  After editing:  systemctl daemon-reload && systemctl enable --now savdopro-backend
+#
+#  This is the CLEAN pattern for a fresh server: profile + all secrets come
+#  from the 0600 EnvironmentFile — NOT from an application-local.properties or
+#  inline Environment= lines. Do not add `--spring.profiles.active=local`.
+# =====================================================================
+[Unit]
+Description=SavdoPRO Backend - barakat-market (port 8086)
+After=network-online.target postgresql.service savdopro-license.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Current prod runs User=root. RECOMMENDED on the new box: a dedicated account
+#   useradd --system --no-create-home --shell /usr/sbin/nologin savdopro
+#   chown -R savdopro:savdopro /opt/barakat
+# then set User=savdopro / Group=savdopro below.
+User=root
+WorkingDirectory=/opt/barakat
+EnvironmentFile=/etc/savdopro/backend.env
+# JVM flags sized for a 2 GB box (default target). G1 replaces SerialGC once
+# the heap is 512m — better pause behaviour under POS load; heap dump on OOM
+# makes the next OOM diagnosable instead of a mystery restart.
+#   4 GB box: -Xmx1024m -Xms512m, MemoryMax=1280M
+#   1 GB box (legacy, not recommended): -Xmx320m -Xms128m -XX:+UseSerialGC, MemoryMax=420M
+ExecStart=/usr/bin/java -Xmx512m -Xms256m -XX:+UseG1GC \
+    -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/barakat/heapdump.hprof \
+    -jar /opt/barakat/barakat-market.jar
+Restart=always
+RestartSec=15
+StartLimitBurst=999
+StartLimitInterval=0
+MemoryMax=768M
+MemorySwapMax=400M
+OOMScoreAdjust=-100
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=savdopro-backend
+NoNewPrivileges=true
+# Optional extra hardening once verified stable (test first — may need ReadWritePaths):
+#   ProtectSystem=strict
+#   ProtectHome=true
+#   PrivateTmp=true
+#   ReadWritePaths=/opt/barakat /var/log/savdopro
+
+[Install]
+WantedBy=multi-user.target

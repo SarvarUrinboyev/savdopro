@@ -30,6 +30,14 @@ offlineDb.version(2).stores({
   queue: '&id, status, createdAt',
 });
 
+// Version 3 adds the customer snapshot so a QARZGA (credit) sale can still
+// pick its customer while offline — the checkout then queues like any other.
+offlineDb.version(3).stores({
+  products: '++id, barcode, name, quantity, updatedAt',
+  queue: '&id, status, createdAt',
+  customers: '++id, name, phone, updatedAt',
+});
+
 /** Persist (or replace) the product catalog snapshot. */
 export async function cacheProducts(list) {
   if (!Array.isArray(list)) return;
@@ -45,6 +53,21 @@ export async function cacheProducts(list) {
 /** Read the cached product list. Returns [] when nothing is cached. */
 export async function getCachedProducts() {
   return offlineDb.products.toArray();
+}
+
+/** Persist (or replace) the customer snapshot (for offline QARZGA sales). */
+export async function cacheCustomers(list) {
+  if (!Array.isArray(list)) return;
+  const now = Date.now();
+  await offlineDb.transaction('rw', offlineDb.customers, async () => {
+    await offlineDb.customers.clear();
+    await offlineDb.customers.bulkAdd(list.map((c) => ({ ...c, updatedAt: now })));
+  });
+}
+
+/** Read the cached customer list. Returns [] when nothing is cached. */
+export async function getCachedCustomers() {
+  return offlineDb.customers.toArray();
 }
 
 /** Enqueue a checkout payload to flush when connectivity returns. */

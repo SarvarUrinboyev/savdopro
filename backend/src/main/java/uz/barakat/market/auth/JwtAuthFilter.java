@@ -43,11 +43,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwt;
     private final AuthService auth;
     private final AccountRepository accounts;
+    private final int graceDays;
 
-    public JwtAuthFilter(JwtService jwt, AuthService auth, AccountRepository accounts) {
+    public JwtAuthFilter(JwtService jwt, AuthService auth, AccountRepository accounts,
+                         @org.springframework.beans.factory.annotation.Value(
+                                 "${savdopro.subscription.grace-days:3}") int graceDays) {
         this.jwt = jwt;
         this.auth = auth;
         this.accounts = accounts;
+        this.graceDays = Math.max(0, graceDays);
     }
 
     @Override
@@ -106,8 +110,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
                 Object subExpClaim = claims.get("subExp");
                 long subExp = (subExpClaim instanceof Number num) ? num.longValue() : -1L;
-                boolean expired = subExp >= 0 && subExp < LocalDate.now().toEpochDay();
-                if (expired && isMutating(request.getMethod())) {
+                // Grace window: writes survive `grace-days` past expiry so a
+                // shop isn't bricked mid-day the moment the clock rolls over —
+                // dunning SMS (license server) nudges renewal during it. After
+                // the window, mutating verbs are refused; reads stay open so
+                // the owner can always reach reports + the billing page.
+                boolean pastGrace = subExp >= 0
+                        && subExp + graceDays < LocalDate.now().toEpochDay();
+                if (pastGrace && isMutating(request.getMethod())) {
                     writeForbidden(response, "SUBSCRIPTION_EXPIRED",
                             "Obuna muddati tugagan. Davom etish uchun tarifni yangilang.");
                     return;

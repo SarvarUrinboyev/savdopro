@@ -33,7 +33,7 @@ Tenant isolation is enforced **in the persistence layer**, not in business code:
 | Database | 47 Flyway migrations (34 backend + 13 license) |
 | Releases | **35 tagged releases** (v1.4 → v2.3) across 145 conventional commits |
 | Public API | API keys + OpenAPI docs + webhooks |
-| Notable | AI sales-anomaly detection · IMEI/Apple-ID device tracking · MXIK national-catalogue barcode auto-fill |
+| Notable | LLM assistant (multi-provider, tool-calling) · rule-based sales-anomaly detection with real-time alerts · recency-weighted demand forecasting · IMEI/Apple-ID device tracking · MXIK national-catalogue barcode auto-fill |
 
 ## Security
 

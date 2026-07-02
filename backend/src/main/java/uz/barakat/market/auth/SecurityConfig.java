@@ -87,7 +87,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
-                                           ApiKeyAuthFilter apiKeyFilter, Environment env)
+                                           ApiKeyAuthFilter apiKeyFilter,
+                                           MetricsScrapeTokenFilter metricsFilter,
+                                           Environment env)
             throws Exception {
         boolean prod = env.acceptsProfiles(Profiles.of("prod"));
         http
@@ -239,7 +241,12 @@ public class SecurityConfig {
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 // API-key auth runs BEFORE the JWT filter; it acts only on sk_live_
                 // tokens / X-Api-Key and leaves JWT bearer tokens untouched.
-                .addFilterBefore(apiKeyFilter, JwtAuthFilter.class);
+                .addFilterBefore(apiKeyFilter, JwtAuthFilter.class)
+                // Metrics scrape token runs AFTER the JWT filter: JwtAuthFilter
+                // clears the context when a bearer token fails to parse as a JWT
+                // (which the opaque scrape token always does), so this filter has
+                // to authenticate the scraper afterwards.
+                .addFilterAfter(metricsFilter, JwtAuthFilter.class);
         return http.build();
     }
 

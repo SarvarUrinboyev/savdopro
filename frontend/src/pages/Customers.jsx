@@ -167,6 +167,7 @@ export function Customers() {
                     <th>{t('Ism')}</th>
                     <th>{t('Telefon')}</th>
                     <th>{t('Manzil')}</th>
+                    <th className="num">⭐ {t('Ball')}</th>
                     <th className="num">{t('Holat')}</th>
                     <th />
                   </tr>
@@ -183,6 +184,13 @@ export function Customers() {
                         <td className="name-cell">{c.name}</td>
                         <td className="faint mono">{c.phone || '—'}</td>
                         <td className="faint">{c.address || '—'}</td>
+                        <td className="num mono">
+                          {Number(c.pointsBalance) > 0
+                            ? <span style={{ color: '#d97706', fontWeight: 700 }}>
+                                {Number(c.pointsBalance).toLocaleString()}
+                              </span>
+                            : <span className="faint">—</span>}
+                        </td>
                         <td className="num">
                           {info.amount === 0 ? (
                             <span className="balance-pill zero">

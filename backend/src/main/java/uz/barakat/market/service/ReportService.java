@@ -46,6 +46,9 @@ public class ReportService {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(ReportService.class);
+
     private final ExpenseRepository expenses;
     private final HomeExpenseRepository homeExpenses;
     private final OrderRepository orders;
@@ -57,13 +60,17 @@ public class ReportService {
     private final MoneyConverter converter;
     private final SaleRepository sales;
     private final ProductRepository products;
+    private final EmailService emailService;
+    private final String reportEmailTo;
 
     public ReportService(ExpenseRepository expenses, HomeExpenseRepository homeExpenses,
                          OrderRepository orders, DebtorRepository debtors,
                          CustomerDebtRepository customerDebts, ShiftRepository shifts,
                          BalanceService balanceService, TelegramService telegramService,
                          MoneyConverter converter, SaleRepository sales,
-                         ProductRepository products) {
+                         ProductRepository products, EmailService emailService,
+                         @org.springframework.beans.factory.annotation.Value(
+                                 "${app.email.report-to:}") String reportEmailTo) {
         this.expenses = expenses;
         this.homeExpenses = homeExpenses;
         this.orders = orders;
@@ -75,6 +82,8 @@ public class ReportService {
         this.converter = converter;
         this.sales = sales;
         this.products = products;
+        this.emailService = emailService;
+        this.reportEmailTo = reportEmailTo == null ? "" : reportEmailTo.trim();
     }
 
     /** Full end-of-day report for a date, with the rendered receipt text. */
@@ -133,10 +142,24 @@ public class ReportService {
                 expenseDtos, homeDtos, renderReceipt(report));
     }
 
-    /** Builds today/that-date's report and pushes it to Telegram. */
+    /**
+     * Builds today/that-date's report and pushes it to Telegram, plus an
+     * email copy when OWNER_REPORT_EMAIL + SMTP are configured — the owner
+     * still gets the daily numbers if Telegram is blocked on their network.
+     */
     public EndOfDayReport sendToTelegram(LocalDate date) {
         EndOfDayReport report = forDate(date);
-        telegramService.sendMessage(renderTelegram(report));
+        String text = renderTelegram(report);
+        telegramService.sendMessage(text);
+        if (!reportEmailTo.isBlank() && emailService.isUsable()) {
+            try {
+                emailService.send(reportEmailTo,
+                        "SavdoPRO kunlik hisobot — " + date.format(DATE), text);
+            } catch (RuntimeException ex) {
+                // Email nusxasi best-effort: Telegram yo'li asosiy kanal.
+                log.warn("Daily report email failed: {}", ex.toString());
+            }
+        }
         return report;
     }
 

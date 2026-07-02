@@ -1,0 +1,98 @@
+# =====================================================================
+#  /etc/nginx/sites-available/savdopro   (symlink into sites-enabled/)
+#  Public ingress. Backend 127.0.0.1:8086, License 127.0.0.1:9090.
+#  Replace __NEW_HOST__ with the new server's public host (e.g. its own
+#  <dashed-ip>.nip.io or a real domain). Get a cert first:
+#     sudo apt install certbot python3-certbot-nginx
+#     sudo certbot --nginx -d __NEW_HOST__
+#
+#  Security headers (HSTS, CSP, Referrer-Policy, Permissions-Policy,
+#  X-Frame-Options, X-Content-Type-Options) are emitted by the APP and pass
+#  through nginx — do NOT duplicate CSP here. X-Forwarded-Proto below is what
+#  lets the app emit HSTS, so keep it on every proxy location.
+# =====================================================================
+
+# Port 80: ACME challenge + redirect to HTTPS.
+# (The old server also used :80 as a cloudflared-tunnel target with no redirect;
+#  if you front this with a Cloudflare Tunnel instead of direct HTTPS, proxy the
+#  same locations here on :80 and drop the redirect.)
+server {
+    listen 80 default_server;
+    server_name __NEW_HOST__;
+    client_max_body_size 64m;
+    location /.well-known/acme-challenge/ { root /var/www/html; }
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    server_name __NEW_HOST__;
+    ssl_certificate     /etc/letsencrypt/live/__NEW_HOST__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__NEW_HOST__/privkey.pem;
+    client_max_body_size 64m;
+
+    # Auth / admin / billing → LICENSE server (9090)
+    location ~ ^/api/(auth|admin|billing)/ {
+        proxy_pass http://127.0.0.1:9090;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    # Electron auto-update manifest (served from disk).
+    location = /update.json {
+        alias /opt/barakat/update.json;
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Content-Type application/json;
+    }
+
+    # Long-running accounting backfill — needs a big read timeout (default /api/
+    # is 60s, which 504s on a large ledger backfill). Exact match wins over /api/.
+    location = /api/accounting/backfill {
+        proxy_pass http://127.0.0.1:8086;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 600s;
+    }
+
+    # AI assistant (LLM chains) — longer timeout.
+    location /api/ai/ {
+        proxy_pass http://127.0.0.1:8086;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 180s;
+    }
+
+    # Everything else under /api → BACKEND (8086)
+    location /api/ {
+        proxy_pass http://127.0.0.1:8086;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 60s;
+    }
+
+    # WebSocket (live sales feed).
+    location /ws {
+        proxy_pass http://127.0.0.1:8086;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+    }
+
+    # SPA + static (bundled in the backend jar).
+    location / {
+        proxy_pass http://127.0.0.1:8086;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+}

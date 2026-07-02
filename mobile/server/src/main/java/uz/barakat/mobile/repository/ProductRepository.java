@@ -8,8 +8,13 @@ import org.springframework.data.repository.query.Param;
 import uz.barakat.mobile.domain.Product;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
+
+    Optional<Product> findBySourceProductId(Long sourceProductId);
+
+    List<Product> findBySourceProductIdIsNotNull();
 
     @Query("""
         SELECT p FROM Product p

@@ -12,7 +12,7 @@ import { useApi } from '../hooks/useApi.js';
 import { useOnline } from '../hooks/useOnline.js';
 import { useVoiceInput } from '../hooks/useVoiceInput.js';
 import {
-  cacheProducts, cancelQueued, clearOldSynced, enqueueCheckout, failedCount, flushQueue,
+  cacheCustomers, cacheProducts, cancelQueued, clearOldSynced, enqueueCheckout, failedCount, flushQueue, getCachedCustomers,
   getCachedProducts, listQueue, pendingCount, pendingProductQuantities, retryQueued,
 } from '../lib/offlineDb.js';
 import { normalizeBarcode } from '../lib/barcode.js';
@@ -132,7 +132,19 @@ export function Pos() {
   }, []);
   const { data: products, loading, error: productError, reload: reloadProducts } =
     useApi(loadProducts, [loadProducts]);
-  const { data: customers } = useApi(() => CustomerApi.list().catch(() => []), []);
+  // Customers mirror the product snapshot: cache online, fall back offline —
+  // a QARZGA sale can then still pick its customer and queue the checkout.
+  const loadCustomers = useCallback(async () => {
+    try {
+      const list = await CustomerApi.list();
+      await cacheCustomers(list);
+      return list;
+    } catch (err) {
+      const cached = await getCachedCustomers();
+      return cached.length > 0 ? cached : [];
+    }
+  }, []);
+  const { data: customers } = useApi(loadCustomers, [loadCustomers]);
 
   // ----- receipts (multi-check, like the register's Chek № tabs) -----
   const [checks, setChecks] = useState(() => [newCheckObj()]);
@@ -1191,7 +1203,18 @@ export function Pos() {
               />
             </div>
             <div className="field" style={{ margin: 0 }}>
-              <label>{t('Mijoz')} ({t('ixtiyoriy')})</label>
+              <label>
+                {t('Mijoz')} ({t('ixtiyoriy')})
+                {(() => {
+                  const sel = (customers || []).find(
+                    (c) => String(c.id) === String(activeCheck.customerId));
+                  return sel && Number(sel.pointsBalance) > 0
+                    ? <span style={{ marginLeft: 6, fontWeight: 700, color: '#d97706' }}>
+                        ⭐ {Number(sel.pointsBalance).toLocaleString()} {t('ball')}
+                      </span>
+                    : null;
+                })()}
+              </label>
               <select
                 className="input"
                 value={activeCheck.customerId}
@@ -1199,7 +1222,9 @@ export function Pos() {
               >
                 <option value="">—</option>
                 {(customers || []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}{Number(c.pointsBalance) > 0 ? ` (⭐${c.pointsBalance})` : ''}
+                  </option>
                 ))}
               </select>
             </div>

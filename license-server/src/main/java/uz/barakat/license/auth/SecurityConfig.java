@@ -35,7 +35,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter)
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
+                                           MetricsScrapeTokenFilter metricsFilter)
             throws Exception {
         http
                 .cors(c -> c.configurationSource(corsSource()))
@@ -82,7 +83,12 @@ public class SecurityConfig {
                         .anyRequest().permitAll())
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                // Metrics scrape token runs AFTER the JWT filter: JwtAuthFilter
+                // clears the context when a bearer token fails to parse as a JWT
+                // (which the opaque scrape token always does), so this filter has
+                // to authenticate the scraper afterwards.
+                .addFilterAfter(metricsFilter, JwtAuthFilter.class);
         return http.build();
     }
 

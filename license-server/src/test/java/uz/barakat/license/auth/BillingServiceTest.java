@@ -33,6 +33,7 @@ class BillingServiceTest {
 
     @Mock private PaymentRepository payments;
     @Mock private AccountRepository accounts;
+    @Mock private SmsProvider sms;
     @InjectMocks private BillingService billing;
 
     @Test

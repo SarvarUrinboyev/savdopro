@@ -1,0 +1,38 @@
+# =====================================================================
+#  /etc/systemd/system/savdopro-license.service   (clean deploy template)
+#  After editing:  systemctl daemon-reload && systemctl enable --now savdopro-license
+#  Start the LICENSE server BEFORE the backend (backend After= it).
+# =====================================================================
+[Unit]
+Description=SavdoPRO License Server (port 9090)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# See backend unit for the dedicated-user recommendation (savdopro-license).
+User=root
+WorkingDirectory=/opt/savdopro
+EnvironmentFile=/etc/savdopro/license.env
+# Sized for a 2 GB box. 4 GB: -Xmx384m, MemoryMax=512M.
+# 1 GB legacy: -Xmx200m -Xms64m -XX:+UseSerialGC, MemoryMax=280M.
+ExecStart=/usr/bin/java -Xmx256m -Xms128m -XX:+UseG1GC \
+    -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/opt/savdopro/heapdump.hprof \
+    -jar /opt/savdopro/savdopro-license-server.jar
+Restart=always
+RestartSec=10
+StartLimitBurst=999
+StartLimitInterval=0
+MemoryMax=384M
+MemorySwapMax=200M
+OOMScoreAdjust=-100
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=savdopro-license
+NoNewPrivileges=true
+# NOTE: while the license DB is H2, /opt/savdopro must stay writable
+# (license-data.mv.db). If you enable ProtectSystem=strict, add
+#   ReadWritePaths=/opt/savdopro
+
+[Install]
+WantedBy=multi-user.target

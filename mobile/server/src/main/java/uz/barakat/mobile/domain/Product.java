@@ -43,6 +43,17 @@ public class Product extends BaseEntity {
     @JoinColumn(name = "category_id")
     private Category category;
 
+    /**
+     * POS backend'dagi mahsulot IDsi (CatalogSyncService upsert kaliti).
+     * null = qo'lda kiritilgan mahsulot — sinxron unga hech qachon tegmaydi.
+     */
+    @Column(name = "source_product_id", unique = true)
+    private Long sourceProductId;
+
+    /** Shtrix-kod (POS'dan sinxronlanadi; qidiruv/moslashtirish uchun). */
+    @Column(length = 64)
+    private String barcode;
+
     public boolean isInStock() { return active && stockQty > 0; }
 
     public Integer getDiscountPercent() {
@@ -70,4 +81,8 @@ public class Product extends BaseEntity {
     public void setPopular(boolean popular) { this.popular = popular; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
+    public Long getSourceProductId() { return sourceProductId; }
+    public void setSourceProductId(Long sourceProductId) { this.sourceProductId = sourceProductId; }
+    public String getBarcode() { return barcode; }
+    public void setBarcode(String barcode) { this.barcode = barcode; }
 }

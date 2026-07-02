@@ -187,6 +187,7 @@ public class AiChatService {
                 + "ACTION DISCOUNT | <mahsulot nomi> | <foiz>\n"
                 + "ACTION PRICE | <mahsulot nomi> | <foiz>\n"
                 + "ACTION NOTIFY | <mijoz nomi> |\n"
+                + "ACTION NOTIFY_ALL | overdue | <necha kundan beri kechikkan>\n"
                 + "Faqat asboblardan kelgan HAQIQIY nom yoz. Amal kerak bo'lmasa, ACTION yozma.";
 
         StringBuilder ctx = new StringBuilder();

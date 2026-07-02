@@ -99,6 +99,11 @@ export function AiChatWidget() {
       } else if (a.type === 'NOTIFY') {
         const r = await CustomerApi.notify(a.params.customerId, { template: 'DEBT' });
         toast.success(t('Eslatma yuborildi') + (r?.channel ? ` (${r.channel})` : ''));
+      } else if (a.type === 'NOTIFY_ALL') {
+        const r = await CustomerApi.remindDebtors();
+        const sent = (r?.telegram ?? 0) + (r?.sms ?? 0);
+        toast.success(`${t('Eslatma yuborildi')}: ${sent}/${r?.debtors ?? 0} ${t('mijoz')}`
+          + (r?.noChannel ? ` (${r.noChannel} ${t('kanalsiz')})` : ''));
       }
       setConfirm(null);
     } catch (err) {
@@ -115,6 +120,9 @@ export function AiChatWidget() {
     }
     if (a.type === 'NOTIFY') {
       return `"${a.params.customerName}" mijozga qarz eslatmasi yuborilsinmi? (${a.detail})`;
+    }
+    if (a.type === 'NOTIFY_ALL') {
+      return t('BARCHA qarzdor mijozlarga qarz eslatmasi yuborilsinmi? Har biriga o\'z kanalida (Telegram/SMS) ketadi.');
     }
     return t('Davom etamizmi?');
   };

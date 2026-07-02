@@ -1,0 +1,16 @@
+# Telegram contact point for Grafana-managed alerts. The two env vars are
+# passed into the container by docker-compose.monitoring.yml; when they are
+# empty, alerts still evaluate and show in the Grafana UI, delivery just
+# fails silently — set them to actually get pinged.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: telegram-owner
+    receivers:
+      - uid: telegram-owner
+        type: telegram
+        settings:
+          bottoken: ${TELEGRAM_BOT_TOKEN}
+          chatid: "${TELEGRAM_ALERT_CHAT_ID}"
+        disableResolveMessage: false

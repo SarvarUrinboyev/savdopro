@@ -51,6 +51,53 @@ jobs:
           chmod +x ./mvnw
           ./mvnw -B --no-transfer-progress test
 
+  # Proves the license Flyway chain (V1..V13) + Hibernate validate run
+  # cleanly on REAL PostgreSQL — the H2->PG migration's schema guarantee
+  # (docs/ops/license-server-postgres-migration-plan.md step 2). The unit
+  # suite stays on H2; this boots the full context once against PG.
+  license-postgres:
+    name: License Flyway on Postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: license
+          POSTGRES_PASSWORD: license
+          POSTGRES_DB: savdopro_license
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U license"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: license-server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Context smoke on PostgreSQL
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/savdopro_license
+          SPRING_DATASOURCE_USERNAME: license
+          SPRING_DATASOURCE_PASSWORD: license
+          # application-test.properties pins H2 driver + dialect literals for
+          # the unit suite; only EXACT-name env vars outrank a profile file,
+          # so use spring.datasource.driver-class-name's relaxed-binding name
+          # (SPRING_DATASOURCE_DRIVER alone would only feed the ${...}
+          # placeholder in main application.properties, which the test file
+          # overrides — verified locally).
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+          SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B --no-transfer-progress test -Dtest=LicenseContextSmokeTest
+
   frontend:
     name: Frontend build
     runs-on: ubuntu-latest
@@ -66,3 +113,59 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  # Full-stack smoke E2E: builds the real images (SPA baked into the jar),
+  # boots the staging compose with the guarded demo seed, and drives the UI
+  # with Playwright (landing → login → dashboard → POS). Catches what unit
+  # tests can't: a broken SPA bundle, license<->backend JWT drift, dead
+  # routes/chunks.
+  e2e:
+    name: E2E smoke (staging stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Boot staging stack
+        run: |
+          docker compose -f docker-compose.staging.yml up -d --build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Wait for stack health
+        run: |
+          ok=0
+          for i in $(seq 1 60); do
+            sleep 3
+            curl -sf -m3 http://localhost:19090/actuator/health >/dev/null 2>&1 \
+              && curl -sf -m3 http://localhost:28086/actuator/health >/dev/null 2>&1 \
+              && { ok=1; break; }
+          done
+          [ "$ok" = "1" ] || {
+            echo "::error::staging stack failed to become healthy"
+            docker compose -f docker-compose.staging.yml logs --tail 100
+            exit 1
+          }
+          # Give the guarded demo seeders a moment past first health.
+          sleep 10
+      - name: Run Playwright smoke
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://localhost:28086
+          E2E_LICENSE_URL: http://localhost:19090
+          DEMO_SEED_PASSWORD: DemoStaging2026
+        run: npx playwright test
+      - name: Stack logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.staging.yml logs --tail 200
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

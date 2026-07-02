@@ -56,6 +56,14 @@ export function Billing() {
   const s = data || {};
   const isTrial = s.plan === 'TRIAL';
   const soon = !s.expired && s.daysRemaining <= 3;
+  // Mirrors the backend's savdopro.subscription.grace-days default. Wording
+  // only — enforcement stays server-side, a mismatch just softens the text.
+  const GRACE_DAYS = 3;
+  const daysSinceExpiry = s.expired && s.subscriptionExpires
+    ? Math.max(0, Math.floor((Date.now() - new Date(s.subscriptionExpires).getTime()) / 86400000))
+    : 0;
+  const graceLeft = GRACE_DAYS - daysSinceExpiry;
+  const inGrace = s.expired && graceLeft > 0;
   const userPct = s.maxUsers ? Math.min(100, Math.round((s.currentUsers / s.maxUsers) * 100)) : 0;
   const statusColor = s.expired ? '#dc2626' : soon ? '#d97706' : '#16a34a';
   const statusText = s.expired ? t('Muddati tugagan') : `${s.daysRemaining} ${t('kun qoldi')}`;
@@ -91,11 +99,13 @@ export function Billing() {
       {(s.expired || soon) && (
         <div style={{
           margin: '12px 0', padding: '12px 16px', borderRadius: 10,
-          background: s.expired ? '#fee2e2' : '#fef3c7',
-          color: s.expired ? '#991b1b' : '#92400e', fontWeight: 600,
+          background: (s.expired && !inGrace) ? '#fee2e2' : '#fef3c7',
+          color: (s.expired && !inGrace) ? '#991b1b' : '#92400e', fontWeight: 600,
         }}>
           {s.expired
-            ? t('Obuna muddati tugadi — faqat o\'qish rejimi. Ishni davom ettirish uchun tarifni yangilang.')
+            ? (inGrace
+                ? `${t('Obuna muddati tugadi. Savdo kiritish')} ${graceLeft} ${t('kundan keyin to\'xtaydi — hozir to\'lasangiz uzilish bo\'lmaydi.')}`
+                : t('Obuna muddati tugadi — faqat o\'qish rejimi. Ishni davom ettirish uchun tarifni yangilang.'))
             : `${t('Sinov muddati tugashiga')} ${s.daysRemaining} ${t('kun qoldi.')}`}
         </div>
       )}
