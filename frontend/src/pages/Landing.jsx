@@ -306,7 +306,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="lp-section">
+      <section className="lp-section" id="pricing">
         <h2 className="lp-h2">{t('Oddiy narxlar')}</h2>
         <p className="lp-h2-sub">{t('Har bir reja 3 kunlik bepul sinov bilan boshlanadi.')}</p>
         <div className="lp-plans">
@@ -334,7 +334,7 @@ export function Landing() {
       </section>
 
       {/* PHASE D — premium conversion band */}
-      <section className="lp-section">
+      <section className="lp-section" id="cta">
         <div className="cta2">
           <div className="cta2-copy">
             <h2 className="cta2-title">{t('Bugun bepul boshlang')}</h2>
@@ -364,26 +364,44 @@ export function Landing() {
       </section>
 
       <footer className="lpf">
-        <div className="lpf-main">
-          <div className="lpf-brand">
-            <div className="lp-logo">SavdoPRO <span className="lp-logo-tag">POS</span></div>
-            <p className="lpf-tag">{t("O'zbekiston bizneslari uchun bulutli savdo boshqaruv tizimi.")}</p>
+        <div className="lpf-glow" aria-hidden="true" />
+        <div className="lpf-in">
+          <div className="lpf-main">
+            <div className="lpf-brand">
+              <div className="lpf-logo">SavdoPRO <span className="lpf-logo-tag">POS</span></div>
+              <p className="lpf-tag">
+                {t("O'zbekiston bizneslari uchun bulutli savdo boshqaruv tizimi — kassa, ombor, mijozlar va AI tahlil bitta platformada.")}
+              </p>
+              <div className="lpf-badges">
+                <span className="lpf-badge">☁️ {t('Bulutda')}</span>
+                <span className="lpf-badge">🤖 {t('AI yordamchi')}</span>
+                <span className="lpf-badge">📴 {t('Offline kassa')}</span>
+                <span className="lpf-badge">🇺🇿 {t("O'zbekcha")}</span>
+              </div>
+            </div>
+            <div className="lpf-col">
+              <div className="lpf-col-h">{t('Mahsulot')}</div>
+              <a href="#about" className="lpf-link">{t('Dastur haqida')}</a>
+              <a href="#pricing" className="lpf-link">{t('Tariflar')}</a>
+              <Link to="/login" className="lpf-link">{t('Kirish')}</Link>
+            </div>
+            <div className="lpf-col">
+              <div className="lpf-col-h">{t('Yordam')}</div>
+              <a href="#contact" className="lpf-link">{t('Bog\'lanish')}</a>
+              <a href="#contact" className="lpf-link">{t('Demo so\'rash')}</a>
+              <a href="#contact" className="lpf-link">{t('Texnik yordam')}</a>
+            </div>
+            <div className="lpf-cta">
+              <div className="lpf-cta-h">{t('Bugun boshlang')}</div>
+              <p className="lpf-cta-p">{t('3 kun bepul, karta shart emas.')}</p>
+              <Link to="/register" className="btn lpf-cta-btn">{t('Bepul boshlash')} →</Link>
+            </div>
           </div>
-          <div className="lpf-col">
-            <div className="lpf-col-h">{t('Mahsulot')}</div>
-            <a href="#about" className="lpf-link">{t('Dastur haqida')}</a>
-            <Link to="/register" className="lpf-link">{t('Bepul boshlash')}</Link>
-            <Link to="/login" className="lpf-link">{t('Kirish')}</Link>
+          <div className="lpf-bar">
+            <span className="lpf-copy">© 2026 SavdoPRO — {t('Barcha huquqlar himoyalangan')}</span>
+            <span className="lpf-status"><i className="lpf-dot" /> {t('Tizim ishlamoqda')}</span>
+            <span className="lpf-copy">{t('Ish vaqti')}: Du–Sha, 9:00–18:00</span>
           </div>
-          <div className="lpf-col">
-            <div className="lpf-col-h">{t('Bog‘lanish')}</div>
-            <a href="#contact" className="lpf-link">{t('Bog\'lanish')}</a>
-            <Link to="/register" className="lpf-link">{t('Ro\'yxatdan o\'tish')}</Link>
-          </div>
-        </div>
-        <div className="lpf-bar">
-          <span className="lpf-copy">© 2026 SavdoPRO</span>
-          <span className="lpf-copy">{t('Ish vaqti')}: Du–Sha, 9:00–18:00</span>
         </div>
       </footer>
     </div>
