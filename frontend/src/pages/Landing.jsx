@@ -294,6 +294,7 @@ export function Landing() {
         <div className="ds-timeline">
           {STEPS.map((s, i) => (
             <div key={s.n} className="ds-step">
+              <span className="ds-step-ghost" aria-hidden="true">{`0${s.n}`}</span>
               <div className="ds-step-top">
                 <span className="ds-step-ico">{s.icon}</span>
                 {i < STEPS.length - 1 && <span className="ds-step-line" />}
@@ -311,23 +312,25 @@ export function Landing() {
         <p className="lp-h2-sub">{t('Har bir reja 3 kunlik bepul sinov bilan boshlanadi.')}</p>
         <div className="lp-plans">
           {PLANS.map((p) => (
-            <div key={p.key} className={`lp-plan card${p.featured ? ' lp-plan-featured' : ''}`}>
-              {p.featured && <div className="lp-plan-badge">{t('Ommabop')}</div>}
+            <div key={p.key} className={`lp-plan${p.featured ? ' lp-plan-featured' : ''}`}>
+              {p.featured && <div className="lp-plan-badge">⭐ {t('Eng ommabop')}</div>}
               <div className="lp-plan-name">{t(p.name)}</div>
               <div className="lp-plan-price">
                 {money(p.priceUzs)} <span className="lp-plan-per">{t('so\'m/oy')}</span>
               </div>
               <div className="lp-plan-limits">
-                {p.users} {t('foydalanuvchi')} · {p.shops} {t("do'kon")}
+                <span className="lp-plan-chip">👥 {p.users} {t('foydalanuvchi')}</span>
+                <span className="lp-plan-chip">🏪 {p.shops} {t("do'kon")}</span>
               </div>
               <ul className="lp-plan-perks">
                 {p.perks.map((perk) => (
-                  <li key={perk}>✓ {t(perk)}</li>
+                  <li key={perk}><i className="lp-perk-check">✓</i> {t(perk)}</li>
                 ))}
               </ul>
-              <Link to="/register" className={`btn lp-plan-cta ${p.featured ? 'btn-primary' : ''}`}>
-                {t('Tanlash')}
+              <Link to="/register" className="btn lp-plan-cta">
+                {t('Tanlash')} →
               </Link>
+              <div className="lp-plan-note">{t('3 kun bepul — karta shart emas')}</div>
             </div>
           ))}
         </div>
